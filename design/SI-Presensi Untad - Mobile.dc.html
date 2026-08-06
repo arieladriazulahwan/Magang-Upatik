@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+.scr::-webkit-scrollbar{width:0;height:0}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+@keyframes fadeUp{from{opacity:0;transform:translate(-50%,8px)}to{opacity:1;transform:translate(-50%,0)}}
+@keyframes scanline{0%{top:14%}100%{top:80%}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{opacity:.55;transform:scale(1)}50%{opacity:1;transform:scale(1.04)}}
+@keyframes ring{0%{transform:scale(.7);opacity:.7}100%{transform:scale(1.5);opacity:0}}
+@keyframes floatY{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
+@keyframes dotB{0%,80%,100%{transform:scale(.55);opacity:.3}40%{transform:scale(1);opacity:1}}
+</style>
+</helmet>
+
+<div style="min-height:100vh;width:100%;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% -10%,#1b2c49,#0c1626 62%);padding:22px;font-family:'Plus Jakarta Sans',system-ui,sans-serif">
+
+  <!-- ===================== PHONE BEZEL ===================== -->
+  <div style="position:relative;width:412px;height:892px;flex:none;border-radius:48px;background:#080b12;padding:7px;box-shadow:0 50px 100px rgba(8,18,38,.6),0 0 0 2px #20232c,inset 0 0 0 1px #000">
+    <div style="position:relative;width:100%;height:100%;border-radius:41px;overflow:hidden;background:#0d2747;display:flex;flex-direction:column">
+
+      <!-- STATUS BAR -->
+      <div style="height:42px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 22px;position:relative;background:{{ topColor }};z-index:6">
+        <span style="font-size:13px;font-weight:700;letter-spacing:.3px;color:{{ sbIcon }}">{{ clock }}</span>
+        <div style="position:absolute;left:50%;top:11px;transform:translateX(-50%);width:11px;height:11px;border-radius:50%;background:#05070b"></div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <svg width="18" height="13" viewBox="0 0 18 13" fill="{{ sbIcon }}"><rect x="0" y="9" width="3" height="4" rx="1"></rect><rect x="5" y="6" width="3" height="7" rx="1"></rect><rect x="10" y="3" width="3" height="10" rx="1"></rect><rect x="15" y="0" width="3" height="13" rx="1"></rect></svg>
+          <svg width="16" height="13" viewBox="0 0 16 13" fill="{{ sbIcon }}"><path d="M8 11.6l7.4-7.4a10.4 10.4 0 0 0-14.8 0L8 11.6z"></path></svg>
+          <svg width="24" height="13" viewBox="0 0 25 13" fill="none"><rect x="1" y="1.4" width="20" height="10.2" rx="2.6" stroke="{{ sbIcon }}" stroke-width="1.3" opacity=".55"></rect><rect x="3" y="3.4" width="14" height="6.2" rx="1.3" fill="{{ sbIcon }}"></rect><rect x="22.4" y="4.4" width="2" height="4.2" rx="1" fill="{{ sbIcon }}" opacity=".55"></rect></svg>
+        </div>
+      </div>
+
+      <!-- SCREEN AREA -->
+      <div class="scr" style="position:relative;flex:1;overflow-y:auto;overflow-x:hidden">
+
+        <!-- ===================== SPLASH ===================== -->
+        <sc-if value="{{ isSplash }}" hint-placeholder-val="{{ true }}">
+        <div onClick="{{ splashSkip }}" style="min-height:100%;background:linear-gradient(165deg,#0d2747 0%,#11315a 54%,#0a1d36 100%);color:#fff;position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 30px;cursor:pointer">
+          <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.045) 1px,transparent 1px);background-size:42px 42px"></div>
+          <div style="position:absolute;width:360px;height:360px;border-radius:50%;background:radial-gradient(circle,rgba(59,130,246,.3),transparent 70%);top:-150px;right:-120px"></div>
+          <div style="position:absolute;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(13,148,136,.2),transparent 70%);bottom:-90px;left:-110px"></div>
+
+          <div style="position:relative;display:flex;align-items:center;justify-content:center;width:200px;height:200px">
+            <div style="position:absolute;width:150px;height:150px;border-radius:50%;border:1.5px solid rgba(96,165,250,.4);animation:ring 2.8s ease-out infinite"></div>
+            <div style="position:absolute;width:150px;height:150px;border-radius:50%;border:1.5px solid rgba(96,165,250,.3);animation:ring 2.8s ease-out infinite;animation-delay:.9s"></div>
+            <div style="position:absolute;width:150px;height:150px;border-radius:50%;border:1.5px solid rgba(96,165,250,.22);animation:ring 2.8s ease-out infinite;animation-delay:1.8s"></div>
+
+            <div style="position:relative;width:108px;height:108px;border-radius:30px;background:linear-gradient(135deg,#3b82f6,#1d4ed8);display:flex;align-items:center;justify-content:center;overflow:hidden;box-shadow:0 18px 40px rgba(29,78,216,.55);animation:floatY 3.4s ease-in-out infinite">
+              <div style="position:absolute;width:66px;height:78px;border:2.5px dashed rgba(255,255,255,.55);border-radius:50% 50% 47% 47%"></div>
+              <svg viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="#fff" stroke-width="1.2"><circle cx="12" cy="9.5" r="4.2"></circle><path d="M4.5 21a7.5 7.5 0 0 1 15 0"></path></svg>
+              <div style="position:absolute;left:12%;right:12%;height:2.5px;background:linear-gradient(90deg,transparent,#dbeafe,transparent);box-shadow:0 0 14px #93c5fd;animation:scanline 2.4s ease-in-out infinite alternate"></div>
+            </div>
+          </div>
+
+          <div style="position:relative;text-align:center;margin-top:30px">
+            <div style="font-size:31px;font-weight:800;letter-spacing:-.6px">KlikPresensi</div>
+            <div style="font-size:13px;color:#a8c4e6;font-weight:600;margin-top:8px">Presensi Cerdas Wajah &amp; Lokasi</div>
+          </div>
+
+          <div style="position:relative;display:flex;align-items:center;gap:11px;margin-top:20px">
+            <div style="width:26px;height:1px;background:rgba(255,255,255,.2)"></div>
+            <div style="font-size:10.5px;letter-spacing:2px;color:#8fb4e8;font-weight:700">UNIVERSITAS TADULAKO</div>
+            <div style="width:26px;height:1px;background:rgba(255,255,255,.2)"></div>
+          </div>
+
+          <div style="position:absolute;bottom:46px;left:0;right:0;display:flex;flex-direction:column;align-items:center;gap:16px">
+            <div style="display:flex;align-items:center;gap:7px">
+              <span style="width:9px;height:9px;border-radius:50%;background:#60a5fa;animation:dotB 1.4s ease-in-out infinite"></span>
+              <span style="width:9px;height:9px;border-radius:50%;background:#60a5fa;animation:dotB 1.4s ease-in-out infinite;animation-delay:.2s"></span>
+              <span style="width:9px;height:9px;border-radius:50%;background:#60a5fa;animation:dotB 1.4s ease-in-out infinite;animation-delay:.4s"></span>
+            </div>
+            <div style="font-size:11px;color:#7f9bc4;font-weight:600">Versi 1.0.0 · SSO SIGA8</div>
+          </div>
+        </div>
+        </sc-if>
+
+        <!-- ===================== LOGIN ===================== -->
+        <sc-if value="{{ isLogin }}" hint-placeholder-val="{{ false }}">
+        <div style="min-height:100%;background:linear-gradient(165deg,#0d2747 0%,#11315a 54%,#0a1d36 100%);color:#fff;position:relative;overflow:hidden;display:flex;flex-direction:column;padding:8px 26px 26px">
+          <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px);background-size:42px 42px"></div>
+          <div style="position:absolute;width:360px;height:360px;border-radius:50%;background:radial-gradient(circle,rgba(59,130,246,.32),transparent 70%);top:-150px;right:-130px"></div>
+          <div style="position:absolute;width:280px;height:280px;border-radius:50%;background:radial-gradient(circle,rgba(13,148,136,.22),transparent 70%);bottom:40px;left:-110px"></div>
+
+          <div style="position:relative;display:flex;align-items:center;gap:12px;margin-top:18px">
+            <div style="width:44px;height:44px;border-radius:13px;background:linear-gradient(135deg,#3b82f6,#1d4ed8);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;box-shadow:0 8px 22px rgba(29,78,216,.5)">KP</div>
+            <div><div style="font-weight:800;font-size:18px;letter-spacing:-.3px">KlikPresensi</div><div style="font-size:10px;letter-spacing:1.6px;color:#8fb4e8;font-weight:600">UNIVERSITAS TADULAKO</div></div>
+          </div>
+
+          <div style="position:relative;display:flex;flex-direction:column;align-items:center;margin-top:26px">
+            <div style="position:relative;width:92px;height:92px;border-radius:26px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;overflow:hidden">
+              <div style="position:absolute;width:60px;height:70px;border:2px dashed rgba(96,165,250,.55);border-radius:50% 50% 47% 47%"></div>
+              <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="rgba(255,255,255,.6)" stroke-width="1.1"><circle cx="12" cy="9.5" r="4.2"></circle><path d="M4.5 21a7.5 7.5 0 0 1 15 0"></path></svg>
+              <div style="position:absolute;left:14%;right:14%;height:2px;background:linear-gradient(90deg,transparent,#60a5fa,transparent);box-shadow:0 0 12px #60a5fa;animation:scanline 2.6s ease-in-out infinite alternate"></div>
+            </div>
+          </div>
+
+          <div style="position:relative;text-align:center;margin-top:16px">
+            <div style="font-size:22px;font-weight:800;line-height:1.2;letter-spacing:-.4px">Masuk ke akun Anda</div>
+            <div style="font-size:12.5px;color:#a8c4e6;font-weight:500;margin-top:7px;line-height:1.5">Gunakan NIP/username &amp; kata sandi kepegawaian Untad</div>
+          </div>
+
+          <!-- USERNAME -->
+          <div style="position:relative;margin-top:22px">
+            <div style="font-size:11.5px;font-weight:700;color:#8fb4e8;letter-spacing:.3px;margin-bottom:7px">NIP / Username</div>
+            <div style="position:relative;display:flex;align-items:center">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#7f9bc4" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="position:absolute;left:15px;pointer-events:none"><circle cx="12" cy="8" r="4"></circle><path d="M5 21a7 7 0 0 1 14 0"></path></svg>
+              <input type="text" value="{{ loginUser }}" onInput="{{ setUser }}" placeholder="198203152008011002" style="width:100%;height:52px;border:1px solid rgba(255,255,255,.16);border-radius:14px;background:rgba(255,255,255,.06);color:#fff;font-family:inherit;font-size:14px;font-weight:600;padding:0 15px 0 44px;outline:none" style-focus="border-color:#60a5fa;background:rgba(255,255,255,.1)" />
+            </div>
+          </div>
+
+          <!-- PASSWORD -->
+          <div style="position:relative;margin-top:15px">
+            <div style="font-size:11.5px;font-weight:700;color:#8fb4e8;letter-spacing:.3px;margin-bottom:7px">Kata sandi</div>
+            <div style="position:relative;display:flex;align-items:center">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#7f9bc4" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="position:absolute;left:15px;pointer-events:none"><rect x="4" y="11" width="16" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>
+              <input type="{{ passType }}" value="{{ loginPass }}" onInput="{{ setPass }}" placeholder="Masukkan kata sandi" style="width:100%;height:52px;border:1px solid rgba(255,255,255,.16);border-radius:14px;background:rgba(255,255,255,.06);color:#fff;font-family:inherit;font-size:14px;font-weight:600;padding:0 46px 0 44px;outline:none" style-focus="border-color:#60a5fa;background:rgba(255,255,255,.1)" />
+              <button onClick="{{ togglePass }}" style="position:absolute;right:8px;width:36px;height:36px;border:0;background:none;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:9px">
+                <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#9fb5d4" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="{{ eyePath }}"></path><circle cx="12" cy="12" r="3" opacity="{{ eyeDot }}"></circle></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- remember / forgot -->
+          <div style="position:relative;display:flex;align-items:center;justify-content:space-between;margin-top:15px">
+            <button onClick="{{ toggleRemember }}" style="display:flex;align-items:center;gap:8px;border:0;background:none;cursor:pointer;font-family:inherit;padding:0">
+              <span style="width:19px;height:19px;border-radius:6px;border:1.5px solid {{ rememberBd }};background:{{ rememberBg }};display:flex;align-items:center;justify-content:center;flex:none"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="opacity:{{ rememberTick }}"><path d="M5 12l5 5L20 6"></path></svg></span>
+              <span style="font-size:12px;font-weight:600;color:#cfe0f5">Ingat saya</span>
+            </button>
+            <span style="font-size:12px;font-weight:700;color:#60a5fa;cursor:pointer">Lupa sandi?</span>
+          </div>
+
+          <button onClick="{{ doLogin }}" style="position:relative;width:100%;height:52px;margin-top:20px;border:0;border-radius:15px;background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:#fff;font-family:inherit;font-size:14.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px;box-shadow:0 12px 26px rgba(29,78,216,.45)">
+            Masuk
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+          </button>
+
+          <div style="position:relative;display:flex;align-items:center;gap:12px;margin-top:20px"><div style="flex:1;height:1px;background:rgba(255,255,255,.12)"></div><span style="font-size:11px;color:#7f9bc4;font-weight:600">atau</span><div style="flex:1;height:1px;background:rgba(255,255,255,.12)"></div></div>
+
+          <button onClick="{{ doLogin }}" style="position:relative;width:100%;height:50px;margin-top:16px;border:1px solid rgba(255,255,255,.2);border-radius:14px;background:rgba(255,255,255,.06);color:#e8f0fc;font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#93c5fd" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="M9 12l2 2 4-4"></path></svg>
+            Masuk dengan SSO SIGA8
+          </button>
+
+          <div style="flex:1;min-height:14px"></div>
+
+          <div style="position:relative;display:flex;align-items:center;justify-content:center;gap:7px;margin-top:16px;font-size:11px;color:#7f9bc4;font-weight:500">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#7f9bc4" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4 M12 8h.01"></path></svg>
+            Bantuan · helpdesk@untad.ac.id
+          </div>
+        </div>
+        </sc-if>
+
+        <!-- ===================== BERANDA ===================== -->
+        <sc-if value="{{ isBeranda }}" hint-placeholder-val="{{ false }}">
+        <div style="min-height:100%;background:#eef1f6;padding:4px 0 24px">
+
+          <!-- header -->
+          <div style="display:flex;align-items:center;gap:12px;padding:12px 18px 10px">
+            <div style="width:42px;height:42px;flex:none;border-radius:13px;background:linear-gradient(135deg,#1d4ed8,#0d2747);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:14px;box-shadow:0 4px 12px rgba(13,39,71,.25)">{{ me.ini }}</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:12px;color:#7a8699;font-weight:600">{{ greeting }},</div>
+              <div style="font-size:15.5px;font-weight:800;letter-spacing:-.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ me.sapaan }}</div>
+            </div>
+            <button onClick="{{ goNotif }}" style="position:relative;width:42px;height:42px;flex:none;border:1px solid #e4e9f2;background:#fff;border-radius:13px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#48536a" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.7 21a2 2 0 0 1-3.4 0"></path></svg>
+              <span style="position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:#dc2626;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid #eef1f6">{{ notifCount }}</span>
+            </button>
+          </div>
+
+          <!-- HERO absen card -->
+          <div style="margin:6px 16px 0;border-radius:22px;background:linear-gradient(155deg,#0d2747 0%,#13386a 58%,#0a1d36 100%);padding:18px 18px 19px;color:#fff;position:relative;overflow:hidden;box-shadow:0 16px 34px rgba(13,39,71,.32)">
+            <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.045) 1px,transparent 1px);background-size:34px 34px"></div>
+            <div style="position:absolute;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(59,130,246,.32),transparent 70%);top:-90px;right:-60px"></div>
+
+            <div style="position:relative;display:flex;align-items:center;justify-content:space-between">
+              <div style="font-size:11.5px;color:#a8c4e6;font-weight:600">{{ today }}</div>
+              <span style="display:flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;padding:4px 9px;border-radius:8px;background:rgba(255,255,255,.12);color:#cfe0f5">{{ modeChip }}</span>
+            </div>
+
+            <div style="position:relative;margin-top:14px">
+              <div style="font-size:18.5px;font-weight:800;letter-spacing:-.3px">{{ absTitle }}</div>
+              <div style="font-size:12px;color:#a8c4e6;font-weight:500;margin-top:3px">{{ absSub }}</div>
+            </div>
+
+            <!-- masuk/pulang chips -->
+            <sc-if value="{{ bMasuk }}" hint-placeholder-val="{{ false }}">
+            <div style="position:relative;display:flex;gap:10px;margin-top:15px">
+              <div style="flex:1;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);border-radius:13px;padding:10px 12px">
+                <div style="font-size:10px;color:#8fb4e8;font-weight:700;letter-spacing:.4px">MASUK</div>
+                <div style="font-size:19px;font-weight:800;font-family:'JetBrains Mono',monospace;margin-top:2px">{{ jamMasuk }}</div>
+              </div>
+              <div style="flex:1;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);border-radius:13px;padding:10px 12px">
+                <div style="font-size:10px;color:#8fb4e8;font-weight:700;letter-spacing:.4px">PULANG</div>
+                <div style="font-size:19px;font-weight:800;font-family:'JetBrains Mono',monospace;margin-top:2px;color:{{ pulangColor }}">{{ jamPulangTxt }}</div>
+              </div>
+            </div>
+            </sc-if>
+
+            <!-- geofence -->
+            <div style="position:relative;display:flex;align-items:center;gap:8px;margin-top:14px;padding:9px 12px;background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.22);border-radius:11px">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#6ee7b7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+              <div style="font-size:11.5px;font-weight:600;color:#d7f3e6;line-height:1.35">{{ geoText }} <span style="color:#6ee7b7;font-weight:700">· {{ jarakText }}</span></div>
+            </div>
+
+            <sc-if value="{{ absBtnShow }}" hint-placeholder-val="{{ true }}">
+            <button onClick="{{ startAbsenBtn }}" style="position:relative;width:100%;height:50px;margin-top:15px;border:0;border-radius:15px;background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:#fff;font-family:inherit;font-size:14.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 10px 24px rgba(29,78,216,.45)">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V6a2 2 0 0 1 2-2h2 M16 4h2a2 2 0 0 1 2 2v2 M20 16v2a2 2 0 0 1-2 2h-2 M8 20H6a2 2 0 0 1-2-2v-2"></path><circle cx="12" cy="12" r="3.4"></circle></svg>
+              {{ absBtnLabel }}
+            </button>
+            </sc-if>
+          </div>
+
+          <!-- stats row -->
+          <div style="display:flex;gap:10px;padding:13px 16px 0">
+            <sc-for list="{{ stats }}" as="s" hint-placeholder-count="3">
+              <div style="flex:1;background:#fff;border:1px solid #e4e9f2;border-radius:15px;padding:12px 12px 11px;box-shadow:0 1px 2px rgba(16,33,64,.04)">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="{{ s.color }}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="{{ s.d }}"></path></svg>
+                <div style="font-size:18px;font-weight:800;font-family:'JetBrains Mono',monospace;letter-spacing:-.4px;margin-top:9px;line-height:1">{{ s.value }}</div>
+                <div style="font-size:10.5px;color:#7a8699;font-weight:600;margin-top:4px;line-height:1.25">{{ s.label }}</div>
+              </div>
+            </sc-for>
+          </div>
+
+          <!-- pimpinan card -->
+          <sc-if value="{{ pimpinanShow }}" hint-placeholder-val="{{ true }}">
+          <button onClick="{{ goPersetujuan }}" style="width:calc(100% - 32px);margin:13px 16px 0;border:1px solid #d9e2f3;border-radius:16px;background:linear-gradient(120deg,#eef3fc,#f6f9ff);padding:14px 15px;display:flex;align-items:center;gap:13px;cursor:pointer;font-family:inherit;text-align:left;box-shadow:0 1px 2px rgba(16,33,64,.04)">
+            <div style="width:42px;height:42px;flex:none;border-radius:12px;background:#e7eefc;display:flex;align-items:center;justify-content:center">
+              <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="#1d4ed8" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+            </div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:13.5px;font-weight:800;color:#16223a">Persetujuan menunggu Anda</div>
+              <div style="font-size:11.5px;color:#7a8699;font-weight:500;margin-top:2px">Sebagai {{ me.peranSingkat }} · ketuk untuk meninjau</div>
+            </div>
+            <span style="min-width:26px;height:26px;padding:0 8px;border-radius:13px;background:#dc2626;color:#fff;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace">{{ pendingCount }}</span>
+          </button>
+          </sc-if>
+
+          <!-- shortcuts -->
+          <div style="display:flex;align-items:baseline;justify-content:space-between;padding:18px 18px 2px">
+            <div style="font-size:13.5px;font-weight:800;letter-spacing:-.2px">Akses Cepat</div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:9px;padding:8px 16px 0">
+            <sc-for list="{{ shortcuts }}" as="c" hint-placeholder-count="8">
+              <button onClick="{{ c.onClick }}" style="background:#fff;border:1px solid #e4e9f2;border-radius:15px;padding:12px 6px 10px;display:flex;flex-direction:column;align-items:center;gap:7px;cursor:pointer;font-family:inherit;box-shadow:0 1px 2px rgba(16,33,64,.04)">
+                <div style="width:38px;height:38px;border-radius:11px;background:{{ c.bg }};display:flex;align-items:center;justify-content:center">
+                  <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="{{ c.color }}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="{{ c.d }}"></path></svg>
+                </div>
+                <span style="font-size:10.5px;font-weight:700;color:#2b3650;text-align:center;line-height:1.2">{{ c.label }}</span>
+              </button>
+            </sc-for>
+          </div>
+
+          <!-- aktivitas -->
+          <div style="display:flex;align-items:baseline;justify-content:space-between;padding:20px 18px 2px">
+            <div style="font-size:13.5px;font-weight:800;letter-spacing:-.2px">Aktivitas Terakhir</div>
+            <button onClick="{{ goRiwayat }}" style="border:0;background:none;font-family:inherit;font-size:11.5px;font-weight:700;color:#1d4ed8;cursor:pointer">Lihat semua</button>
+          </div>
+          <div style="margin:8px 16px 0;background:#fff;border:1px solid #e4e9f2;border-radius:16px;overflow:hidden;box-shadow:0 1px 2px rgba(16,33,64,.04)">
+            <sc-for list="{{ aktivitas }}" as="a" hint-placeholder-count="3">
+              <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid #f2f4f8">
+                <div style="width:38px;height:38px;flex:none;border-radius:11px;background:{{ a.bg }};display:flex;flex-direction:column;align-items:center;justify-content:center;color:{{ a.color }}">
+                  <span style="font-size:13px;font-weight:800;font-family:'JetBrains Mono',monospace;line-height:1">{{ a.tgl }}</span>
+                  <span style="font-size:8px;font-weight:700;letter-spacing:.3px;margin-top:1px">{{ a.hari }}</span>
+                </div>
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:12.5px;font-weight:700;font-family:'JetBrains Mono',monospace">{{ a.masuk }} <span style="color:#c2c9d6">→</span> {{ a.keluar }}</div>
+                  <div style="font-size:11px;color:#7a8699;font-weight:500;margin-top:2px">{{ a.dur }} · {{ a.modeLabel }}</div>
+                </div>
+                <span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:7px;color:{{ a.stColor }};background:{{ a.stBg }}">{{ a.stLabel }}</span>
+              </div>
+            </sc-for>
+          </div>
+
+        </div>
+        </sc-if>
+
+        <!-- ===================== ABSEN FLOW ===================== -->
+        <sc-if value="{{ isAbsen }}" hint-placeholder-val="{{ false }}">
+        <div style="min-height:100%;background:radial-gradient(circle at 50% 18%,#13386a,#0a1428 70%);color:#fff;display:flex;flex-direction:column;position:relative">
+
+          <!-- header -->
+          <div style="display:flex;align-items:center;gap:12px;padding:14px 18px 4px">
+            <button onClick="{{ absenCancel }}" style="width:38px;height:38px;flex:none;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);border-radius:11px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#cfe0f5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+            </button>
+            <div style="flex:1">
+              <div style="font-size:15px;font-weight:800">Absen {{ absenJenisLabel }}</div>
+              <div style="font-size:11px;color:#8fb4e8;font-weight:500">{{ absStepHint }}</div>
+            </div>
+          </div>
+
+          <!-- step LOKASI -->
+          <sc-if value="{{ absStepLokasi }}" hint-placeholder-val="{{ true }}">
+          <div style="flex:1;display:flex;flex-direction:column;padding:10px 22px 24px">
+            <div style="position:relative;flex:1;min-height:300px;border-radius:24px;overflow:hidden;background:linear-gradient(160deg,#0f2748,#0a1b33);border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center">
+              <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(96,165,250,.08) 1px,transparent 1px),linear-gradient(90deg,rgba(96,165,250,.08) 1px,transparent 1px);background-size:38px 38px"></div>
+              <div style="position:absolute;width:230px;height:230px;border-radius:50%;border:1.5px dashed rgba(96,165,250,.4);background:radial-gradient(circle,rgba(59,130,246,.16),transparent 68%)"></div>
+              <div style="position:absolute;width:230px;height:230px;border-radius:50%;border:1px solid rgba(96,165,250,.18);animation:ring 2.6s ease-out infinite"></div>
+              <div style="position:absolute;width:150px;height:150px;border-radius:50%;border:1px solid rgba(96,165,250,.25)"></div>
+              <div style="position:relative;display:flex;flex-direction:column;align-items:center">
+                <div style="width:46px;height:46px;border-radius:50% 50% 50% 2px;background:linear-gradient(135deg,#3b82f6,#1d4ed8);transform:rotate(45deg);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 22px rgba(29,78,216,.6)">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(-45deg)"><circle cx="12" cy="10" r="3"></circle><path d="M12 2a8 8 0 0 0-8 8c0 5 8 12 8 12"></path></svg>
+                </div>
+              </div>
+              <div style="position:absolute;bottom:14px;left:14px;right:14px;display:flex;align-items:center;gap:9px;padding:11px 13px;background:rgba(8,18,38,.72);backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.1);border-radius:14px">
+                <span style="width:9px;height:9px;border-radius:50%;background:#34d399;box-shadow:0 0 8px #34d399;animation:blink 1.8s infinite;flex:none"></span>
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:12.5px;font-weight:700">Anda berada dalam radius</div>
+                  <div style="font-size:10.5px;color:#9fb5d4;font-weight:500;font-family:'JetBrains Mono',monospace">-0.8389, 119.8707 · akurasi 4 m</div>
+                </div>
+              </div>
+            </div>
+
+            <div style="display:flex;gap:10px;margin-top:14px">
+              <div style="flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:12px 13px">
+                <div style="font-size:10px;color:#8fb4e8;font-weight:700;letter-spacing:.4px">LOKASI</div>
+                <div style="font-size:12.5px;font-weight:700;margin-top:3px">Gd. Dekanat FATEK</div>
+              </div>
+              <div style="flex:none;width:118px;background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.25);border-radius:14px;padding:12px 13px">
+                <div style="font-size:10px;color:#6ee7b7;font-weight:700;letter-spacing:.4px">JARAK TITIK</div>
+                <div style="font-size:18px;font-weight:800;font-family:'JetBrains Mono',monospace;margin-top:1px">12 m</div>
+              </div>
+            </div>
+
+            <button onClick="{{ absenToWajah }}" style="width:100%;height:52px;margin-top:14px;border:0;border-radius:15px;background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:#fff;font-family:inherit;font-size:14.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px;box-shadow:0 12px 26px rgba(29,78,216,.45)">
+              Lanjut · Verifikasi Wajah
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+            </button>
+          </div>
+          </sc-if>
+
+          <!-- step WAJAH -->
+          <sc-if value="{{ absStepWajah }}" hint-placeholder-val="{{ false }}">
+          <div style="flex:1;display:flex;flex-direction:column;padding:10px 22px 24px">
+            <div style="position:relative;flex:1;min-height:330px;border-radius:24px;overflow:hidden;background:radial-gradient(circle at 50% 40%,#1c2c44,#0a1322);border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center">
+              <div style="position:absolute;top:16px;left:16px;width:26px;height:26px;border-left:3px solid rgba(96,165,250,.7);border-top:3px solid rgba(96,165,250,.7);border-radius:6px 0 0 0"></div>
+              <div style="position:absolute;top:16px;right:16px;width:26px;height:26px;border-right:3px solid rgba(96,165,250,.7);border-top:3px solid rgba(96,165,250,.7);border-radius:0 6px 0 0"></div>
+              <div style="position:absolute;bottom:16px;left:16px;width:26px;height:26px;border-left:3px solid rgba(96,165,250,.7);border-bottom:3px solid rgba(96,165,250,.7);border-radius:0 0 0 6px"></div>
+              <div style="position:absolute;bottom:16px;right:16px;width:26px;height:26px;border-right:3px solid rgba(96,165,250,.7);border-bottom:3px solid rgba(96,165,250,.7);border-radius:0 0 6px 0"></div>
+
+              <div style="position:relative;width:184px;height:230px;border-radius:50% 50% 48% 48%;border:3px solid #60a5fa;box-shadow:0 0 0 9999px rgba(8,16,32,.55);display:flex;align-items:center;justify-content:center;overflow:hidden">
+                <svg viewBox="0 0 24 24" width="120" height="120" fill="none" stroke="rgba(255,255,255,.32)" stroke-width=".9"><circle cx="12" cy="9.5" r="4.4"></circle><path d="M3.8 21a8.2 8.2 0 0 1 16.4 0"></path></svg>
+                <div style="position:absolute;left:0;right:0;height:2.5px;background:linear-gradient(90deg,transparent,#60a5fa,transparent);box-shadow:0 0 16px #60a5fa;animation:scanline 2.2s ease-in-out infinite alternate"></div>
+              </div>
+
+              <div style="position:absolute;bottom:16px;left:16px;right:16px;display:flex;align-items:center;justify-content:center;gap:8px;padding:10px;background:rgba(8,18,38,.7);backdrop-filter:blur(6px);border:1px solid rgba(96,165,250,.25);border-radius:13px">
+                <span style="width:8px;height:8px;border-radius:50%;background:#fbbf24;animation:pulse 1.2s infinite;flex:none"></span>
+                <span style="font-size:12px;font-weight:700;color:#e8f0fc">Kedipkan mata untuk uji liveness</span>
+              </div>
+            </div>
+
+            <div style="font-size:13px;font-weight:700;text-align:center;margin-top:16px">Posisikan wajah di dalam bingkai</div>
+            <div style="font-size:11.5px;color:#9fb5d4;font-weight:500;text-align:center;margin-top:4px;line-height:1.5">Pastikan pencahayaan cukup &amp; wajah tidak tertutup masker</div>
+
+            <button onClick="{{ absenVerify }}" style="width:100%;height:52px;margin-top:16px;border:0;border-radius:15px;background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:#fff;font-family:inherit;font-size:14.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 12px 26px rgba(29,78,216,.45)">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="3.4"></circle></svg>
+              Ambil &amp; Verifikasi
+            </button>
+          </div>
+          </sc-if>
+
+          <!-- step PROSES -->
+          <sc-if value="{{ absStepProses }}" hint-placeholder-val="{{ false }}">
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 30px">
+            <div style="position:relative;width:104px;height:104px;display:flex;align-items:center;justify-content:center">
+              <div style="position:absolute;inset:0;border-radius:50%;border:4px solid rgba(96,165,250,.18)"></div>
+              <div style="position:absolute;inset:0;border-radius:50%;border:4px solid transparent;border-top-color:#60a5fa;animation:spin .9s linear infinite"></div>
+              <svg viewBox="0 0 24 24" width="42" height="42" fill="none" stroke="#93c5fd" stroke-width="1.4"><circle cx="12" cy="9.5" r="4.2"></circle><path d="M4.5 21a7.5 7.5 0 0 1 15 0"></path></svg>
+            </div>
+            <div style="font-size:16px;font-weight:800;margin-top:24px">Memverifikasi wajah…</div>
+            <div style="font-size:12px;color:#9fb5d4;font-weight:500;margin-top:6px;text-align:center">Mengirim ke microservice face recognition</div>
+            <div style="width:100%;margin-top:24px;display:flex;flex-direction:column;gap:10px">
+              <div style="display:flex;align-items:center;gap:11px;font-size:12px;color:#cfe0f5;font-weight:600"><span style="width:20px;height:20px;border-radius:50%;background:#16a34a;display:flex;align-items:center;justify-content:center;flex:none"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 6"></path></svg></span>Mengekstrak embedding wajah (512-d)</div>
+              <div style="display:flex;align-items:center;gap:11px;font-size:12px;color:#cfe0f5;font-weight:600"><span style="width:20px;height:20px;border-radius:50%;border:2px solid #60a5fa;border-top-color:transparent;animation:spin .8s linear infinite;flex:none"></span>Mencocokkan (cosine similarity)</div>
+              <div style="display:flex;align-items:center;gap:11px;font-size:12px;color:#6b82a6;font-weight:600"><span style="width:20px;height:20px;border-radius:50%;border:2px solid rgba(255,255,255,.18);flex:none"></span>Uji anti-spoofing / liveness</div>
+            </div>
+          </div>
+          </sc-if>
+
+          <!-- step HASIL -->
+          <sc-if value="{{ absStepHasil }}" hint-placeholder-val="{{ false }}">
+          <div style="flex:1;display:flex;flex-direction:column;padding:16px 22px 24px">
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center">
+              <div style="position:relative;width:96px;height:96px;display:flex;align-items:center;justify-content:center">
+                <div style="position:absolute;inset:0;border-radius:50%;background:rgba(52,211,153,.16);animation:ring 1.8s ease-out infinite"></div>
+                <div style="width:84px;height:84px;border-radius:50%;background:linear-gradient(135deg,#34d399,#10b981);display:flex;align-items:center;justify-content:center;box-shadow:0 14px 30px rgba(16,185,129,.5)">
+                  <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 6"></path></svg>
+                </div>
+              </div>
+              <div style="font-size:21px;font-weight:800;margin-top:20px;letter-spacing:-.3px">Absen {{ absenJenisLabel }} Berhasil</div>
+              <div style="font-size:42px;font-weight:800;font-family:'JetBrains Mono',monospace;letter-spacing:-1px;margin-top:8px">{{ resJam }}</div>
+              <div style="font-size:12px;color:#9fb5d4;font-weight:500;margin-top:2px">WITA · {{ today }}</div>
+              <span style="display:inline-flex;align-items:center;gap:6px;margin-top:14px;font-size:12px;font-weight:700;padding:6px 13px;border-radius:10px;background:rgba(52,211,153,.14);color:#6ee7b7">{{ resStatus }}</span>
+            </div>
+
+            <div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:4px 14px;margin-top:18px">
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.08)"><span style="font-size:12px;color:#9fb5d4;font-weight:500">Skor kemiripan wajah</span><span style="font-size:12.5px;font-weight:700;font-family:'JetBrains Mono',monospace;color:#6ee7b7">0.93 · lolos</span></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.08)"><span style="font-size:12px;color:#9fb5d4;font-weight:500">Anti-spoofing / liveness</span><span style="font-size:12.5px;font-weight:700;color:#6ee7b7">Lolos</span></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.08)"><span style="font-size:12px;color:#9fb5d4;font-weight:500">Lokasi geofence</span><span style="font-size:12.5px;font-weight:700">Gd. Dekanat FATEK</span></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 0"><span style="font-size:12px;color:#9fb5d4;font-weight:500">Tipe presensi</span><span style="font-size:12.5px;font-weight:700">WFO · {{ me.kategoriSingkat }}</span></div>
+            </div>
+
+            <button onClick="{{ absenDone }}" style="width:100%;height:52px;margin-top:14px;border:0;border-radius:15px;background:#fff;color:#0d2747;font-family:inherit;font-size:14.5px;font-weight:700;cursor:pointer;box-shadow:0 10px 24px rgba(0,0,0,.28)">Selesai</button>
+          </div>
+          </sc-if>
+
+        </div>
+        </sc-if>
+
+        <!-- ===================== RIWAYAT ===================== -->
+        <sc-if value="{{ isRiwayat }}" hint-placeholder-val="{{ false }}">
+        <div style="min-height:100%;background:#eef1f6">
+          <div style="background:#fff;border-bottom:1px solid #e9edf4;padding:14px 18px 14px">
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <div><div style="font-size:17px;font-weight:800;letter-spacing:-.3px">Riwayat Kehadiran</div><div style="font-size:11.5px;color:#7a8699;font-weight:500;margin-top:1px">Rekap presensi terverifikasi</div></div>
+              <button style="display:flex;align-items:center;gap:6px;border:1px solid #e1e6ef;background:#f6f8fb;border-radius:10px;padding:7px 11px;font-family:inherit;font-size:12px;font-weight:700;color:#48536a;cursor:pointer">{{ riwBulan }}<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#7a8699" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg></button>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:13px">
+              <sc-for list="{{ riwSummary }}" as="s" hint-placeholder-count="4">
+                <div style="flex:1;background:{{ s.bg }};border-radius:12px;padding:9px 4px;text-align:center"><div style="font-size:18px;font-weight:800;font-family:'JetBrains Mono',monospace;color:{{ s.color }};line-height:1">{{ s.value }}</div><div style="font-size:9.5px;font-weight:700;color:{{ s.color }};margin-top:3px">{{ s.label }}</div></div>
+              </sc-for>
+            </div>
+          </div>
+          <div style="padding:14px 16px 24px;display:flex;flex-direction:column;gap:9px">
+            <sc-for list="{{ riwRows }}" as="r" hint-placeholder-count="8">
+              <div style="background:#fff;border:1px solid #e4e9f2;border-radius:15px;padding:13px 14px;display:flex;align-items:center;gap:13px;box-shadow:0 1px 2px rgba(16,33,64,.04)">
+                <div style="width:44px;height:44px;flex:none;border-radius:12px;background:{{ r.stBg }};display:flex;flex-direction:column;align-items:center;justify-content:center;color:{{ r.stColor }}"><span style="font-size:15px;font-weight:800;font-family:'JetBrains Mono',monospace;line-height:1">{{ r.tgl }}</span><span style="font-size:8px;font-weight:700;letter-spacing:.3px;margin-top:2px">{{ r.hari }}</span></div>
+                <div style="flex:1;min-width:0">
+                  <sc-if value="{{ r.isHadir }}" hint-placeholder-val="{{ true }}"><div style="font-size:13.5px;font-weight:700;font-family:'JetBrains Mono',monospace">{{ r.masuk }} <span style="color:#c2c9d6">→</span> {{ r.keluar }}</div></sc-if>
+                  <div style="font-size:11.5px;color:#7a8699;font-weight:500;margin-top:3px">{{ r.dur }}</div>
+                </div>
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex:none">
+                  <span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:7px;color:{{ r.stColor }};background:{{ r.stBg }}">{{ r.stLabel }}</span>
+                  <sc-if value="{{ r.isHadir }}" hint-placeholder-val="{{ true }}"><span style="font-size:9.5px;font-weight:700;padding:2px 7px;border-radius:6px;color:{{ r.modeC }};background:{{ r.modeBg }}">{{ r.modeLabel }}</span></sc-if>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        </sc-if>
+
+        <!-- ===================== PENGAJUAN ===================== -->
+        <sc-if value="{{ isPengajuan }}" hint-placeholder-val="{{ false }}">
+        <div style="min-height:100%;background:#eef1f6">
+          <div style="background:#fff;border-bottom:1px solid #e9edf4;padding:14px 18px 12px">
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <div><div style="font-size:17px;font-weight:800;letter-spacing:-.3px">Pengajuan</div><div style="font-size:11.5px;color:#7a8699;font-weight:500;margin-top:1px">Izin · Cuti · Sakit · WFH · Lembur</div></div>
+              <button onClick="{{ goPengajuanBaru }}" style="display:flex;align-items:center;gap:6px;border:0;background:#0d2747;border-radius:11px;padding:9px 13px;font-family:inherit;font-size:12.5px;font-weight:700;color:#fff;cursor:pointer;box-shadow:0 6px 14px rgba(13,39,71,.25)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"></path></svg>Ajukan</button>
+            </div>
+            <div style="display:flex;gap:7px;margin-top:13px;overflow-x:auto" class="scr">
+              <sc-for list="{{ pengChips }}" as="c" hint-placeholder-count="6">
+                <button onClick="{{ c.onClick }}" style="flex:none;border:1px solid {{ c.bd }};background:{{ c.bg }};color:{{ c.fg }};border-radius:10px;padding:7px 13px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer">{{ c.label }}</button>
+              </sc-for>
+            </div>
+          </div>
+          <div style="padding:14px 16px 24px;display:flex;flex-direction:column;gap:9px">
+            <sc-for list="{{ pengList }}" as="p" hint-placeholder-count="5">
+              <div style="background:#fff;border:1px solid #e4e9f2;border-radius:15px;padding:14px;box-shadow:0 1px 2px rgba(16,33,64,.04)">
+                <div style="display:flex;align-items:center;gap:11px">
+                  <div style="width:40px;height:40px;flex:none;border-radius:11px;background:{{ p.katBg }};display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="{{ p.katC }}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="{{ p.d }}"></path></svg></div>
+                  <div style="flex:1;min-width:0"><div style="font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.jenis }}</div><div style="font-size:11.5px;color:#7a8699;font-weight:500;margin-top:2px">{{ p.range }} · {{ p.hari }}</div></div>
+                  <span style="font-size:10px;font-weight:700;padding:4px 9px;border-radius:8px;color:{{ p.stC }};background:{{ p.stBg }};flex:none">{{ p.stL }}</span>
+                </div>
+              </div>
+            </sc-for>
+            <sc-if value="{{ pengEmpty }}" hint-placeholder-val="{{ false }}"><div style="text-align:center;padding:40px 20px;color:#94a0b3;font-size:13px;font-weight:600">Tidak ada pengajuan pada kategori ini</div></sc-if>
+          </div>
+        </div>
+        </sc-if>
+
+        <!-- ===================== PENGAJUAN BARU ===================== -->
+        <sc-if value="{{ isPengajuanBaru }}" hint-placeholder-val="{{ false }}">
+        <div style="min-height:100%;background:#eef1f6">
+          <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:#fff;border-bottom:1px solid #e9edf4">
+            <button onClick="{{ goPengajuan }}" style="width:38px;height:38px;flex:none;border:1px solid #e4e9f2;background:#fff;border-radius:11px;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#48536a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg></button>
+            <div style="flex:1"><div style="font-size:16px;font-weight:800">Pengajuan Baru</div><div style="font-size:11.5px;color:#7a8699;font-weight:500">Lengkapi data &amp; lampiran</div></div>
+          </div>
+          <div style="padding:16px;display:flex;flex-direction:column;gap:14px">
+            <div>
+              <div style="font-size:12px;font-weight:700;color:#48536a;margin-bottom:8px">Jenis pengajuan</div>
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+                <div style="background:#0d2747;color:#fff;border-radius:11px;padding:11px 6px;text-align:center;font-size:11.5px;font-weight:700">Cuti Tahunan</div>
+                <div style="background:#fff;border:1px solid #e1e6ef;color:#48536a;border-radius:11px;padding:11px 6px;text-align:center;font-size:11.5px;font-weight:700">Izin</div>
+                <div style="background:#fff;border:1px solid #e1e6ef;color:#48536a;border-radius:11px;padding:11px 6px;text-align:center;font-size:11.5px;font-weight:700">Sakit</div>
+                <div style="background:#fff;border:1px solid #e1e6ef;color:#48536a;border-radius:11px;padding:11px 6px;text-align:center;font-size:11.5px;font-weight:700">WFH</div>
+                <div style="background:#fff;border:1px solid #e1e6ef;color:#48536a;border-radius:11px;padding:11px 6px;text-align:center;font-size:11.5px;font-weight:700">Dinas Luar</div>
+                <div style="background:#fff;border:1px solid #e1e6ef;color:#48536a;border-radius:11px;padding:11px 6px;text-align:center;font-size:11.5px;font-weight:700">Lembur</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:10px">
+              <div style="flex:1"><div style="font-size:12px;font-weight:700;color:#48536a;margin-bottom:6px">Tanggal mulai</div><div style="height:46px;background:#fff;border:1px solid #e1e6ef;border-radius:11px;display:flex;align-items:center;padding:0 13px;font-size:13px;font-weight:600;color:#16223a;font-family:'JetBrains Mono',monospace">07 Jul 2026</div></div>
+              <div style="flex:1"><div style="font-size:12px;font-weight:700;color:#48536a;margin-bottom:6px">Tanggal selesai</div><div style="height:46px;background:#fff;border:1px solid #e1e6ef;border-radius:11px;display:flex;align-items:center;padding:0 13px;font-size:13px;font-weight:600;color:#16223a;font-family:'JetBrains Mono',monospace">08 Jul 2026</div></div>
+            </div>
+            <div style="background:#eef3fc;border:1px solid #d9e2f3;border-radius:11px;padding:11px 13px;display:flex;align-items:center;gap:9px"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#1d4ed8" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4M12 8h.01"></path></svg><span style="font-size:11.5px;font-weight:600;color:#1c4fb8">2 hari kerja · sisa saldo cuti tahunan: 14 hari</span></div>
+            <div><div style="font-size:12px;font-weight:700;color:#48536a;margin-bottom:6px">Alasan / keterangan</div><div style="min-height:78px;background:#fff;border:1px solid #e1e6ef;border-radius:11px;padding:12px 13px;font-size:13px;color:#94a0b3;font-weight:500">Tulis alasan pengajuan Anda…</div></div>
+            <div><div style="font-size:12px;font-weight:700;color:#48536a;margin-bottom:6px">Lampiran</div><div style="height:72px;background:#f6f8fb;border:1.5px dashed #cdd6e4;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#9aa5b6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"></path></svg><span style="font-size:11.5px;color:#94a0b3;font-weight:600">Unggah surat / dokumen pendukung</span></div></div>
+            <button onClick="{{ submitPengajuan }}" style="width:100%;height:52px;border:0;border-radius:15px;background:#1d4ed8;color:#fff;font-family:inherit;font-size:14.5px;font-weight:700;cursor:pointer;box-shadow:0 10px 24px rgba(29,78,216,.32);margin-top:2px">Kirim Pengajuan</button>
+          </div>
+        </div>
+        </sc-if>
+
+        <!-- ===================== SALDO CUTI ===================== -->
+        <sc-if value="{{ isSaldo }}" hint-placeholder-val="{{ false }}">
+        <div style="min-height:100%;background:#eef1f6">
+          <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:#fff;border-bottom:1px solid #e9edf4">
+            <button onClick="{{ goBeranda }}" style="width:38px;height:38px;flex:none;border:1px solid #e4e9f2;background:#fff;border-radius:11px;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#48536a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg></button>
+            <div style="flex:1"><div style="font-size:16px;font-weight:800">Saldo Cuti</div><div style="font-size:11.5px;color:#7a8699;font-weight:500">Tahun 2026 · {{ me.status }}</div></div>
+          </div>
+          <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
+            <div style="border-radius:18px;background:linear-gradient(150deg,#0d2747,#13386a 60%,#0a1d36);padding:18px;color:#fff;position:relative;overflow:hidden;box-shadow:0 14px 30px rgba(13,39,71,.28)">
+              <div style="position:absolute;width:180px;height:180px;border-radius:50%;background:radial-gradient(circle,rgba(59,130,246,.3),transparent 70%);top:-80px;right:-50px"></div>
+              <div style="position:relative;display:flex;align-items:center;justify-content:space-between"><div style="font-size:14px;font-weight:800">Cuti Tahunan</div><span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:7px;background:rgba(255,255,255,.14);color:#cfe0f5">Akumulasi maks 18 hari</span></div>
+              <div style="position:relative;display:flex;align-items:flex-end;gap:8px;margin-top:14px"><div style="font-size:40px;font-weight:800;font-family:'JetBrains Mono',monospace;letter-spacing:-1px;line-height:1">{{ saldoTahunan.sisa }}</div><div style="font-size:13px;color:#a8c4e6;font-weight:600;margin-bottom:6px">hari tersisa</div></div>
+              <div style="position:relative;display:flex;height:9px;border-radius:6px;overflow:hidden;background:rgba(255,255,255,.14);margin-top:14px"><div style="width:{{ saldoTahunan.barSisa }};background:#34d399"></div><div style="width:{{ saldoTahunan.barPakai }};background:#f59e0b"></div></div>
+              <div style="position:relative;display:flex;justify-content:space-between;margin-top:12px">
+                <div><div style="font-size:10px;color:#8fb4e8;font-weight:600">Hak tahun ini</div><div style="font-size:14px;font-weight:800;font-family:'JetBrains Mono',monospace;margin-top:2px">{{ saldoTahunan.hak }}</div></div>
+                <div><div style="font-size:10px;color:#8fb4e8;font-weight:600">Carry-over</div><div style="font-size:14px;font-weight:800;font-family:'JetBrains Mono',monospace;margin-top:2px">{{ saldoTahunan.carry }}</div></div>
+                <div><div style="font-size:10px;color:#8fb4e8;font-weight:600">Terpakai</div><div style="font-size:14px;font-weight:800;font-family:'JetBrains Mono',monospace;margin-top:2px;color:#fbbf24">{{ saldoTahunan.pakai }}</div></div>
+                <div><div style="font-size:10px;color:#8fb4e8;font-weight:600">Sisa</div><div style="font-size:14px;font-weight:800;font-family:'JetBrains Mono',monospace;margin-top:2px;color:#6ee7b7">{{ saldoTahunan.sisa }}</div></div>
+              </div>
+            </div>
+            <div style="font-size:12px;font-weight:800;color:#7a8699;letter-spacing:.3px;text-transform:uppercase;margin:4px 2px 0">Jenis cuti lain (PNS)</div>
+            <sc-for list="{{ saldoList }}" as="c" hint-placeholder-count="4">
+              <div style="background:#fff;border:1px solid #e4e9f2;border-radius:15px;padding:13px 14px;display:flex;align-items:center;gap:13px;box-shadow:0 1px 2px rgba(16,33,64,.04)">
+                <div style="width:40px;height:40px;flex:none;border-radius:11px;background:{{ c.bg }};display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="{{ c.c }}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="{{ c.d }}"></path></svg></div>
+                <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700">{{ c.nama }}</div><div style="font-size:11px;color:#7a8699;font-weight:500;margin-top:2px">{{ c.note }}</div></div>
+                <span style="font-size:11.5px;font-weight:800;color:{{ c.c }};flex:none;font-family:'JetBrains Mono',monospace">{{ c.sisa }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        </sc-if>
+
+        <!-- ===================== LEMBUR ===================== -->
+        <sc-if value="{{ isLembur }}" hint-placeholder-val="{{ false }}">
+        <div style="min-height:100%;background:#eef1f6">
+          <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:#fff;border-bottom:1px solid #e9edf4">
+            <button onClick="{{ goBeranda }}" style="width:38px;height:38px;flex:none;border:1px solid #e4e9f2;background:#fff;border-radius:11px;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#48536a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg></button>
+            <div style="flex:1"><div style="font-size:16px;font-weight:800">Lembur</div><div style="font-size:11.5px;color:#7a8699;font-weight:500">Rencana &amp; realisasi lembur</div></div>
+          </div>
+          <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
+            <div style="background:#fff;border:1px solid #e4e9f2;border-radius:16px;padding:16px;display:flex;align-items:center;gap:14px;box-shadow:0 1px 2px rgba(16,33,64,.04)">
+              <div style="width:52px;height:52px;flex:none;border-radius:14px;background:#fdf2dd;display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#b45309" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v4l2.5 1.5M21 12a9 9 0 1 1-9-9"></path></svg></div>
+              <div style="flex:1"><div style="font-size:11.5px;color:#7a8699;font-weight:600">Total lembur bulan ini</div><div style="font-size:26px;font-weight:800;font-family:'JetBrains Mono',monospace;letter-spacing:-.5px;line-height:1.1">{{ lemburTotal }}</div></div>
+              <span style="font-size:10.5px;font-weight:700;padding:4px 10px;border-radius:8px;color:#0f7a4a;background:#e7f6ed">2 disetujui</span>
+            </div>
+            <sc-for list="{{ lemburList }}" as="l" hint-placeholder-count="3">
+              <div style="background:#fff;border:1px solid #e4e9f2;border-radius:15px;padding:14px;box-shadow:0 1px 2px rgba(16,33,64,.04)">
+                <div style="display:flex;align-items:center;justify-content:space-between"><div style="font-size:13px;font-weight:700">{{ l.desc }}</div><span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:7px;color:{{ l.stC }};background:{{ l.stBg }};flex:none">{{ l.stL }}</span></div>
+                <div style="display:flex;align-items:center;gap:14px;margin-top:9px">
+                  <div style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:#7a8699;font-weight:600"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#9aa5b6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v3M16 2v3M3.5 9h17M5 6h14a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2"></path></svg>{{ l.tgl }}</div>
+                  <div style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:#7a8699;font-weight:600;font-family:'JetBrains Mono',monospace">{{ l.jam }}</div>
+                  <div style="margin-left:auto;font-size:12.5px;font-weight:800;font-family:'JetBrains Mono',monospace;color:#b45309">{{ l.dur }}</div>
+                </div>
+              </div>
+            </sc-for>
+            <button style="width:100%;height:50px;border:1.5px dashed #cdd6e4;border-radius:14px;background:#f6f8fb;color:#48536a;font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#48536a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"></path></svg>Ajukan rencana lembur</button>
+          </div>
+        </div>
+        </sc-if>
+
+        <!-- ===================== PERSETUJUAN ===================== -->
+        <sc-if value="{{ isPersetujuan }}" hint-placeholder-val="{{ false }}">
+        <div style="min-height:100%;background:#eef1f6">
+          <div style="background:#fff;border-bottom:1px solid #e9edf4;padding:14px 16px 0">
+            <div style="display:flex;align-items:center;gap:12px">
+              <button onClick="{{ goBeranda }}" style="width:38px;height:38px;flex:none;border:1px solid #e4e9f2;background:#fff;border-radius:11px;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#48536a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg></button>
+              <div style="flex:1"><div style="font-size:16px;font-weight:800">Persetujuan</div><div style="font-size:11.5px;color:#7a8699;font-weight:500">Pengajuan staf {{ me.unit }}</div></div>
+            </div>
+            <div style="display:flex;gap:4px;margin-top:13px;background:#f1f4f9;border-radius:11px;padding:4px">
+              <button onClick="{{ persTabMenungguOn }}" style="flex:1;border:0;border-radius:8px;padding:8px;font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;background:{{ tabMenungguBg }};color:{{ tabMenungguC }}">Menunggu · {{ pendingCountP }}</button>
+              <button onClick="{{ persTabRiwayatOn }}" style="flex:1;border:0;border-radius:8px;padding:8px;font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;background:{{ tabRiwayatBg }};color:{{ tabRiwayatC }}">Riwayat · {{ doneCount }}</button>
+            </div>
+            <div style="height:13px"></div>
+          </div>
+          <sc-if value="{{ persTabMenunggu }}" hint-placeholder-val="{{ true }}">
+          <div style="padding:14px 16px 24px;display:flex;flex-direction:column;gap:11px">
+            <sc-for list="{{ persPending }}" as="p" hint-placeholder-count="3">
+              <div style="background:#fff;border:1px solid #e4e9f2;border-radius:16px;padding:14px;box-shadow:0 1px 2px rgba(16,33,64,.04)">
+                <div style="display:flex;align-items:center;gap:11px">
+                  <div style="width:42px;height:42px;flex:none;border-radius:12px;background:{{ p.color }};display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:700">{{ p.ini }}</div>
+                  <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.nama }}</div><div style="font-size:11px;color:#7a8699;font-weight:500;margin-top:1px">{{ p.unit }}</div></div>
+                  <span style="font-size:10px;font-weight:700;padding:4px 9px;border-radius:8px;color:{{ p.katC }};background:{{ p.katBg }};flex:none">{{ p.katL }}</span>
+                </div>
+                <div style="background:#f6f8fb;border-radius:12px;padding:11px 13px;margin-top:12px">
+                  <div style="display:flex;justify-content:space-between"><span style="font-size:12.5px;font-weight:700">{{ p.jenis }}</span><span style="font-size:12px;font-weight:700;color:#48536a;font-family:'JetBrains Mono',monospace">{{ p.hari }}</span></div>
+                  <div style="font-size:11.5px;color:#7a8699;font-weight:500;margin-top:5px">{{ p.range }} · {{ p.alasan }}</div>
+                  <div style="display:flex;align-items:center;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid #e9edf4"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#1d4ed8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4M12 8h.01"></path></svg><span style="font-size:11px;font-weight:600;color:#1c4fb8">{{ p.info }}</span></div>
+                </div>
+                <div style="display:flex;gap:9px;margin-top:12px">
+                  <button onClick="{{ p.tolak }}" style="flex:1;height:44px;border:1px solid #f0c9c4;border-radius:12px;background:#fdeee9;color:#b91c1c;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#b91c1c" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"></path></svg>Tolak</button>
+                  <button onClick="{{ p.setuju }}" style="flex:1;height:44px;border:0;border-radius:12px;background:#16a34a;color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;box-shadow:0 6px 14px rgba(22,163,74,.3)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 6"></path></svg>Setujui</button>
+                </div>
+              </div>
+            </sc-for>
+            <sc-if value="{{ persEmptyPending }}" hint-placeholder-val="{{ false }}"><div style="text-align:center;padding:50px 24px"><div style="width:64px;height:64px;margin:0 auto;border-radius:18px;background:#e7f6ed;display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 6"></path></svg></div><div style="font-size:14px;font-weight:800;margin-top:14px">Semua sudah ditinjau</div><div style="font-size:12px;color:#7a8699;font-weight:500;margin-top:4px">Tidak ada pengajuan menunggu persetujuan</div></div></sc-if>
+          </div>
+          </sc-if>
+          <sc-if value="{{ persTabRiwayat }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:14px 16px 24px;display:flex;flex-direction:column;gap:9px">
+            <sc-for list="{{ persDone }}" as="p" hint-placeholder-count="0">
+              <div style="background:#fff;border:1px solid #e4e9f2;border-radius:15px;padding:13px 14px;display:flex;align-items:center;gap:12px;box-shadow:0 1px 2px rgba(16,33,64,.04)">
+                <div style="width:40px;height:40px;flex:none;border-radius:11px;background:{{ p.color }};display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700">{{ p.ini }}</div>
+                <div style="flex:1;min-width:0"><div style="font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.nama }}</div><div style="font-size:11px;color:#7a8699;font-weight:500;margin-top:2px">{{ p.jenis }} · {{ p.range }}</div></div>
+                <span style="font-size:10px;font-weight:700;padding:4px 9px;border-radius:8px;color:{{ p.stC }};background:{{ p.stBg }};flex:none">{{ p.stL }}</span>
+              </div>
+            </sc-for>
+            <sc-if value="{{ persEmptyDone }}" hint-placeholder-val="{{ true }}"><div style="text-align:center;padding:50px 24px"><div style="width:64px;height:64px;margin:0 auto;border-radius:18px;background:#eef1f6;display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="#94a0b3" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5M3.05 13a9 9 0 1 0 2.6-6.4L3 8M12 7v5l4 2"></path></svg></div><div style="font-size:14px;font-weight:800;margin-top:14px;color:#48536a">Belum ada riwayat</div><div style="font-size:12px;color:#7a8699;font-weight:500;margin-top:4px">Keputusan yang Anda buat akan muncul di sini</div></div></sc-if>
+          </div>
+          </sc-if>
+        </div>
+        </sc-if>
+
+        <!-- ===================== PROFIL ===================== -->
+        <sc-if value="{{ isProfil }}" hint-placeholder-val="{{ false }}">
+        <div style="min-height:100%;background:#eef1f6">
+          <div style="background:linear-gradient(160deg,#0d2747,#13386a);padding:18px 18px 22px;color:#fff;position:relative;overflow:hidden">
+            <div style="position:absolute;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(59,130,246,.28),transparent 70%);top:-90px;right:-50px"></div>
+            <div style="position:relative;display:flex;align-items:center;gap:14px">
+              <div style="width:62px;height:62px;flex:none;border-radius:18px;background:linear-gradient(135deg,#3b82f6,#1d4ed8);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;box-shadow:0 8px 20px rgba(29,78,216,.45)">{{ me.ini }}</div>
+              <div style="flex:1;min-width:0"><div style="font-size:16.5px;font-weight:800;letter-spacing:-.3px;line-height:1.2">{{ me.nama }}</div><div style="font-size:12px;color:#a8c4e6;font-weight:500;margin-top:3px">{{ me.jabatan }}</div></div>
+            </div>
+            <div style="position:relative;display:flex;gap:7px;margin-top:14px;flex-wrap:wrap">
+              <span style="font-size:10.5px;font-weight:700;padding:5px 11px;border-radius:9px;background:rgba(255,255,255,.13);color:#cfe0f5">{{ me.status }} · {{ me.gol }}</span>
+              <span style="font-size:10.5px;font-weight:700;padding:5px 11px;border-radius:9px;background:rgba(52,211,153,.16);color:#6ee7b7">Pegawai</span>
+              <span style="font-size:10.5px;font-weight:700;padding:5px 11px;border-radius:9px;background:rgba(96,165,250,.18);color:#93c5fd">{{ me.peranSingkat }}</span>
+            </div>
+          </div>
+          <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
+            <div style="background:#fff;border:1px solid #e4e9f2;border-radius:16px;overflow:hidden;box-shadow:0 1px 2px rgba(16,33,64,.04)">
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:13px 15px;border-bottom:1px solid #f2f4f8"><span style="font-size:12px;color:#7a8699;font-weight:600">NIP</span><span style="font-size:12.5px;font-weight:700;font-family:'JetBrains Mono',monospace">{{ me.nip }}</span></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:13px 15px;border-bottom:1px solid #f2f4f8"><span style="font-size:12px;color:#7a8699;font-weight:600">Unit kerja</span><span style="font-size:12.5px;font-weight:700">{{ me.unit }}</span></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:13px 15px;border-bottom:1px solid #f2f4f8"><span style="font-size:12px;color:#7a8699;font-weight:600">Kategori</span><span style="font-size:12px;font-weight:700;text-align:right">{{ me.kategoriSingkat }}<br><span style="color:#1d4ed8">min. {{ me.minMenit }}/hari</span></span></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:13px 15px"><span style="font-size:12px;color:#7a8699;font-weight:600">Email</span><span style="font-size:12px;font-weight:700">{{ me.email }}</span></div>
+            </div>
+            <div style="background:#fff;border:1px solid #e4e9f2;border-radius:16px;padding:14px;display:flex;align-items:center;gap:13px;box-shadow:0 1px 2px rgba(16,33,64,.04)">
+              <div style="width:42px;height:42px;flex:none;border-radius:12px;background:#e7f6ed;display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="#16a34a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9.5" r="4.2"></circle><path d="M4.5 21a7.5 7.5 0 0 1 15 0"></path><path d="M17 4l1.5 1.5L21 3"></path></svg></div>
+              <div style="flex:1"><div style="font-size:13px;font-weight:700">Data Wajah Terdaftar</div><div style="font-size:11px;color:#7a8699;font-weight:500;margin-top:2px">5 sampel · terverifikasi</div></div>
+              <span style="font-size:11px;font-weight:700;color:#1d4ed8">Perbarui</span>
+            </div>
+            <div style="background:#fff;border:1px solid #e4e9f2;border-radius:16px;overflow:hidden;box-shadow:0 1px 2px rgba(16,33,64,.04)">
+              <div style="display:flex;align-items:center;gap:13px;padding:13px 15px;border-bottom:1px solid #f2f4f8"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#48536a" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"></path></svg><span style="flex:1;font-size:13px;font-weight:600">Notifikasi</span><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#c2c9d6" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"></path></svg></div>
+              <div style="display:flex;align-items:center;gap:13px;padding:13px 15px;border-bottom:1px solid #f2f4f8"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#48536a" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"></path></svg><span style="flex:1;font-size:13px;font-weight:600">Bahasa</span><span style="font-size:12px;color:#7a8699;font-weight:600">Indonesia</span></div>
+              <div style="display:flex;align-items:center;gap:13px;padding:13px 15px"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#48536a" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-2.82 1.17V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 8 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15H4a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 6 8.6l-.32-.33a2 2 0 1 1 2.82-2.83l.06.06A1.65 1.65 0 0 0 12 4.6V4a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 2.85 1.18l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg><span style="flex:1;font-size:13px;font-weight:600">Pengaturan perangkat</span><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#c2c9d6" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"></path></svg></div>
+            </div>
+            <button onClick="{{ doLogout }}" style="width:100%;height:50px;border:1px solid #f0c9c4;border-radius:14px;background:#fff;color:#b91c1c;font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px;margin-top:2px"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#b91c1c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"></path></svg>Keluar</button>
+            <div style="text-align:center;font-size:11px;color:#94a0b3;font-weight:500;padding:4px 0 8px">KlikPresensi · Universitas Tadulako<br>Versi 1.0.0 · SSO SIGA8</div>
+          </div>
+        </div>
+        </sc-if>
+
+        <!-- ===================== NOTIFIKASI ===================== -->
+        <sc-if value="{{ isNotif }}" hint-placeholder-val="{{ false }}">
+        <div style="min-height:100%;background:#eef1f6">
+          <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:#fff;border-bottom:1px solid #e9edf4">
+            <button onClick="{{ goBeranda }}" style="width:38px;height:38px;flex:none;border:1px solid #e4e9f2;background:#fff;border-radius:11px;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#48536a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg></button>
+            <div style="flex:1"><div style="font-size:16px;font-weight:800">Notifikasi</div><div style="font-size:11.5px;color:#7a8699;font-weight:500">In-app · email</div></div>
+          </div>
+          <div style="padding:14px 16px 24px">
+            <div style="font-size:11.5px;font-weight:800;color:#7a8699;letter-spacing:.3px;text-transform:uppercase;margin:2px 2px 9px">Hari ini</div>
+            <div style="display:flex;flex-direction:column;gap:9px">
+              <sc-for list="{{ notifToday }}" as="n" hint-placeholder-count="2">
+                <div style="background:#fff;border:1px solid #e4e9f2;border-radius:15px;padding:13px;display:flex;gap:12px;box-shadow:0 1px 2px rgba(16,33,64,.04);position:relative">
+                  <div style="width:40px;height:40px;flex:none;border-radius:11px;background:{{ n.bg }};display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="{{ n.c }}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="{{ n.ic }}"></path></svg></div>
+                  <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700;line-height:1.3">{{ n.title }}</div><div style="font-size:11.5px;color:#7a8699;font-weight:500;margin-top:3px;line-height:1.4">{{ n.desc }}</div><div style="font-size:10.5px;color:#94a0b3;font-weight:600;margin-top:5px">{{ n.time }}</div></div>
+                </div>
+              </sc-for>
+            </div>
+            <div style="font-size:11.5px;font-weight:800;color:#7a8699;letter-spacing:.3px;text-transform:uppercase;margin:18px 2px 9px">Sebelumnya</div>
+            <div style="display:flex;flex-direction:column;gap:9px">
+              <sc-for list="{{ notifEarlier }}" as="n" hint-placeholder-count="3">
+                <div style="background:#fff;border:1px solid #e4e9f2;border-radius:15px;padding:13px;display:flex;gap:12px;box-shadow:0 1px 2px rgba(16,33,64,.04)">
+                  <div style="width:40px;height:40px;flex:none;border-radius:11px;background:{{ n.bg }};display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="{{ n.c }}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="{{ n.ic }}"></path></svg></div>
+                  <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700;line-height:1.3">{{ n.title }}</div><div style="font-size:11.5px;color:#7a8699;font-weight:500;margin-top:3px;line-height:1.4">{{ n.desc }}</div><div style="font-size:10.5px;color:#94a0b3;font-weight:600;margin-top:5px">{{ n.time }}</div></div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+
+        <!--MORESCREENS-->
+
+      </div>
+
+      <!-- ===================== BOTTOM NAV ===================== -->
+      <sc-if value="{{ showNav }}" hint-placeholder-val="{{ true }}">
+      <div style="flex:none;background:#fff;border-top:1px solid #e7ebf3;padding:9px 14px 5px;display:flex;align-items:flex-start;justify-content:space-between;box-shadow:0 -4px 20px rgba(16,33,64,.05);overflow:visible">
+        <button onClick="{{ goBeranda }}" style="flex:1;border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;font-family:inherit;padding:2px 0">
+          <svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="{{ navBerandaC }}" stroke-width="1.95" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.6l9-7 9 7V20a1 1 0 0 1-1 1h-5v-6.5h-6V21H4a1 1 0 0 1-1-1z"></path></svg>
+          <span style="font-size:9.5px;font-weight:700;color:{{ navBerandaC }}">Beranda</span>
+        </button>
+        <button onClick="{{ goRiwayat }}" style="flex:1;border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;font-family:inherit;padding:2px 0">
+          <svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="{{ navRiwayatC }}" stroke-width="1.95" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5M3.05 13a9 9 0 1 0 2.6-6.4L3 8M12 7v5l4 2"></path></svg>
+          <span style="font-size:9.5px;font-weight:700;color:{{ navRiwayatC }}">Riwayat</span>
+        </button>
+        <div style="flex:1;display:flex;justify-content:center">
+          <button onClick="{{ startAbsenBtn }}" style="width:60px;height:60px;margin-top:-26px;border:4px solid #fff;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#1d4ed8);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;cursor:pointer;box-shadow:0 10px 22px rgba(29,78,216,.5)">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V6a2 2 0 0 1 2-2h2 M16 4h2a2 2 0 0 1 2 2v2 M20 16v2a2 2 0 0 1-2 2h-2 M8 20H6a2 2 0 0 1-2-2v-2"></path><circle cx="12" cy="12" r="3.2"></circle></svg>
+            <span style="font-size:8px;font-weight:800;color:#fff;letter-spacing:.3px">ABSEN</span>
+          </button>
+        </div>
+        <button onClick="{{ goPengajuan }}" style="flex:1;border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;font-family:inherit;padding:2px 0">
+          <svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="{{ navPengajuanC }}" stroke-width="1.95" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z M14 3v5h5 M9 13h6 M9 17h4"></path></svg>
+          <span style="font-size:9.5px;font-weight:700;color:{{ navPengajuanC }}">Pengajuan</span>
+        </button>
+        <button onClick="{{ goProfil }}" style="flex:1;border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;font-family:inherit;padding:2px 0">
+          <svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="{{ navProfilC }}" stroke-width="1.95" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"></circle><path d="M5 21a7 7 0 0 1 14 0"></path></svg>
+          <span style="font-size:9.5px;font-weight:700;color:{{ navProfilC }}">Profil</span>
+        </button>
+      </div>
+      </sc-if>
+
+      <!-- TOAST -->
+      <sc-if value="{{ hasToast }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;left:50%;bottom:96px;transform:translateX(-50%);background:#16223a;color:#fff;padding:11px 18px;border-radius:13px;font-size:13px;font-weight:600;box-shadow:0 14px 36px rgba(0,0,0,.4);display:flex;align-items:center;gap:9px;z-index:60;animation:fadeUp .25s;white-space:nowrap">
+        <span style="width:8px;height:8px;border-radius:50%;background:{{ toastDot }};flex:none"></span>{{ toastMsg }}
+      </div>
+      </sc-if>
+
+      <!-- GESTURE PILL -->
+      <div style="flex:none;height:26px;display:flex;align-items:center;justify-content:center;background:{{ footerColor }}">
+        <div style="width:120px;height:5px;border-radius:3px;background:{{ pillColor }}"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:470,&quot;height&quot;:956},&quot;mulaiDari&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Splash&quot;,&quot;Login&quot;,&quot;Beranda&quot;,&quot;Riwayat&quot;,&quot;Pengajuan&quot;,&quot;Saldo Cuti&quot;,&quot;Lembur&quot;,&quot;Persetujuan&quot;,&quot;Profil&quot;,&quot;Notifikasi&quot;],&quot;default&quot;:&quot;Splash&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototipe&quot;},&quot;statusAbsen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Belum absen&quot;,&quot;Sudah masuk&quot;],&quot;default&quot;:&quot;Belum absen&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototipe&quot;},&quot;peran&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Pegawai + Pimpinan&quot;,&quot;Pegawai saja&quot;],&quot;default&quot;:&quot;Pegawai + Pimpinan&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototipe&quot;}}">
+class Component extends DCLogic {
+  state = {
+    screen:'beranda', absenStep:'lokasi', absenJenis:'masuk',
+    sudahMasuk:false, jamMasuk:'07:42', sudahPulang:false, jamPulang:null,
+    pengFilter:'semua', persTab:'menunggu',
+    loginUser:'', loginPass:'', showPass:false, remember:true,
+    clock:'07:41', today:'', toast:null, approved:{}
+  };
+
+  componentDidMount(){
+    this._tick(); this._t=setInterval(()=>this._tick(),20000);
+    const map={'Splash':'splash','Login':'login','Beranda':'beranda','Riwayat':'riwayat','Pengajuan':'pengajuan','Saldo Cuti':'saldo','Lembur':'lembur','Persetujuan':'persetujuan','Profil':'profil','Notifikasi':'notifikasi'};
+    const m=this.props.mulaiDari;
+    const start = (m && map[m]) ? map[m] : 'splash';
+    this.setState({screen:start});
+    if(start==='splash') this._st=setTimeout(()=>{ if(this.state.screen==='splash') this.setState({screen:'login'}); },2600);
+    if(this.props.statusAbsen==='Sudah masuk') this.setState({sudahMasuk:true});
+  }
+  componentWillUnmount(){ clearInterval(this._t); clearTimeout(this._at); clearTimeout(this._tt); clearTimeout(this._st); }
+  _tick(){ const d=new Date();
+    let t=''; try{ t=new Intl.DateTimeFormat('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'}).format(d);}catch(e){ t=d.toDateString(); }
+    this.setState({ clock:String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'), today:t });
+  }
+  _now(){ const d=new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+
+  PALETTE=['#2563eb','#0f766e','#b45309','#7c3aed','#be123c','#0e7490','#15803d','#a21caf'];
+  _ini(n){ const skip=['dr.','ir.','prof.','ns.','hj.','h.','drs.','dra.']; const w=n.split(',')[0].split(' ').filter(x=>x&&!skip.includes(x.toLowerCase())&&!/\.$/.test(x)); return (w.slice(0,2).map(x=>x[0]).join('')||n.slice(0,2)).toUpperCase(); }
+  _col(i){ return this.PALETTE[((i%this.PALETTE.length)+this.PALETTE.length)%this.PALETTE.length]; }
+
+  go(s){ return ()=>this.setState({screen:s}); }
+  startAbsen(){ const jenis=!this.state.sudahMasuk?'masuk':'pulang'; this.setState({screen:'absen',absenStep:'lokasi',absenJenis:jenis}); }
+  absenToWajah(){ this.setState({absenStep:'wajah'}); }
+  absenVerify(){ this.setState({absenStep:'proses'}); clearTimeout(this._at);
+    this._at=setTimeout(()=>{ const now=this._now(); this.setState(st=> st.absenJenis==='masuk'?{absenStep:'hasil',jamMasuk:now}:{absenStep:'hasil',jamPulang:now}); },1800);
+  }
+  absenDone(){ this.setState(st=> st.absenJenis==='masuk'?{sudahMasuk:true,screen:'beranda',absenStep:'lokasi'}:{sudahPulang:true,screen:'beranda',absenStep:'lokasi'}); }
+  absenCancel(){ this.setState({screen:'beranda',absenStep:'lokasi'}); }
+  setPengFilter(f){ return ()=>this.setState({pengFilter:f}); }
+  setPersTab(t){ return ()=>this.setState({persTab:t}); }
+  approve(id,ok){ return ()=>{ this.setState(s=>({approved:{...s.approved,[id]:ok?'disetujui':'ditolak'}})); this._flash(ok?'Pengajuan disetujui':'Pengajuan ditolak', ok?'ok':'no'); }; }
+  doLogin(){ this.setState({screen:'beranda'}); }
+  splashSkip(){ clearTimeout(this._st); this.setState({screen:'login'}); }
+  setUser(e){ this.setState({loginUser:e.target.value}); }
+  setPass(e){ this.setState({loginPass:e.target.value}); }
+  togglePass(){ this.setState(s=>({showPass:!s.showPass})); }
+  toggleRemember(){ this.setState(s=>({remember:!s.remember})); }
+  doLogout(){ this.setState({screen:'login'}); }
+  _flash(msg,kind){ this.setState({toast:{msg,kind:kind||'ok'}}); clearTimeout(this._tt); this._tt=setTimeout(()=>this.setState({toast:null}),2400); }
+
+  renderVals(){
+    const st=this.state;
+    const peranPimpinan = (this.props.peran||'Pegawai + Pimpinan') !== 'Pegawai saja';
+    const sc=st.screen;
+    const dark = (sc==='login'||sc==='absen'||sc==='splash');
+    const topColor = sc==='login' ? '#0d2747' : sc==='absen' ? '#0a1428' : sc==='splash' ? '#0d2747' : '#eef1f6';
+    const sbIcon = dark ? '#ffffff' : '#16223a';
+    const showNav = ['beranda','riwayat','pengajuan','profil'].includes(sc);
+    const footerColor = showNav ? '#ffffff' : sc==='login' ? '#0d2747' : sc==='absen' ? '#0a1428' : sc==='splash' ? '#0a1d36' : '#eef1f6';
+    const pillColor = dark ? 'rgba(255,255,255,.45)' : '#c2c9d6';
+
+    const hr = parseInt((st.clock||'07').slice(0,2),10);
+    const greeting = hr<11?'Selamat pagi': hr<15?'Selamat siang': hr<18?'Selamat sore':'Selamat malam';
+
+    const me = {
+      ini:'SH', nama:'Dr. Ir. Sutomo Hadi, M.T.', sapaan:'Pak Sutomo',
+      jabatan:'Dekan Fakultas Teknik', unit:'FATEK · Teknik Sipil',
+      nip:'1982 0315 2008 01 1002', status:'PNS', gol:'IV/b', pangkat:'Pembina Tk. I',
+      email:'sutomo.hadi@untad.ac.id', hp:'0812-4455-7788',
+      kategori:'Dosen dengan Tugas Tambahan', kategoriSingkat:'Dosen Tugas Tambahan', minJam:'4 jam', minMenit:'240 menit',
+      peranSingkat:'Pimpinan FATEK'
+    };
+
+    const STT={
+      hadir:{l:'Hadir',c:'#0f7a4a',bg:'#e7f6ed'},
+      terlambat:{l:'Terlambat',c:'#b45309',bg:'#fdf2dd'},
+      izin:{l:'Izin',c:'#1c4fb8',bg:'#e7eefc'},
+      cuti:{l:'Cuti',c:'#7c3aed',bg:'#f0ecfd'},
+      wfh:{l:'WFH',c:'#0f766e',bg:'#e2f3f0'},
+      alpha:{l:'Alpha',c:'#b91c1c',bg:'#fde8e8'},
+      disetujui:{l:'Disetujui',c:'#0f7a4a',bg:'#e7f6ed'},
+      menunggu:{l:'Menunggu',c:'#b45309',bg:'#fdf2dd'},
+      ditolak:{l:'Ditolak',c:'#b91c1c',bg:'#fde8e8'},
+    };
+    const MODE={ WFO:{c:'#1c4fb8',bg:'#e7eefc'}, WFH:{c:'#0f766e',bg:'#e2f3f0'}, SHIFT:{c:'#7c3aed',bg:'#f0ecfd'} };
+    const KAT={
+      cuti:{l:'Cuti',c:'#7c3aed',bg:'#f0ecfd'}, izin:{l:'Izin',c:'#1c4fb8',bg:'#e7eefc'},
+      sakit:{l:'Sakit',c:'#0e7490',bg:'#e0f2f6'}, wfh:{l:'WFH',c:'#0f766e',bg:'#e2f3f0'},
+      lembur:{l:'Lembur',c:'#b45309',bg:'#fdf2dd'}, dinas:{l:'Dinas',c:'#b45309',bg:'#fdf2dd'}
+    };
+
+    // ---------- BERANDA ----------
+    const bMasuk = st.sudahMasuk;
+    const bPulang = st.sudahPulang;
+    const absBtnShow = !st.sudahPulang;
+    let absTitle, absSub, absBtnLabel;
+    if(!st.sudahMasuk){ absTitle='Anda belum absen masuk'; absSub='Ketuk untuk memulai presensi hari ini'; absBtnLabel='Absen Masuk'; }
+    else if(!st.sudahPulang){ absTitle='Sudah absen masuk'; absSub='Jangan lupa absen pulang sebelum 17.00'; absBtnLabel='Absen Pulang'; }
+    else { absTitle='Presensi hari ini selesai'; absSub='Terima kasih, sampai jumpa besok'; absBtnLabel=''; }
+
+    const stats=[
+      { d:'M12 8v4l3 2M12 3a9 9 0 1 0 9 9', color:'#1d4ed8', value: st.sudahMasuk?'4j 18m':'0j 0m', label:'Jam kerja · min 4j' },
+      { d:'M8 2v3M16 2v3M3.5 9h17M5 6h14a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2', color:'#0f766e', value:'14', label:'Sisa cuti tahunan' },
+      { d:'M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z M14 3v5h5', color:'#b45309', value:'2', label:'Pengajuan diproses' },
+    ];
+
+    const SHORT=[
+      {label:'Riwayat', scr:'riwayat', color:'#1d4ed8', bg:'#e7eefc', d:'M3 3v5h5M3.05 13a9 9 0 1 0 2.6-6.4L3 8M12 7v5l4 2'},
+      {label:'Saldo Cuti', scr:'saldo', color:'#0f766e', bg:'#e2f3f0', d:'M8 2v3M16 2v3M3.5 9h17M5 6h14a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2M9 15l2 2 4-4'},
+      {label:'Ajukan', scr:'pengajuanBaru', color:'#7c3aed', bg:'#f0ecfd', d:'M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z M13 3v6h6 M12 12v6 M9 15h6'},
+      {label:'Lembur', scr:'lembur', color:'#b45309', bg:'#fdf2dd', d:'M12 8v4l2.5 1.5M21 12a9 9 0 1 1-9-9M19 3v4M17 5h4'},
+      {label:'WFH', scr:'pengajuanBaru', color:'#0e7490', bg:'#e0f2f6', d:'M3 9.6l9-7 9 7V20a1 1 0 0 1-1 1h-5v-6.5h-6V21H4a1 1 0 0 1-1-1z'},
+      {label:'Sakit', scr:'pengajuanBaru', color:'#be123c', bg:'#fde8e8', d:'M9 3h6v3h3a1 1 0 0 1 1 1v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7a1 1 0 0 1 1-1h3zM12 11v5M9.5 13.5h5'},
+      {label:'Persetujuan', scr:'persetujuan', color:'#1c4fb8', bg:'#e7eefc', d:'M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11'},
+      {label:'Notifikasi', scr:'notifikasi', color:'#48536a', bg:'#eceff4', d:'M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0'},
+    ];
+    const shortcuts = SHORT.filter(s=> s.scr!=='persetujuan' || peranPimpinan).slice(0,8).map(s=>({ label:s.label, color:s.color, bg:s.bg, d:s.d, onClick:this.go(s.scr) }));
+
+    const RIW=[
+      {tgl:'30',hari:'SEN',masuk:'07:38',keluar:'16:10',dur:'8j 32m',st:'hadir',mode:'WFO'},
+      {tgl:'27',hari:'JUM',masuk:'07:51',keluar:'15:40',dur:'7j 49m',st:'hadir',mode:'WFO'},
+      {tgl:'26',hari:'KAM',masuk:'08:12',keluar:'16:05',dur:'7j 53m',st:'terlambat',mode:'WFO'},
+      {tgl:'25',hari:'RAB',masuk:'—',keluar:'—',dur:'Izin keperluan keluarga',st:'izin',mode:'—'},
+      {tgl:'24',hari:'SEL',masuk:'07:33',keluar:'16:20',dur:'8j 47m',st:'hadir',mode:'WFO'},
+      {tgl:'23',hari:'SEN',masuk:'09:02',keluar:'16:00',dur:'6j 58m',st:'hadir',mode:'WFH'},
+      {tgl:'20',hari:'JUM',masuk:'07:45',keluar:'15:55',dur:'8j 10m',st:'hadir',mode:'WFO'},
+      {tgl:'19',hari:'KAM',masuk:'07:40',keluar:'16:15',dur:'8j 35m',st:'hadir',mode:'WFO'},
+    ];
+    const aktivitas = RIW.slice(0,3).map((r,i)=>{ const s=STT[r.st]; const m=MODE[r.mode]||{};
+      return { tgl:r.tgl, hari:r.hari, masuk:r.masuk, keluar:r.keluar, dur:r.dur, modeLabel: r.mode==='—'?'Izin':r.mode,
+        stLabel:s.l, stColor:s.c, stBg:s.bg, color:'#1d4ed8', bg:'#eef3fc' }; });
+
+    // ---------- RIWAYAT ----------
+    const riwRows = RIW.map(r=>{ const s=STT[r.st]; const m=MODE[r.mode]||{c:'#94a0b3',bg:'#eef1f6'};
+      return { tgl:r.tgl, hari:r.hari, masuk:r.masuk, keluar:r.keluar, dur:r.dur, modeLabel:r.mode, modeC:m.c, modeBg:m.bg,
+        stLabel:s.l, stColor:s.c, stBg:s.bg, isHadir: r.mode!=='—' };
+    });
+    const riwSummary=[
+      {label:'Hadir', value:'18', color:'#0f7a4a', bg:'#e7f6ed'},
+      {label:'Terlambat', value:'2', color:'#b45309', bg:'#fdf2dd'},
+      {label:'Izin/WFH', value:'4', color:'#1c4fb8', bg:'#e7eefc'},
+      {label:'Alpha', value:'0', color:'#94a0b3', bg:'#eef1f6'},
+    ];
+
+    // ---------- PENGAJUAN ----------
+    const PNG=[
+      {jenis:'Cuti Tahunan', kat:'cuti', range:'12–13 Jun 2026', hari:'2 hari kerja', st:'disetujui'},
+      {jenis:'Izin Keperluan Keluarga', kat:'izin', range:'25 Jun 2026', hari:'1 hari', st:'menunggu'},
+      {jenis:'Work From Home', kat:'wfh', range:'23 Jun 2026', hari:'1 hari', st:'disetujui'},
+      {jenis:'Cuti Sakit', kat:'sakit', range:'5 Jun 2026', hari:'1 hari · surat dokter', st:'disetujui'},
+      {jenis:'Lembur Akreditasi Prodi', kat:'lembur', range:'2 Jun 2026', hari:'3 jam', st:'disetujui'},
+      {jenis:'Izin Datang Terlambat', kat:'izin', range:'18 Mei 2026', hari:'2 jam', st:'ditolak'},
+    ];
+    const pengChips=[
+      {key:'semua',label:'Semua'},{key:'izin',label:'Izin'},{key:'cuti',label:'Cuti'},
+      {key:'sakit',label:'Sakit'},{key:'wfh',label:'WFH'},{key:'lembur',label:'Lembur'}
+    ].map(c=>({ label:c.label, active: st.pengFilter===c.key, onClick:this.setPengFilter(c.key),
+      bg: st.pengFilter===c.key?'#0d2747':'#fff', fg: st.pengFilter===c.key?'#fff':'#48536a', bd: st.pengFilter===c.key?'#0d2747':'#e1e6ef' }));
+    const pengList = PNG.filter(p=> st.pengFilter==='semua' || p.kat===st.pengFilter).map(p=>{ const k=KAT[p.kat], s=STT[p.st];
+      return { jenis:p.jenis, range:p.range, hari:p.hari, katL:k.l, katC:k.c, katBg:k.bg, stL:s.l, stC:s.c, stBg:s.bg, d:this._katIcon(p.kat) }; });
+
+    // ---------- SALDO ----------
+    const saldoTahunan = { hak:12, carry:6, pakai:4, sisa:14, barPakai: (4/18*100)+'%', barSisa:(14/18*100)+'%' };
+    const saldoList=[
+      {nama:'Cuti Besar', sisa:'3 bulan', note:'Memenuhi syarat · masa kerja ≥ 5 thn', c:'#0f766e', bg:'#e2f3f0', d:'M12 2l2.4 7.4H22l-6 4.5 2.3 7.1-6.3-4.6L5.7 21l2.3-7.1-6-4.5h7.6z'},
+      {nama:'Cuti Sakit', sisa:'Sesuai surat', note:'1–14 hr surat dokter; >14 hr tim penguji', c:'#0e7490', bg:'#e0f2f6', d:'M9 3h6v3h3v15H6V6h3zM12 11v5M9.5 13.5h5'},
+      {nama:'Cuti Alasan Penting', sisa:'Maks 1 bln', note:'Nikah / keluarga inti / bencana', c:'#be123c', bg:'#fde8e8', d:'M20.8 8.6a5 5 0 0 0-8.8-3.2A5 5 0 0 0 3.2 8.6c0 4.5 8.8 11 8.8 11s8.8-6.5 8.8-11z'},
+      {nama:'Cuti Bersama', sisa:'Ikut Keppres', note:'Tidak memotong cuti tahunan', c:'#7c3aed', bg:'#f0ecfd', d:'M8 2v3M16 2v3M3.5 9h17M5 6h14a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2'},
+    ];
+
+    // ---------- LEMBUR ----------
+    const lemburList=[
+      {tgl:'2 Jun 2026', jam:'17:00 – 20:00', dur:'3j 0m', desc:'Persiapan akreditasi prodi', st:'disetujui'},
+      {tgl:'9 Jun 2026', jam:'16:30 – 19:00', dur:'2j 30m', desc:'Rapat anggaran fakultas', st:'disetujui'},
+      {tgl:'16 Jun 2026', jam:'17:00 – 18:00', dur:'1j 0m', desc:'Input nilai akhir semester', st:'menunggu'},
+    ].map(l=>{ const s=STT[l.st]; return {...l, stL:s.l, stC:s.c, stBg:s.bg}; });
+
+    // ---------- PERSETUJUAN ----------
+    const PER=[
+      {id:1, nama:'Reza Pratama Nugroho, S.T.', unit:'FATEK · Tata Usaha', jenis:'Cuti Tahunan', kat:'cuti', range:'7–8 Jul 2026', hari:'2 hari kerja', alasan:'Acara keluarga di luar kota', info:'Sisa saldo cuti tahunan: 10 hari'},
+      {id:2, nama:'Bambang Wijaya, S.Kom., M.Cs.', unit:'FATEK · Informatika', jenis:'Izin Keperluan', kat:'izin', range:'3 Jul 2026', hari:'4 jam (sebagian hari)', alasan:'Mengurus administrasi BPJS Kesehatan', info:'Izin berbasis jam'},
+      {id:3, nama:'Andi Saputra, A.Md.', unit:'FATEK · Tata Usaha', jenis:'Work From Home', kat:'wfh', range:'4 Jul 2026', hari:'1 hari', alasan:'Penyelesaian laporan SPM fakultas', info:'Kuota WFH bulan ini: 1 / 4'},
+    ];
+    const persPending = PER.filter(p=>!st.approved[p.id]).map((p,i)=>{ const k=KAT[p.kat];
+      return { id:p.id, nama:p.nama, ini:this._ini(p.nama), color:this._col(i+2), unit:p.unit, jenis:p.jenis, range:p.range, hari:p.hari, alasan:p.alasan, info:p.info,
+        katL:k.l, katC:k.c, katBg:k.bg, setuju:this.approve(p.id,true), tolak:this.approve(p.id,false) }; });
+    const persDone = PER.filter(p=>st.approved[p.id]).map((p,i)=>{ const k=KAT[p.kat]; const stt=st.approved[p.id]; const s=STT[stt];
+      return { id:p.id, nama:p.nama, ini:this._ini(p.nama), color:this._col(i+2), unit:p.unit, jenis:p.jenis, range:p.range, katL:k.l, katC:k.c, katBg:k.bg, stL:s.l, stC:s.c, stBg:s.bg }; });
+    const pendingCount = persPending.length;
+    const persTabMenunggu = st.persTab==='menunggu';
+    const persEmptyDone = persDone.length===0;
+    const persEmptyPending = persPending.length===0;
+
+    // ---------- NOTIF ----------
+    const notifToday=[
+      {ic:'M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11', title:'Reza Pratama mengajukan Cuti Tahunan', desc:'Perlu persetujuan Anda · 7–8 Jul 2026', time:'09:12', c:'#1d4ed8', bg:'#e7eefc', unread:true},
+      {ic:'M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z', title:'Anda belum absen pulang kemarin', desc:'Lengkapi jam keluar 29 Jun via koreksi atasan', time:'07:30', c:'#b45309', bg:'#fdf2dd', unread:true},
+    ];
+    const notifEarlier=[
+      {ic:'M5 12l5 5L20 6', title:'Pengajuan WFH Anda disetujui', desc:'23 Jun 2026 · oleh Admin Kepegawaian', time:'Kemarin 14:20', c:'#0f7a4a', bg:'#e7f6ed', unread:false},
+      {ic:'M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z', title:'Saldo cuti tahunan akan hangus', desc:'6 hari carry-over kedaluwarsa 31 Des 2026', time:'Kemarin 08:00', c:'#b91c1c', bg:'#fde8e8', unread:false},
+      {ic:'M12 2l2.4 7.4H22l-6 4.5 2.3 7.1-6.3-4.6L5.7 21l2.3-7.1-6-4.5h7.6z', title:'Cuti Besar Anda kini aktif', desc:'Masa kerja ≥ 5 tahun telah terpenuhi', time:'2 hari lalu', c:'#7c3aed', bg:'#f0ecfd', unread:false},
+    ];
+    const notifCount = notifToday.filter(n=>n.unread).length + 5;
+
+    // ---------- ABSEN ----------
+    const absenJenisLabel = st.absenJenis==='masuk'?'Masuk':'Pulang';
+    const stepNum = st.absenStep==='lokasi'?1: st.absenStep==='wajah'?2:3;
+    const absStepHint = st.absenStep==='hasil'?'Selesai': ('Langkah '+stepNum+' dari 3 · '+(st.absenStep==='lokasi'?'Validasi lokasi': st.absenStep==='wajah'?'Pengenalan wajah':'Verifikasi'));
+    const resJam = st.absenJenis==='masuk' ? st.jamMasuk : st.jamPulang;
+    const resStatus = st.absenJenis==='masuk' ? 'Hadir · Tepat waktu' : 'Tercatat · durasi memenuhi';
+
+    return {
+      // frame
+      clock:st.clock, today:st.today, topColor, sbIcon, footerColor, pillColor, showNav,
+      isSplash: sc==='splash', splashSkip:()=>this.splashSkip(),
+      isLogin: sc==='login', isBeranda: sc==='beranda', isAbsen: sc==='absen',
+      isRiwayat: sc==='riwayat', isPengajuan: sc==='pengajuan', isPengajuanBaru: sc==='pengajuanBaru',
+      isSaldo: sc==='saldo', isLembur: sc==='lembur', isPersetujuan: sc==='persetujuan',
+      isProfil: sc==='profil', isNotif: sc==='notifikasi',
+      // nav
+      navBerandaC: sc==='beranda'?'#1d4ed8':'#9aa5b6', navRiwayatC: sc==='riwayat'?'#1d4ed8':'#9aa5b6',
+      navPengajuanC: sc==='pengajuan'?'#1d4ed8':'#9aa5b6', navProfilC: sc==='profil'?'#1d4ed8':'#9aa5b6',
+      goBeranda:this.go('beranda'), goRiwayat:this.go('riwayat'), goPengajuan:this.go('pengajuan'),
+      goProfil:this.go('profil'), goNotif:this.go('notifikasi'), goPersetujuan:this.go('persetujuan'),
+      goSaldo:this.go('saldo'), goLembur:this.go('lembur'), goPengajuanBaru:this.go('pengajuanBaru'),
+      doLogin:()=>this.doLogin(), doLogout:()=>this.doLogout(),
+      loginUser:st.loginUser, loginPass:st.loginPass,
+      setUser:(e)=>this.setUser(e), setPass:(e)=>this.setPass(e),
+      togglePass:()=>this.togglePass(), passType: st.showPass?'text':'password',
+      eyePath: st.showPass?'M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z':'M17.9 17.9A10.4 10.4 0 0 1 12 20C5 20 1 12 1 12a19 19 0 0 1 5.1-6M9.9 4.2A10.9 10.9 0 0 1 12 4c7 0 11 8 11 8a19.2 19.2 0 0 1-2.2 3.2M1 1l22 22',
+      eyeDot: st.showPass?'1':'0',
+      toggleRemember:()=>this.toggleRemember(),
+      rememberBd: st.remember?'#3b82f6':'rgba(255,255,255,.3)', rememberBg: st.remember?'#1d4ed8':'transparent', rememberTick: st.remember?'1':'0',
+      startAbsenBtn:()=>this.startAbsen(),
+      // toast
+      hasToast: !!st.toast, toastMsg: st.toast?st.toast.msg:'', toastDot: st.toast&&st.toast.kind==='no'?'#dc2626':'#34d399',
+      // login + me
+      me, greeting,
+      // beranda
+      notifCount, modeChip:'WFO · Reguler',
+      absTitle, absSub, absBtnShow, absBtnLabel, bMasuk, bPulang,
+      jamMasuk:st.jamMasuk, jamPulangTxt: st.jamPulang||'—', pulangColor: st.jamPulang?'#fff':'#5d80ad',
+      geoText:'Dalam radius · Gd. Dekanat FATEK', jarakText:'12 m',
+      stats, shortcuts, aktivitas, pimpinanShow: peranPimpinan, pendingCount,
+      // riwayat
+      riwRows, riwSummary, riwBulan:'Juni 2026',
+      // pengajuan
+      pengChips, pengList, pengEmpty: pengList.length===0,
+      // saldo
+      saldoTahunan, saldoList,
+      // lembur
+      lemburList, lemburTotal:'6j 30m',
+      // persetujuan
+      persPending, persDone, pendingCountP:pendingCount, doneCount:persDone.length,
+      persTabMenunggu, persTabRiwayat: !persTabMenunggu, persEmptyDone, persEmptyPending,
+      persTabMenungguOn:this.setPersTab('menunggu'), persTabRiwayatOn:this.setPersTab('riwayat'),
+      tabMenungguBg: persTabMenunggu?'#0d2747':'transparent', tabMenungguC: persTabMenunggu?'#fff':'#7a8699',
+      tabRiwayatBg: !persTabMenunggu?'#0d2747':'transparent', tabRiwayatC: !persTabMenunggu?'#fff':'#7a8699',
+      // notif
+      notifToday, notifEarlier,
+      // absen
+      absenJenisLabel, absStepHint, resJam, resStatus,
+      absStepLokasi: st.absenStep==='lokasi', absStepWajah: st.absenStep==='wajah',
+      absStepProses: st.absenStep==='proses', absStepHasil: st.absenStep==='hasil',
+      absenToWajah:()=>this.absenToWajah(), absenVerify:()=>this.absenVerify(),
+      absenDone:()=>this.absenDone(), absenCancel:()=>this.absenCancel(),
+      submitPengajuan:()=>{ this._flash('Pengajuan terkirim · menunggu persetujuan'); this.setState({screen:'pengajuan'}); },
+    };
+  }
+
+  _katIcon(k){
+    const M={ cuti:'M8 2v3M16 2v3M3.5 9h17M5 6h14a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2',
+      izin:'M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z M14 3v5h5',
+      sakit:'M9 3h6v3h3v15H6V6h3zM12 11v5M9.5 13.5h5', wfh:'M3 9.6l9-7 9 7V20a1 1 0 0 1-1 1h-5v-6.5h-6V21H4a1 1 0 0 1-1-1z',
+      lembur:'M12 8v4l2.5 1.5M21 12a9 9 0 1 1-9-9', dinas:'M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z' };
+    return M[k]||M.izin;
+  }
+}
+</script>
+</body>
+</html>
