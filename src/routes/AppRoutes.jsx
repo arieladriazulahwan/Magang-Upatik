@@ -7,6 +7,9 @@ import Pegawai from "../pages/pegawai/Pegawai";
 import Monitoring from "../pages/monitoring/Monitoring";
 import UnitKerja from "../pages/unit/UnitKerja";
 import Jadwal from "../pages/jadwal/Jadwal";
+import Pengajuan from "../pages/pengajuan/Pengajuan";
+import Approval from "../pages/pengajuan/Approval";
+import DetailPengajuan from "../pages/pengajuan/DetailPengajuan";
 
 function SimplePage({ title }) {
   return (
@@ -58,17 +61,25 @@ function AppRoutes() {
     />
 
       <Route
-        path="/verifikasi"
-        element={
-          <SimplePage title="Verifikasi & Koreksi" />
-        }
+      path="/pengajuan"
+  element={<Pengajuan />}
+    />
+
+    <Route
+      path="/pengajuan/:id"
+      element={<DetailPengajuan />}
+    />
+
+<Route
+  path="/verifikasi"
+  element={
+    <SimplePage title="Verifikasi & Koreksi" />
+  }
       />
 
       <Route
         path="/persetujuan"
-        element={
-          <SimplePage title="Persetujuan" />
-        }
+        element={<Approval />}
       />
 
       <Route
