@@ -36,7 +36,3 @@ expo-web*.log
 
 # typescript
 *.tsbuildinfo
-
-# generated native folders
-/ios
-/android

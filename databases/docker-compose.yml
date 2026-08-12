@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: klikpresensi-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-si_presensi_untad}
+      POSTGRES_USER: ${POSTGRES_USER:-presensi_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-presensi_password}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - ./data:/var/lib/postgresql/data
+      - ./init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-presensi_user} -d ${POSTGRES_DB:-si_presensi_untad}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
