@@ -4,9 +4,11 @@ import Badge from "../../components/Badge";
 import MainScreen from "../../components/MainScreen";
 import StatCard from "../../components/StatCard";
 import { Colors } from "../../constants/colors";
-import { attendanceRows } from "../../constants/mockData";
+import { usePrototype } from "../../contexts/PrototypeContext";
 
 export default function RiwayatScreen() {
+  const { attendanceHistory } = usePrototype();
+
   return (
     <MainScreen>
       <View style={styles.header}>
@@ -22,7 +24,7 @@ export default function RiwayatScreen() {
       </View>
 
       <View style={styles.list}>
-        {attendanceRows.map((row) => (
+        {attendanceHistory.map((row) => (
           <View key={`${row.day}-${row.date}`} style={styles.row}>
             <View style={styles.dateBox}>
               <Text style={styles.date}>{row.date}</Text>

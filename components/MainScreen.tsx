@@ -3,6 +3,7 @@ import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from "rea
 import { router, usePathname } from "expo-router";
 import Svg, { Circle, Path } from "react-native-svg";
 import { Colors } from "../constants/colors";
+import { usePrototype } from "../contexts/PrototypeContext";
 
 interface MainScreenProps {
   children: React.ReactNode;
@@ -48,6 +49,7 @@ function TabIcon({ name, color }: { name: string; color: string }) {
 
 export default function MainScreen({ children, scroll = true }: MainScreenProps) {
   const pathname = usePathname();
+  const { toast } = usePrototype();
   const content = scroll ? (
     <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
       {children}
@@ -59,6 +61,12 @@ export default function MainScreen({ children, scroll = true }: MainScreenProps)
   return (
     <SafeAreaView style={styles.root}>
       {content}
+      {toast ? (
+        <View style={styles.toast}>
+          <View style={styles.toastDot} />
+          <Text style={styles.toastText}>{toast}</Text>
+        </View>
+      ) : null}
       <View style={styles.nav}>
         {tabs.map((tab) => {
           const active = tab.match.some((item) => pathname === item || pathname.endsWith(item));
@@ -104,6 +112,35 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     borderTopWidth: 1,
     borderTopColor: Colors.line,
+  },
+  toast: {
+    position: "absolute",
+    left: 22,
+    right: 22,
+    bottom: 88,
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 9,
+    borderRadius: 13,
+    backgroundColor: "#16223A",
+    shadowColor: Colors.black,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.28,
+    shadowRadius: 24,
+    elevation: 8,
+  },
+  toastDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.success,
+  },
+  toastText: {
+    color: Colors.white,
+    fontSize: 12.5,
+    fontWeight: "700",
   },
   navItem: {
     flex: 1,

@@ -5,20 +5,34 @@ import Svg, { Circle, Path } from "react-native-svg";
 import Badge from "../../components/Badge";
 import Button from "../../components/Button";
 import { Colors } from "../../constants/colors";
+import { usePrototype } from "../../contexts/PrototypeContext";
 
 type Step = "lokasi" | "wajah" | "hasil";
 
 export default function PresensiScreen() {
   const [step, setStep] = useState<Step>("lokasi");
+  const [completedType, setCompletedType] = useState<"masuk" | "pulang" | null>(null);
+  const { attendanceState, jamMasuk, jamPulang, submitAttendance } = usePrototype();
+  const type = attendanceState === "masuk" ? "pulang" : "masuk";
+  const typeLabel = type === "masuk" ? "Masuk" : "Pulang";
+  const resultType = completedType || type;
+  const resultLabel = resultType === "masuk" ? "Masuk" : "Pulang";
+  const resultTime = resultType === "masuk" ? jamMasuk : jamPulang;
+
+  const finishAttendance = () => {
+    setCompletedType(type);
+    submitAttendance(type);
+    setStep("hasil");
+  };
 
   return (
     <View style={styles.root}>
       <View style={styles.top}>
         <Pressable onPress={() => router.back()} style={styles.back}>
-          <Text style={styles.backText}>‹</Text>
+          <Text style={styles.backText}>{"<"}</Text>
         </Pressable>
         <View>
-          <Text style={styles.title}>Presensi Masuk</Text>
+          <Text style={styles.title}>Presensi {typeLabel}</Text>
           <Text style={styles.subtitle}>
             {step === "lokasi" ? "Langkah 1 dari 3 - Validasi lokasi" : step === "wajah" ? "Langkah 2 dari 3 - Pengenalan wajah" : "Selesai"}
           </Text>
@@ -57,22 +71,22 @@ export default function PresensiScreen() {
             <View style={styles.scanLine} />
             <Text style={styles.cameraHint}>Posisikan wajah di dalam bingkai</Text>
           </View>
-          <Button title="Verifikasi Wajah" onPress={() => setStep("hasil")} />
+          <Button title="Verifikasi Wajah" onPress={finishAttendance} />
         </View>
       ) : null}
 
       {step === "hasil" ? (
         <View style={styles.content}>
           <View style={styles.resultIcon}>
-            <Text style={styles.resultCheck}>✓</Text>
+            <Text style={styles.resultCheck}>OK</Text>
           </View>
           <Text style={styles.resultTitle}>Presensi berhasil</Text>
-          <Text style={styles.resultSub}>Masuk tercatat pukul 07:42 WITA</Text>
+          <Text style={styles.resultSub}>{resultLabel} tercatat pukul {resultTime || "--:--"} WITA</Text>
           <View style={styles.resultCard}>
             <Row label="Skor kemiripan wajah" value="0.93 - lolos" />
             <Row label="Anti-spoofing / liveness" value="Lolos" />
             <Row label="Lokasi geofence" value="Gd. Dekanat FATEK" />
-            <Row label="Tipe presensi" value="WFO - Dosen Tugas Tambahan" />
+            <Row label="Tipe presensi" value={`WFO - ${resultLabel}`} />
           </View>
           <Badge label="Hadir - Tepat waktu" tone="green" />
           <Button title="Kembali ke Beranda" onPress={() => router.replace("/(main)")} />
@@ -252,7 +266,7 @@ const styles = StyleSheet.create({
   },
   resultCheck: {
     color: Colors.white,
-    fontSize: 42,
+    fontSize: 24,
     fontWeight: "800",
   },
   resultTitle: {

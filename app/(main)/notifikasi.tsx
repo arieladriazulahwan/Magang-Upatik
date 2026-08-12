@@ -4,14 +4,16 @@ import { router } from "expo-router";
 import Badge from "../../components/Badge";
 import MainScreen from "../../components/MainScreen";
 import { Colors } from "../../constants/colors";
-import { notifications } from "../../constants/mockData";
+import { usePrototype } from "../../contexts/PrototypeContext";
 
 export default function NotifikasiScreen() {
+  const { notifications, markNotificationRead } = usePrototype();
+
   return (
     <MainScreen>
       <View style={styles.headerRow}>
         <Pressable onPress={() => router.back()} style={styles.back}>
-          <Text style={styles.backText}>‹</Text>
+          <Text style={styles.backText}>{"<"}</Text>
         </Pressable>
         <View>
           <Text style={styles.title}>Notifikasi</Text>
@@ -21,7 +23,7 @@ export default function NotifikasiScreen() {
 
       <View style={styles.list}>
         {notifications.map((item) => (
-          <View key={`${item.title}-${item.time}`} style={styles.card}>
+          <Pressable key={`${item.title}-${item.time}`} style={styles.card} onPress={() => markNotificationRead(item.id)}>
             <View style={[styles.icon, item.unread ? styles.iconUnread : null]}>
               <Text style={[styles.iconText, item.unread ? styles.iconTextUnread : null]}>!</Text>
             </View>
@@ -33,7 +35,7 @@ export default function NotifikasiScreen() {
               <Text style={styles.desc}>{item.desc}</Text>
               <Text style={styles.time}>{item.time}</Text>
             </View>
-          </View>
+          </Pressable>
         ))}
       </View>
     </MainScreen>

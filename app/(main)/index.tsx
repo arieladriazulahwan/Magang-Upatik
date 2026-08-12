@@ -7,13 +7,18 @@ import Badge from "../../components/Badge";
 import MainScreen from "../../components/MainScreen";
 import StatCard from "../../components/StatCard";
 import { Colors } from "../../constants/colors";
-import { attendanceRows, me } from "../../constants/mockData";
+import { me } from "../../constants/mockData";
+import { usePrototype } from "../../contexts/PrototypeContext";
 
 const shortcuts = [
   { label: "Riwayat", route: "/(main)/riwayat", tone: "#1D4ED8" },
-  { label: "Saldo Cuti", route: "/(main)/pengajuan", tone: "#0F766E" },
+  { label: "Saldo Cuti", route: "/(main)/saldo", tone: "#0F766E" },
   { label: "Ajukan", route: "/(main)/pengajuan-baru", tone: "#7C3AED" },
-  { label: "Presensi", route: "/(main)/presensi", tone: "#B45309" },
+  { label: "Lembur", route: "/(main)/lembur", tone: "#B45309" },
+  { label: "Presensi", route: "/(main)/presensi", tone: "#0E7490" },
+  { label: "Persetujuan", route: "/(main)/persetujuan", tone: "#1C4FB8" },
+  { label: "Notifikasi", route: "/(main)/notifikasi", tone: "#48536A" },
+  { label: "Profil", route: "/(main)/profil", tone: "#BE123C" },
 ];
 
 function BellIcon() {
@@ -25,6 +30,12 @@ function BellIcon() {
 }
 
 export default function BerandaScreen() {
+  const { attendanceState, jamMasuk, jamPulang, workDuration, attendanceHistory, unreadCount } = usePrototype();
+  const isDone = attendanceState === "selesai";
+  const absTitle = attendanceState === "belum" ? "Anda belum absen masuk" : isDone ? "Presensi hari ini selesai" : "Sudah absen masuk";
+  const absSub = attendanceState === "belum" ? "Ketuk untuk memulai presensi hari ini" : isDone ? "Terima kasih, sampai jumpa besok" : "Jangan lupa absen pulang sebelum 17.00";
+  const absButton = attendanceState === "belum" ? "Absen Masuk" : "Absen Pulang";
+
   return (
     <MainScreen>
       <View style={styles.hero}>
@@ -38,7 +49,7 @@ export default function BerandaScreen() {
           </View>
           <Pressable style={styles.bell} onPress={() => router.push("/(main)/notifikasi")}>
             <BellIcon />
-            <View style={styles.dot} />
+            {unreadCount > 0 ? <View style={styles.dot} /> : null}
           </Pressable>
         </View>
 
@@ -47,22 +58,24 @@ export default function BerandaScreen() {
 
         <View style={styles.presenceCard}>
           <View>
-            <Text style={styles.presenceTitle}>Anda belum absen masuk</Text>
-            <Text style={styles.presenceSub}>Ketuk untuk memulai presensi hari ini</Text>
+            <Text style={styles.presenceTitle}>{absTitle}</Text>
+            <Text style={styles.presenceSub}>{absSub}</Text>
           </View>
-          <Pressable style={styles.presenceButton} onPress={() => router.push("/(main)/presensi")}>
-            <Text style={styles.presenceButtonText}>Absen Masuk</Text>
-          </Pressable>
+          {!isDone ? (
+            <Pressable style={styles.presenceButton} onPress={() => router.push("/(main)/presensi")}>
+              <Text style={styles.presenceButtonText}>{absButton}</Text>
+            </Pressable>
+          ) : null}
         </View>
 
         <View style={styles.timeRow}>
           <View>
             <Text style={styles.timeLabel}>Masuk</Text>
-            <Text style={styles.timeValue}>--:--</Text>
+            <Text style={styles.timeValue}>{jamMasuk || "--:--"}</Text>
           </View>
           <View>
             <Text style={styles.timeLabel}>Pulang</Text>
-            <Text style={styles.timeValue}>--:--</Text>
+            <Text style={styles.timeValue}>{jamPulang || "--:--"}</Text>
           </View>
           <View>
             <Text style={styles.timeLabel}>Lokasi</Text>
@@ -72,7 +85,7 @@ export default function BerandaScreen() {
       </View>
 
       <View style={styles.stats}>
-        <StatCard value="0j 0m" label="Jam kerja - min 4j" />
+        <StatCard value={workDuration} label="Jam kerja - min 4j" />
         <StatCard value="14" label="Sisa cuti tahunan" />
         <StatCard value="2" label="Pengajuan diproses" />
       </View>
@@ -98,7 +111,7 @@ export default function BerandaScreen() {
             <Text style={styles.link}>Lihat semua</Text>
           </Pressable>
         </View>
-        {attendanceRows.slice(0, 3).map((row) => (
+        {attendanceHistory.slice(0, 3).map((row) => (
           <View key={`${row.day}-${row.date}`} style={styles.activityRow}>
             <View style={styles.dateBox}>
               <Text style={styles.date}>{row.date}</Text>

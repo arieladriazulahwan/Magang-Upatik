@@ -1,12 +1,21 @@
-import React from "react";
+import React, { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
 import Badge from "../../components/Badge";
 import MainScreen from "../../components/MainScreen";
 import { Colors } from "../../constants/colors";
-import { requests } from "../../constants/mockData";
+import { usePrototype } from "../../contexts/PrototypeContext";
+
+const filters = ["Semua", "Izin", "Cuti", "Sakit", "WFH"];
 
 export default function PengajuanScreen() {
+  const [activeFilter, setActiveFilter] = useState("Semua");
+  const { requests } = usePrototype();
+  const filteredRequests = useMemo(
+    () => requests.filter((item) => activeFilter === "Semua" || item.type === activeFilter),
+    [activeFilter, requests]
+  );
+
   return (
     <MainScreen>
       <View style={styles.headerRow}>
@@ -20,15 +29,15 @@ export default function PengajuanScreen() {
       </View>
 
       <View style={styles.chips}>
-        {["Semua", "Izin", "Cuti", "Sakit", "WFH"].map((item, index) => (
-          <View key={item} style={[styles.chip, index === 0 ? styles.activeChip : null]}>
-            <Text style={[styles.chipText, index === 0 ? styles.activeChipText : null]}>{item}</Text>
-          </View>
+        {filters.map((item) => (
+          <Pressable key={item} style={[styles.chip, activeFilter === item ? styles.activeChip : null]} onPress={() => setActiveFilter(item)}>
+            <Text style={[styles.chipText, activeFilter === item ? styles.activeChipText : null]}>{item}</Text>
+          </Pressable>
         ))}
       </View>
 
       <View style={styles.list}>
-        {requests.map((item) => (
+        {filteredRequests.map((item) => (
           <View key={`${item.title}-${item.meta}`} style={styles.card}>
             <View style={styles.cardTop}>
               <Badge label={item.type} tone={item.type === "Cuti" ? "purple" : item.type === "WFH" ? "green" : "blue"} />
@@ -38,6 +47,11 @@ export default function PengajuanScreen() {
             <Text style={styles.cardMeta}>{item.meta} - {item.days}</Text>
           </View>
         ))}
+        {filteredRequests.length === 0 ? (
+          <View style={styles.empty}>
+            <Text style={styles.emptyText}>Tidak ada pengajuan pada kategori ini</Text>
+          </View>
+        ) : null}
       </View>
     </MainScreen>
   );
@@ -120,5 +134,18 @@ const styles = StyleSheet.create({
     color: "#7A8699",
     fontSize: 12,
     fontWeight: "600",
+  },
+  empty: {
+    alignItems: "center",
+    padding: 26,
+    borderRadius: 15,
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.line,
+  },
+  emptyText: {
+    color: "#94A0B3",
+    fontSize: 13,
+    fontWeight: "700",
   },
 });
