@@ -1,7 +1,8 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import AdminLayout from "../../components/layout/AdminLayout";
 
-const initialApprovals = [
+const initialApprovalData = [
   {
     id: 1,
     name: "Siti Rahma",
@@ -28,18 +29,6 @@ const initialApprovals = [
   },
   {
     id: 3,
-    name: "Rina Amelia",
-    nip: "199402152021052007",
-    unit: "Fakultas Teknik",
-    type: "Dinas",
-    startDate: "14 Agustus 2026",
-    endDate: "15 Agustus 2026",
-    reason: "Mengikuti kegiatan dinas universitas",
-    submitted: "10 Agustus 2026, 09:10",
-    status: "Menunggu",
-  },
-  {
-    id: 4,
     name: "Dewi Lestari",
     nip: "199205202021042004",
     unit: "Fakultas Hukum",
@@ -50,91 +39,62 @@ const initialApprovals = [
     submitted: "08 Agustus 2026, 09:30",
     status: "Disetujui",
   },
-  {
-    id: 5,
-    name: "Andi Saputra",
-    nip: "198501012010011001",
-    unit: "Fakultas Teknik",
-    type: "Izin",
-    startDate: "07 Agustus 2026",
-    endDate: "07 Agustus 2026",
-    reason: "Keperluan pribadi",
-    submitted: "06 Agustus 2026, 15:10",
-    status: "Ditolak",
-  },
 ];
 
 function Approval() {
-  const [approvals, setApprovals] =
-    useState(initialApprovals);
+  const navigate = useNavigate();
 
-  const [search, setSearch] = useState("");
+  const [data, setData] =
+    useState(initialApprovalData);
 
-  const [typeFilter, setTypeFilter] =
-    useState("Semua Jenis");
+  const [search, setSearch] =
+    useState("");
 
   const [statusFilter, setStatusFilter] =
     useState("Menunggu");
 
-  const [selected, setSelected] =
-    useState(null);
-
-  const [showModal, setShowModal] =
-    useState(false);
-
-  const [actionType, setActionType] =
-    useState("");
-
-  const [note, setNote] =
-    useState("");
-
-  const filteredData = approvals.filter((item) => {
+  const filteredData = data.filter((item) => {
     const keyword = search.toLowerCase();
 
     const matchSearch =
-      item.name.toLowerCase().includes(keyword) ||
-      item.nip.toLowerCase().includes(keyword);
-
-    const matchType =
-      typeFilter === "Semua Jenis" ||
-      item.type === typeFilter;
+      item.name
+        .toLowerCase()
+        .includes(keyword) ||
+      item.nip
+        .toLowerCase()
+        .includes(keyword);
 
     const matchStatus =
       statusFilter === "Semua Status" ||
       item.status === statusFilter;
 
-    return matchSearch && matchType && matchStatus;
+    return matchSearch && matchStatus;
   });
 
-  const openApproval = (item, action) => {
-    setSelected(item);
-    setActionType(action);
-    setNote("");
-    setShowModal(true);
-  };
-
-  const handleApproval = (e) => {
-    e.preventDefault();
-
-    const newStatus =
-      actionType === "approve"
-        ? "Disetujui"
-        : "Ditolak";
-
-    setApprovals(
-      approvals.map((item) =>
-        item.id === selected.id
+  const handleApprove = (id) => {
+    setData((prev) =>
+      prev.map((item) =>
+        item.id === id
           ? {
               ...item,
-              status: newStatus,
+              status: "Disetujui",
             }
           : item
       )
     );
+  };
 
-    setShowModal(false);
-    setSelected(null);
-    setNote("");
+  const handleReject = (id) => {
+    setData((prev) =>
+      prev.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              status: "Ditolak",
+            }
+          : item
+      )
+    );
   };
 
   return (
@@ -147,11 +107,16 @@ function Approval() {
         <div className="page-heading">
 
           <div>
-            <h2>Persetujuan</h2>
+
+            <h2>
+              Persetujuan Pengajuan
+            </h2>
 
             <p>
-              Verifikasi dan proses pengajuan pegawai
+              Verifikasi dan persetujuan pengajuan
+              pegawai
             </p>
+
           </div>
 
         </div>
@@ -160,36 +125,25 @@ function Approval() {
 
         <div className="approval-summary">
 
-          <div className="approval-card">
+          <div className="approval-summary-card">
 
             <span>
-              Total Pengajuan
-            </span>
-
-            <strong>
-              {approvals.length}
-            </strong>
-
-          </div>
-
-          <div className="approval-card waiting">
-
-            <span>
-              Menunggu
+              Menunggu Persetujuan
             </span>
 
             <strong>
               {
-                approvals.filter(
+                data.filter(
                   (item) =>
-                    item.status === "Menunggu"
+                    item.status ===
+                    "Menunggu"
                 ).length
               }
             </strong>
 
           </div>
 
-          <div className="approval-card approved">
+          <div className="approval-summary-card approved">
 
             <span>
               Disetujui
@@ -197,16 +151,17 @@ function Approval() {
 
             <strong>
               {
-                approvals.filter(
+                data.filter(
                   (item) =>
-                    item.status === "Disetujui"
+                    item.status ===
+                    "Disetujui"
                 ).length
               }
             </strong>
 
           </div>
 
-          <div className="approval-card rejected">
+          <div className="approval-summary-card rejected">
 
             <span>
               Ditolak
@@ -214,9 +169,10 @@ function Approval() {
 
             <strong>
               {
-                approvals.filter(
+                data.filter(
                   (item) =>
-                    item.status === "Ditolak"
+                    item.status ===
+                    "Ditolak"
                 ).length
               }
             </strong>
@@ -229,100 +185,54 @@ function Approval() {
 
         <section className="data-panel">
 
-          <div className="approval-panel-header">
-
-            <div>
-
-              <h3>
-                Daftar Persetujuan
-              </h3>
-
-              <p>
-                Pengajuan yang membutuhkan verifikasi
-              </p>
-
-            </div>
-
-            {statusFilter === "Menunggu" && (
-              <span className="pending-indicator">
-                ● Perlu tindakan
-              </span>
-            )}
-
-          </div>
-
           <div className="data-toolbar">
 
             <div className="search-box">
 
-              <span>⌕</span>
+              <span>
+                ⌕
+              </span>
 
               <input
                 type="text"
                 placeholder="Cari nama atau NIP..."
                 value={search}
                 onChange={(e) =>
-                  setSearch(e.target.value)
+                  setSearch(
+                    e.target.value
+                  )
                 }
               />
 
             </div>
 
-            <div className="approval-filters">
+            <select
+              className="filter-select"
+              value={statusFilter}
+              onChange={(e) =>
+                setStatusFilter(
+                  e.target.value
+                )
+              }
+            >
 
-              <select
-                className="filter-select"
-                value={typeFilter}
-                onChange={(e) =>
-                  setTypeFilter(e.target.value)
-                }
-              >
+              <option>
+                Menunggu
+              </option>
 
-                <option>
-                  Semua Jenis
-                </option>
+              <option>
+                Disetujui
+              </option>
 
-                <option>
-                  Izin
-                </option>
+              <option>
+                Ditolak
+              </option>
 
-                <option>
-                  Cuti
-                </option>
+              <option>
+                Semua Status
+              </option>
 
-                <option>
-                  Dinas
-                </option>
-
-              </select>
-
-              <select
-                className="filter-select"
-                value={statusFilter}
-                onChange={(e) =>
-                  setStatusFilter(e.target.value)
-                }
-              >
-
-                <option>
-                  Semua Status
-                </option>
-
-                <option>
-                  Menunggu
-                </option>
-
-                <option>
-                  Disetujui
-                </option>
-
-                <option>
-                  Ditolak
-                </option>
-
-              </select>
-
-            </div>
+            </select>
 
           </div>
 
@@ -335,7 +245,7 @@ function Approval() {
                 <tr>
                   <th>Pegawai</th>
                   <th>Jenis</th>
-                  <th>Periode</th>
+                  <th>Tanggal</th>
                   <th>Alasan</th>
                   <th>Diajukan</th>
                   <th>Status</th>
@@ -375,13 +285,11 @@ function Approval() {
                     </td>
 
                     <td>
-
                       <span
                         className={`submission-type ${item.type.toLowerCase()}`}
                       >
                         {item.type}
                       </span>
-
                     </td>
 
                     <td>
@@ -392,7 +300,8 @@ function Approval() {
                           {item.startDate}
                         </strong>
 
-                        {item.startDate !== item.endDate && (
+                        {item.startDate !==
+                          item.endDate && (
                           <span>
                             s/d {item.endDate}
                           </span>
@@ -403,11 +312,9 @@ function Approval() {
                     </td>
 
                     <td>
-
                       <span className="reason-text">
                         {item.reason}
                       </span>
-
                     </td>
 
                     <td>
@@ -419,7 +326,10 @@ function Approval() {
                       <span
                         className={`submission-status ${item.status
                           .toLowerCase()
-                          .replace(/\s+/g, "-")}`}
+                          .replace(
+                            /\s+/g,
+                            "-"
+                          )}`}
                       >
                         {item.status}
                       </span>
@@ -428,42 +338,52 @@ function Approval() {
 
                     <td>
 
-                      <button
-                        className="action-button"
-                        onClick={() =>
-                          setSelected(item)
-                        }
-                      >
-                        Detail
-                      </button>
+                      <div className="approval-actions">
 
-                      {item.status === "Menunggu" && (
-                        <>
-                          <button
-                            className="approve-button"
-                            onClick={() =>
-                              openApproval(
-                                item,
-                                "approve"
-                              )
-                            }
-                          >
-                            Setujui
-                          </button>
+                        <button
+                          className="action-button"
+                          onClick={() =>
+                            navigate(
+                              "/pengajuan/detail",
+                              {
+                                state: {
+                                  pengajuan: item,
+                                },
+                              }
+                            )
+                          }
+                        >
+                          Detail
+                        </button>
 
-                          <button
-                            className="reject-button"
-                            onClick={() =>
-                              openApproval(
-                                item,
-                                "reject"
-                              )
-                            }
-                          >
-                            Tolak
-                          </button>
-                        </>
-                      )}
+                        {item.status ===
+                          "Menunggu" && (
+                          <>
+                            <button
+                              className="approve-small"
+                              onClick={() =>
+                                handleApprove(
+                                  item.id
+                                )
+                              }
+                            >
+                              ✓
+                            </button>
+
+                            <button
+                              className="reject-small"
+                              onClick={() =>
+                                handleReject(
+                                  item.id
+                                )
+                              }
+                            >
+                              ✕
+                            </button>
+                          </>
+                        )}
+
+                      </div>
 
                     </td>
 
@@ -476,324 +396,18 @@ function Approval() {
             </table>
 
             {filteredData.length === 0 && (
+
               <div className="empty-state">
-                Tidak ada pengajuan.
+                Tidak ada pengajuan yang ditemukan.
               </div>
+
             )}
-
-          </div>
-
-          <div className="table-footer">
-
-            <span>
-              Menampilkan {filteredData.length} pengajuan
-            </span>
-
-            <div className="pagination">
-
-              <button>‹</button>
-
-              <button className="current">
-                1
-              </button>
-
-              <button>2</button>
-
-              <button>›</button>
-
-            </div>
 
           </div>
 
         </section>
 
       </div>
-
-      {/* DETAIL */}
-
-      {selected && !showModal && (
-
-        <div
-          className="modal-overlay"
-          onClick={() => setSelected(null)}
-        >
-
-          <div
-            className="employee-modal"
-            onClick={(e) =>
-              e.stopPropagation()
-            }
-          >
-
-            <div className="modal-header">
-
-              <div>
-
-                <h3>
-                  Detail Pengajuan
-                </h3>
-
-                <p>
-                  Informasi pengajuan pegawai
-                </p>
-
-              </div>
-
-              <button
-                className="modal-close"
-                onClick={() =>
-                  setSelected(null)
-                }
-              >
-                ×
-              </button>
-
-            </div>
-
-            <div className="approval-detail">
-
-              <div className="detail-person">
-
-                <div className="employee-avatar large">
-                  {selected.name.charAt(0)}
-                </div>
-
-                <div>
-
-                  <strong>
-                    {selected.name}
-                  </strong>
-
-                  <span>
-                    {selected.nip}
-                  </span>
-
-                  <small>
-                    {selected.unit}
-                  </small>
-
-                </div>
-
-              </div>
-
-              <div className="detail-grid">
-
-                <div>
-                  <span>
-                    Jenis Pengajuan
-                  </span>
-
-                  <strong>
-                    {selected.type}
-                  </strong>
-                </div>
-
-                <div>
-                  <span>
-                    Status
-                  </span>
-
-                  <strong>
-                    {selected.status}
-                  </strong>
-                </div>
-
-                <div>
-                  <span>
-                    Tanggal Mulai
-                  </span>
-
-                  <strong>
-                    {selected.startDate}
-                  </strong>
-                </div>
-
-                <div>
-                  <span>
-                    Tanggal Selesai
-                  </span>
-
-                  <strong>
-                    {selected.endDate}
-                  </strong>
-                </div>
-
-              </div>
-
-              <div className="detail-reason">
-
-                <span>
-                  Alasan
-                </span>
-
-                <p>
-                  {selected.reason}
-                </p>
-
-              </div>
-
-              {selected.status === "Menunggu" && (
-
-                <div className="detail-actions">
-
-                  <button
-                    className="approve-button large-button"
-                    onClick={() =>
-                      openApproval(
-                        selected,
-                        "approve"
-                      )
-                    }
-                  >
-                    ✓ Setujui
-                  </button>
-
-                  <button
-                    className="reject-button large-button"
-                    onClick={() =>
-                      openApproval(
-                        selected,
-                        "reject"
-                      )
-                    }
-                  >
-                    × Tolak
-                  </button>
-
-                </div>
-
-              )}
-
-            </div>
-
-          </div>
-
-        </div>
-
-      )}
-
-      {/* MODAL KONFIRMASI */}
-
-      {showModal && selected && (
-
-        <div
-          className="modal-overlay"
-          onClick={() =>
-            setShowModal(false)
-          }
-        >
-
-          <div
-            className="employee-modal"
-            onClick={(e) =>
-              e.stopPropagation()
-            }
-          >
-
-            <div className="modal-header">
-
-              <div>
-
-                <h3>
-                  {actionType === "approve"
-                    ? "Setujui Pengajuan"
-                    : "Tolak Pengajuan"}
-                </h3>
-
-                <p>
-                  {selected.name} — {selected.type}
-                </p>
-
-              </div>
-
-              <button
-                className="modal-close"
-                onClick={() =>
-                  setShowModal(false)
-                }
-              >
-                ×
-              </button>
-
-            </div>
-
-            <form onSubmit={handleApproval}>
-
-              <div className="approval-confirm">
-
-                <div className="confirm-icon">
-                  {actionType === "approve"
-                    ? "✓"
-                    : "×"}
-                </div>
-
-                <p>
-                  {actionType === "approve"
-                    ? "Apakah Anda yakin ingin menyetujui pengajuan ini?"
-                    : "Apakah Anda yakin ingin menolak pengajuan ini?"}
-                </p>
-
-              </div>
-
-              <div className="form-field">
-
-                <label>
-                  Catatan
-                  {actionType === "reject" &&
-                    " (wajib)"}
-                </label>
-
-                <textarea
-                  value={note}
-                  onChange={(e) =>
-                    setNote(e.target.value)
-                  }
-                  required={
-                    actionType === "reject"
-                  }
-                  placeholder={
-                    actionType === "approve"
-                      ? "Tambahkan catatan jika diperlukan..."
-                      : "Masukkan alasan penolakan..."
-                  }
-                />
-
-              </div>
-
-              <div className="modal-actions">
-
-                <button
-                  type="button"
-                  className="secondary-button"
-                  onClick={() =>
-                    setShowModal(false)
-                  }
-                >
-                  Batal
-                </button>
-
-                <button
-                  type="submit"
-                  className={
-                    actionType === "approve"
-                      ? "approve-submit"
-                      : "reject-submit"
-                  }
-                >
-                  {actionType === "approve"
-                    ? "Ya, Setujui"
-                    : "Ya, Tolak"}
-                </button>
-
-              </div>
-
-            </form>
-
-          </div>
-
-        </div>
-
-      )}
 
     </AdminLayout>
   );

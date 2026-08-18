@@ -1,157 +1,240 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import AdminLayout from "../../components/layout/AdminLayout";
-
-const initialEmployees = [
-  {
-    id: "PGW-001",
-    name: "Andi Saputra",
-    nip: "198501012010011001",
-    unit: "Fakultas Teknik",
-    position: "Dosen",
-    type: "PNS",
-    face: "Terdaftar",
-    status: "Aktif",
-  },
-  {
-    id: "PGW-002",
-    name: "Siti Rahma",
-    nip: "198704152012022002",
-    unit: "Fakultas Ekonomi",
-    position: "Dosen",
-    type: "PNS",
-    face: "Terdaftar",
-    status: "Aktif",
-  },
-  {
-    id: "PGW-003",
-    name: "Budi Santoso",
-    nip: "199001102019031003",
-    unit: "UPT Teknologi Informasi",
-    position: "Staff",
-    type: "PPPK",
-    face: "Belum",
-    status: "Aktif",
-  },
-  {
-    id: "PGW-004",
-    name: "Dewi Lestari",
-    nip: "199205202021042004",
-    unit: "Fakultas Hukum",
-    position: "Staff",
-    type: "Non-ASN",
-    face: "Terdaftar",
-    status: "Aktif",
-  },
-];
+import { apiRequest } from "../../services/api";
 
 function Pegawai() {
-  const [employees, setEmployees] =
-    useState(initialEmployees);
+  const navigate = useNavigate();
 
+  const [employees, setEmployees] = useState([]);
   const [search, setSearch] = useState("");
   const [type, setType] = useState("Semua");
-  const [showModal, setShowModal] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // =========================
+  // AMBIL DATA PEGAWAI
+  // =========================
+
+  const fetchEmployees = async () => {
+    try {
+      setLoading(true);
+
+      const response = await apiRequest("/employees");
+
+      console.log("Response pegawai:", response);
+
+      /*
+       * Menyesuaikan beberapa kemungkinan
+       * bentuk response dari backend.
+       */
+
+      if (Array.isArray(response)) {
+        setEmployees(response);
+      } else if (Array.isArray(response.data)) {
+        setEmployees(response.data);
+      } else {
+        setEmployees([]);
+      }
+
+    } catch (error) {
+      console.error("Gagal mengambil data pegawai:", error);
+
+      setEmployees([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Jalankan ketika halaman dibuka
+  useEffect(() => {
+    fetchEmployees();
+  }, []);
+
+
+  // =========================
+  // FILTER DATA
+  // =========================
 
   const filteredEmployees = employees.filter((employee) => {
+
     const keyword = search.toLowerCase();
 
+    const name =
+      employee.name ||
+      employee.nama ||
+      "";
+
+    const nip =
+      employee.nip ||
+      "";
+
+    const unit =
+      employee.unit ||
+      employee.unit_kerja ||
+      employee.unitKerja ||
+      "";
+
+    const employeeType =
+      employee.type ||
+      employee.jenis_kepegawaian ||
+      employee.jenis_kepegawaian ||
+      "";
+
     const matchesSearch =
-      employee.name.toLowerCase().includes(keyword) ||
-      employee.nip.toLowerCase().includes(keyword) ||
-      employee.unit.toLowerCase().includes(keyword);
+      name.toLowerCase().includes(keyword) ||
+      nip.toLowerCase().includes(keyword) ||
+      unit.toLowerCase().includes(keyword);
 
     const matchesType =
       type === "Semua" ||
-      employee.type === type;
+      employeeType === type;
 
     return matchesSearch && matchesType;
   });
 
-  const handleAddEmployee = (e) => {
-    e.preventDefault();
 
-    const form = new FormData(e.target);
+  // =========================
+  // HITUNG SUMMARY
+  // =========================
 
-    const newEmployee = {
-      id: `PGW-${String(employees.length + 1).padStart(3, "0")}`,
-      name: form.get("name"),
-      nip: form.get("nip"),
-      unit: form.get("unit"),
-      position: form.get("position"),
-      type: form.get("type"),
-      face: "Belum",
-      status: "Aktif",
-    };
+  const totalEmployees = employees.length;
 
-    setEmployees([
-      ...employees,
-      newEmployee,
-    ]);
+  const totalPNS = employees.filter(
+    (employee) =>
+      (employee.type ||
+        employee.jenis_kepegawaian ||
+        "") === "PNS"
+  ).length;
 
-    setShowModal(false);
-  };
+  const totalPPPK = employees.filter(
+    (employee) =>
+      (employee.type ||
+        employee.jenis_kepegawaian ||
+        "") === "PPPK"
+  ).length;
+
+  const totalNonASN = employees.filter(
+    (employee) =>
+      (employee.type ||
+        employee.jenis_kepegawaian ||
+        "") === "Non-ASN"
+  ).length;
+
+
+  // =========================
+  // RENDER
+  // =========================
 
   return (
     <AdminLayout>
 
       <div className="pegawai-page">
 
-        {/* PAGE HEADER */}
+        {/* =========================
+            PAGE HEADER
+        ========================= */}
 
         <div className="page-heading">
 
           <div>
-            <h2>Data Pegawai</h2>
+
+            <h2>
+              Data Pegawai
+            </h2>
 
             <p>
               Kelola master data pegawai Universitas Tadulako
             </p>
+
           </div>
 
           <button
             className="primary-button"
-            onClick={() => setShowModal(true)}
+            onClick={() =>
+              navigate("/pegawai/tambah")
+            }
           >
             + Tambah Pegawai
           </button>
 
         </div>
 
-        {/* SUMMARY */}
+
+        {/* =========================
+            SUMMARY
+        ========================= */}
 
         <div className="employee-summary">
 
           <div className="summary-card">
-            <span>Total Pegawai</span>
-            <strong>2.847</strong>
+
+            <span>
+              Total Pegawai
+            </span>
+
+            <strong>
+              {totalEmployees}
+            </strong>
+
           </div>
 
-          <div className="summary-card">
-            <span>PNS</span>
-            <strong>1.642</strong>
-          </div>
 
           <div className="summary-card">
-            <span>PPPK</span>
-            <strong>728</strong>
+
+            <span>
+              PNS
+            </span>
+
+            <strong>
+              {totalPNS}
+            </strong>
+
           </div>
 
+
           <div className="summary-card">
-            <span>Non-ASN</span>
-            <strong>477</strong>
+
+            <span>
+              PPPK
+            </span>
+
+            <strong>
+              {totalPPPK}
+            </strong>
+
+          </div>
+
+
+          <div className="summary-card">
+
+            <span>
+              Non-ASN
+            </span>
+
+            <strong>
+              {totalNonASN}
+            </strong>
+
           </div>
 
         </div>
 
-        {/* TABLE PANEL */}
+
+        {/* =========================
+            TABLE PANEL
+        ========================= */}
 
         <section className="data-panel">
+
+          {/* TOOLBAR */}
 
           <div className="data-toolbar">
 
             <div className="search-box">
 
-              <span>⌕</span>
+              <span>
+                ⌕
+              </span>
 
               <input
                 type="text"
@@ -164,250 +247,322 @@ function Pegawai() {
 
             </div>
 
-            <select
-              value={type}
-              onChange={(e) =>
-                setType(e.target.value)
-              }
-              className="filter-select"
-            >
-              <option>Semua</option>
-              <option>PNS</option>
-              <option>PPPK</option>
-              <option>Non-ASN</option>
-            </select>
+
+            <div>
+
+              <select
+                value={type}
+                onChange={(e) =>
+                  setType(e.target.value)
+                }
+                className="filter-select"
+              >
+
+                <option value="Semua">
+                  Semua
+                </option>
+
+                <option value="PNS">
+                  PNS
+                </option>
+
+                <option value="PPPK">
+                  PPPK
+                </option>
+
+                <option value="Non-ASN">
+                  Non-ASN
+                </option>
+
+              </select>
+
+              <button
+                className="secondary-button"
+                onClick={fetchEmployees}
+                disabled={loading}
+                style={{
+                  marginLeft: "10px",
+                }}
+              >
+                {loading ? "Memuat..." : "⟳ Refresh"}
+              </button>
+
+            </div>
 
           </div>
+
+
+          {/* =========================
+              TABLE
+          ========================= */}
 
           <div className="employee-table-wrapper">
 
             <table className="employee-table">
 
               <thead>
+
                 <tr>
-                  <th>Pegawai</th>
-                  <th>NIP</th>
-                  <th>Unit Kerja</th>
-                  <th>Jabatan</th>
-                  <th>Status</th>
-                  <th>Wajah</th>
-                  <th>Aksi</th>
+
+                  <th>
+                    Pegawai
+                  </th>
+
+                  <th>
+                    NIP
+                  </th>
+
+                  <th>
+                    Unit Kerja
+                  </th>
+
+                  <th>
+                    Jabatan
+                  </th>
+
+                  <th>
+                    Status
+                  </th>
+
+                  <th>
+                    Wajah
+                  </th>
+
+                  <th>
+                    Aksi
+                  </th>
+
                 </tr>
+
               </thead>
+
 
               <tbody>
 
-                {filteredEmployees.map((employee) => (
-                  <tr key={employee.id}>
+                {loading ? (
 
-                    <td>
-                      <div className="employee-name">
-                        <div className="employee-avatar">
-                          {employee.name.charAt(0)}
-                        </div>
+                  <tr>
 
-                        <div>
-                          <strong>
-                            {employee.name}
-                          </strong>
-
-                          <span>
-                            {employee.type}
-                          </span>
-                        </div>
-                      </div>
-                    </td>
-
-                    <td>
-                      {employee.nip}
-                    </td>
-
-                    <td>
-                      {employee.unit}
-                    </td>
-
-                    <td>
-                      {employee.position}
-                    </td>
-
-                    <td>
-                      <span className="status-pill active">
-                        {employee.status}
-                      </span>
-                    </td>
-
-                    <td>
-                      <span
-                        className={
-                          employee.face === "Terdaftar"
-                            ? "face-status registered"
-                            : "face-status unregistered"
-                        }
-                      >
-                        {employee.face}
-                      </span>
-                    </td>
-
-                    <td>
-                      <button className="action-button">
-                        Detail
-                      </button>
-
-                      <button className="action-button">
-                        ⋮
-                      </button>
+                    <td
+                      colSpan="7"
+                      className="empty-state"
+                    >
+                      Memuat data pegawai...
                     </td>
 
                   </tr>
-                ))}
+
+                ) : filteredEmployees.length > 0 ? (
+
+                  filteredEmployees.map((employee) => {
+
+                    const name =
+                      employee.name ||
+                      employee.nama ||
+                      "-";
+
+                    const nip =
+                      employee.nip ||
+                      "-";
+
+                    const unit =
+                      employee.unit ||
+                      employee.unit_kerja ||
+                      employee.unitKerja ||
+                      "-";
+
+                    const position =
+                      employee.position ||
+                      employee.jabatan ||
+                      "-";
+
+                    const employeeType =
+                      employee.type ||
+                      employee.jenis_kepegawaian ||
+                      "-";
+
+                    const employeeStatus =
+                      employee.status ||
+                      "Aktif";
+
+                    const face =
+                      employee.face ||
+                      employee.face_status ||
+                      "Belum";
+
+                    return (
+
+                      <tr
+                        key={
+                          employee.id ||
+                          employee.nip ||
+                          name
+                        }
+                      >
+
+                        {/* PEGAWAI */}
+
+                        <td>
+
+                          <div className="employee-name">
+
+                            <div className="employee-avatar">
+
+                              {name
+                                .charAt(0)
+                                .toUpperCase()}
+
+                            </div>
+
+                            <div>
+
+                              <strong>
+                                {name}
+                              </strong>
+
+                              <span>
+                                {employeeType}
+                              </span>
+
+                            </div>
+
+                          </div>
+
+                        </td>
+
+
+                        {/* NIP */}
+
+                        <td>
+                          {nip}
+                        </td>
+
+
+                        {/* UNIT */}
+
+                        <td>
+                          {unit}
+                        </td>
+
+
+                        {/* JABATAN */}
+
+                        <td>
+                          {position}
+                        </td>
+
+
+                        {/* STATUS */}
+
+                        <td>
+
+                          <span
+                            className={`status-pill ${
+                              employeeStatus
+                                .toLowerCase()
+                                .replace(/\s+/g, "-")
+                            }`}
+                          >
+                            {employeeStatus}
+                          </span>
+
+                        </td>
+
+
+                        {/* WAJAH */}
+
+                        <td>
+
+                          <span
+                            className={
+                              face === "Terdaftar"
+                                ? "face-status registered"
+                                : "face-status unregistered"
+                            }
+                          >
+                            {face}
+                          </span>
+
+                        </td>
+
+
+                        {/* AKSI */}
+
+                        <td>
+
+                          <button
+                            className="action-button"
+                            onClick={() =>
+                              navigate(
+                                `/pegawai/${employee.id}`
+                              )
+                            }
+                          >
+                            Detail
+                          </button>
+
+                          <button
+                            className="action-button"
+                            onClick={() =>
+                              console.log(
+                                "Menu pegawai:",
+                                employee
+                              )
+                            }
+                          >
+                            ⋮
+                          </button>
+
+                        </td>
+
+                      </tr>
+
+                    );
+                  })
+
+                ) : (
+
+                  <tr>
+
+                    <td
+                      colSpan="7"
+                      className="empty-state"
+                    >
+                      Belum ada data pegawai.
+                    </td>
+
+                  </tr>
+
+                )}
 
               </tbody>
 
             </table>
 
-            {filteredEmployees.length === 0 && (
-              <div className="empty-state">
-                Data pegawai tidak ditemukan.
-              </div>
-            )}
-
           </div>
+
+
+          {/* =========================
+              FOOTER
+          ========================= */}
 
           <div className="table-footer">
 
             <span>
-              Menampilkan {filteredEmployees.length} dari{" "}
-              {employees.length} data
-            </span>
 
-            <div className="pagination">
-              <button>‹</button>
-              <button className="current">1</button>
-              <button>2</button>
-              <button>3</button>
-              <button>›</button>
-            </div>
+              Menampilkan{" "}
+              {filteredEmployees.length}{" "}
+              dari{" "}
+              {employees.length}{" "}
+              data
+
+            </span>
 
           </div>
 
         </section>
 
       </div>
-
-      {/* MODAL TAMBAH PEGAWAI */}
-
-      {showModal && (
-        <div
-          className="modal-overlay"
-          onClick={() => setShowModal(false)}
-        >
-
-          <div
-            className="employee-modal"
-            onClick={(e) =>
-              e.stopPropagation()
-            }
-          >
-
-            <div className="modal-header">
-              <div>
-                <h3>Tambah Pegawai</h3>
-                <p>
-                  Masukkan data pegawai baru
-                </p>
-              </div>
-
-              <button
-                className="modal-close"
-                onClick={() =>
-                  setShowModal(false)
-                }
-              >
-                ×
-              </button>
-            </div>
-
-            <form
-              onSubmit={handleAddEmployee}
-            >
-
-              <div className="form-grid">
-
-                <div className="form-field">
-                  <label>Nama Lengkap</label>
-                  <input
-                    name="name"
-                    required
-                    placeholder="Nama lengkap"
-                  />
-                </div>
-
-                <div className="form-field">
-                  <label>NIP</label>
-                  <input
-                    name="nip"
-                    required
-                    placeholder="Nomor Induk Pegawai"
-                  />
-                </div>
-
-                <div className="form-field">
-                  <label>Unit Kerja</label>
-                  <input
-                    name="unit"
-                    required
-                    placeholder="Unit kerja"
-                  />
-                </div>
-
-                <div className="form-field">
-                  <label>Jabatan</label>
-                  <input
-                    name="position"
-                    required
-                    placeholder="Jabatan"
-                  />
-                </div>
-
-                <div className="form-field">
-                  <label>Status Kepegawaian</label>
-
-                  <select name="type">
-                    <option>PNS</option>
-                    <option>PPPK</option>
-                    <option>Non-ASN</option>
-                  </select>
-                </div>
-
-              </div>
-
-              <div className="modal-actions">
-
-                <button
-                  type="button"
-                  className="secondary-button"
-                  onClick={() =>
-                    setShowModal(false)
-                  }
-                >
-                  Batal
-                </button>
-
-                <button
-                  type="submit"
-                  className="primary-button"
-                >
-                  Simpan Pegawai
-                </button>
-
-              </div>
-
-            </form>
-
-          </div>
-
-        </div>
-      )}
 
     </AdminLayout>
   );

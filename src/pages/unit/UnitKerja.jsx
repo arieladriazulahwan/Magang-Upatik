@@ -1,101 +1,43 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import AdminLayout from "../../components/layout/AdminLayout";
-
-const initialUnits = [
-  {
-    id: 1,
-    code: "FT",
-    name: "Fakultas Teknik",
-    head: "Dr. Andi Wijaya, S.T., M.T.",
-    employees: 386,
-    workMode: "Hybrid",
-    status: "Aktif",
-  },
-  {
-    id: 2,
-    code: "FE",
-    name: "Fakultas Ekonomi",
-    head: "Dr. Siti Rahma, S.E., M.Si.",
-    employees: 324,
-    workMode: "Hybrid",
-    status: "Aktif",
-  },
-  {
-    id: 3,
-    code: "FH",
-    name: "Fakultas Hukum",
-    head: "Dr. Budi Santoso, S.H., M.H.",
-    employees: 287,
-    workMode: "WFO",
-    status: "Aktif",
-  },
-  {
-    id: 4,
-    code: "FK",
-    name: "Fakultas Kedokteran",
-    head: "Dr. Nur Aisyah, M.Kes.",
-    employees: 215,
-    workMode: "WFO",
-    status: "Aktif",
-  },
-  {
-    id: 5,
-    code: "UPT-TI",
-    name: "UPT Teknologi Informasi",
-    head: "Rizky Pratama, S.Kom., M.Kom.",
-    employees: 94,
-    workMode: "Hybrid",
-    status: "Aktif",
-  },
-];
+import { apiRequest } from "../../services/api";
 
 function UnitKerja() {
-  const [units, setUnits] = useState(initialUnits);
+  const [units, setUnits] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] =
-    useState("Semua Status");
+  const fetchUnits = async () => {
+    try {
+      setLoading(true);
+      setError("");
 
-  const [showModal, setShowModal] =
-    useState(false);
+      const response = await apiRequest("/work-units");
 
-  const filteredUnits = units.filter((unit) => {
-    const keyword = search.toLowerCase();
+      console.log("Data work units:", response);
 
-    const matchSearch =
-      unit.name.toLowerCase().includes(keyword) ||
-      unit.code.toLowerCase().includes(keyword) ||
-      unit.head.toLowerCase().includes(keyword);
-
-    const matchStatus =
-      statusFilter === "Semua Status" ||
-      unit.status === statusFilter;
-
-    return matchSearch && matchStatus;
-  });
-
-  const handleAddUnit = (e) => {
-    e.preventDefault();
-
-    const form = new FormData(e.target);
-
-    const newUnit = {
-      id: units.length + 1,
-      code: form.get("code").toUpperCase(),
-      name: form.get("name"),
-      head: form.get("head"),
-      employees: 0,
-      workMode: form.get("workMode"),
-      status: "Aktif",
-    };
-
-    setUnits([
-      ...units,
-      newUnit,
-    ]);
-
-    setShowModal(false);
+      // Menyesuaikan kemungkinan bentuk response backend
+      if (Array.isArray(response)) {
+        setUnits(response);
+      } else if (Array.isArray(response.data)) {
+        setUnits(response.data);
+      } else {
+        setUnits([]);
+      }
+    } catch (error) {
+      console.error("Gagal mengambil data unit kerja:", error);
+      setError(
+        error.message || "Gagal mengambil data unit kerja."
+      );
+      setUnits([]);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  useEffect(() => {
+    fetchUnits();
+  }, []);
 
   return (
     <AdminLayout>
@@ -110,334 +52,193 @@ function UnitKerja() {
             <h2>Unit Kerja</h2>
 
             <p>
-              Kelola struktur organisasi dan mode kerja unit
+              Daftar unit kerja Universitas Tadulako
             </p>
           </div>
 
           <button
-            className="primary-button"
-            onClick={() => setShowModal(true)}
+            className="secondary-button"
+            onClick={fetchUnits}
+            disabled={loading}
           >
-            + Tambah Unit
+            ⟳ Refresh
           </button>
 
         </div>
 
-        {/* SUMMARY */}
 
-        <div className="unit-summary">
-
-          <div className="summary-card">
-            <span>Total Unit Kerja</span>
-            <strong>{units.length}</strong>
-          </div>
-
-          <div className="summary-card">
-            <span>Unit Aktif</span>
-            <strong>
-              {units.filter(
-                (unit) => unit.status === "Aktif"
-              ).length}
-            </strong>
-          </div>
-
-          <div className="summary-card">
-            <span>Mode Hybrid</span>
-            <strong>
-              {units.filter(
-                (unit) => unit.workMode === "Hybrid"
-              ).length}
-            </strong>
-          </div>
-
-          <div className="summary-card">
-            <span>Total Pegawai</span>
-            <strong>
-              {units
-                .reduce(
-                  (total, unit) =>
-                    total + unit.employees,
-                  0
-                )
-                .toLocaleString("id-ID")}
-            </strong>
-          </div>
-
-        </div>
-
-        {/* DATA */}
+        {/* CONTENT */}
 
         <section className="data-panel">
 
+          {/* TOOLBAR */}
+
           <div className="data-toolbar">
 
-            <div className="search-box">
+            <div>
+              <h3>
+                Daftar Unit Kerja
+              </h3>
 
-              <span>⌕</span>
-
-              <input
-                type="text"
-                placeholder="Cari unit kerja atau pimpinan..."
-                value={search}
-                onChange={(e) =>
-                  setSearch(e.target.value)
-                }
-              />
-
+              <p>
+                Data unit kerja yang tersimpan pada sistem
+              </p>
             </div>
-
-            <select
-              className="filter-select"
-              value={statusFilter}
-              onChange={(e) =>
-                setStatusFilter(e.target.value)
-              }
-            >
-              <option>Semua Status</option>
-              <option>Aktif</option>
-              <option>Nonaktif</option>
-            </select>
 
           </div>
 
-          <div className="employee-table-wrapper">
 
-            <table className="employee-table unit-table">
+          {/* LOADING */}
 
-              <thead>
+          {loading && (
+            <div className="empty-state">
+              Memuat data unit kerja...
+            </div>
+          )}
 
-                <tr>
-                  <th>Kode</th>
-                  <th>Unit Kerja</th>
-                  <th>Pimpinan</th>
-                  <th>Pegawai</th>
-                  <th>Mode Kerja</th>
-                  <th>Status</th>
-                  <th>Aksi</th>
-                </tr>
 
-              </thead>
+          {/* ERROR */}
 
-              <tbody>
+          {!loading && error && (
+            <div className="empty-state">
 
-                {filteredUnits.map((unit) => (
+              <p>
+                {error}
+              </p>
 
-                  <tr key={unit.id}>
+              <button
+                className="secondary-button"
+                onClick={fetchUnits}
+              >
+                Coba Lagi
+              </button>
 
-                    <td>
-                      <span className="unit-code">
-                        {unit.code}
-                      </span>
-                    </td>
+            </div>
+          )}
 
-                    <td>
-                      <strong className="unit-name">
-                        {unit.name}
-                      </strong>
-                    </td>
 
-                    <td>
-                      {unit.head}
-                    </td>
+          {/* TABLE */}
 
-                    <td>
-                      <strong>
-                        {unit.employees}
-                      </strong>
-                    </td>
+          {!loading && !error && (
+            <div className="employee-table-wrapper">
 
-                    <td>
+              <table className="employee-table">
 
-                      <span
-                        className={`work-mode ${unit.workMode
-                          .toLowerCase()
-                          .replace("-", "")}`}
-                      >
-                        {unit.workMode}
-                      </span>
+                <thead>
 
-                    </td>
-
-                    <td>
-
-                      <span className="status-pill active">
-                        {unit.status}
-                      </span>
-
-                    </td>
-
-                    <td>
-
-                      <button className="action-button">
-                        Detail
-                      </button>
-
-                      <button className="action-button">
-                        Edit
-                      </button>
-
-                    </td>
-
+                  <tr>
+                    <th>No</th>
+                    <th>Nama Unit Kerja</th>
+                    <th>Detail</th>
                   </tr>
 
-                ))}
+                </thead>
 
-              </tbody>
+                <tbody>
 
-            </table>
+                  {units.length > 0 ? (
 
-            {filteredUnits.length === 0 && (
-              <div className="empty-state">
-                Unit kerja tidak ditemukan.
-              </div>
-            )}
+                    units.map((unit, index) => (
 
-          </div>
+                      <tr key={unit.id || index}>
 
-          <div className="table-footer">
+                        <td>
+                          {index + 1}
+                        </td>
 
-            <span>
-              Menampilkan {filteredUnits.length} unit kerja
-            </span>
+                        <td>
 
-            <div className="pagination">
-              <button>‹</button>
-              <button className="current">1</button>
-              <button>2</button>
-              <button>›</button>
+                          <div className="employee-name">
+
+                            <div className="employee-avatar">
+                              {(unit.name ||
+                                unit.nama ||
+                                unit.nama_unit ||
+                                "U")
+                                .charAt(0)
+                                .toUpperCase()}
+                            </div>
+
+                            <div>
+
+                              <strong>
+                                {unit.name ||
+                                  unit.nama ||
+                                  unit.nama_unit ||
+                                  "-"}
+                              </strong>
+
+                              {unit.code && (
+                                <span>
+                                  {unit.code}
+                                </span>
+                              )}
+
+                            </div>
+
+                          </div>
+
+                        </td>
+
+                        <td>
+
+                          <button
+                            className="action-button"
+                            onClick={() =>
+                              navigate(`/unit/${unit.id}`)
+                              
+                            }
+                          >
+                            Detail
+                          </button>
+
+                        </td>
+
+                      </tr>
+
+                    ))
+
+                  ) : (
+
+                    <tr>
+
+                      <td
+                        colSpan="3"
+                        style={{
+                          textAlign: "center",
+                          padding: "40px",
+                        }}
+                      >
+                        Belum ada data unit kerja.
+                      </td>
+
+                    </tr>
+
+                  )}
+
+                </tbody>
+
+              </table>
+
             </div>
+          )}
 
-          </div>
+
+          {/* FOOTER */}
+
+          {!loading && !error && (
+            <div className="table-footer">
+
+              <span>
+                Menampilkan {units.length} unit kerja
+              </span>
+
+            </div>
+          )}
 
         </section>
 
       </div>
-
-      {/* MODAL */}
-
-      {showModal && (
-
-        <div
-          className="modal-overlay"
-          onClick={() => setShowModal(false)}
-        >
-
-          <div
-            className="employee-modal"
-            onClick={(e) =>
-              e.stopPropagation()
-            }
-          >
-
-            <div className="modal-header">
-
-              <div>
-                <h3>Tambah Unit Kerja</h3>
-
-                <p>
-                  Tambahkan unit kerja baru
-                </p>
-              </div>
-
-              <button
-                className="modal-close"
-                onClick={() =>
-                  setShowModal(false)
-                }
-              >
-                ×
-              </button>
-
-            </div>
-
-            <form onSubmit={handleAddUnit}>
-
-              <div className="form-grid">
-
-                <div className="form-field">
-
-                  <label>Kode Unit</label>
-
-                  <input
-                    name="code"
-                    required
-                    placeholder="Contoh: FT"
-                  />
-
-                </div>
-
-                <div className="form-field">
-
-                  <label>Nama Unit Kerja</label>
-
-                  <input
-                    name="name"
-                    required
-                    placeholder="Nama unit kerja"
-                  />
-
-                </div>
-
-                <div className="form-field">
-
-                  <label>Pimpinan Unit</label>
-
-                  <input
-                    name="head"
-                    required
-                    placeholder="Nama pimpinan"
-                  />
-
-                </div>
-
-                <div className="form-field">
-
-                  <label>Mode Kerja</label>
-
-                  <select name="workMode">
-
-                    <option value="WFO">
-                      WFO
-                    </option>
-
-                    <option value="Hybrid">
-                      Hybrid
-                    </option>
-
-                  </select>
-
-                </div>
-
-              </div>
-
-              <div className="modal-actions">
-
-                <button
-                  type="button"
-                  className="secondary-button"
-                  onClick={() =>
-                    setShowModal(false)
-                  }
-                >
-                  Batal
-                </button>
-
-                <button
-                  type="submit"
-                  className="primary-button"
-                >
-                  Simpan Unit
-                </button>
-
-              </div>
-
-            </form>
-
-          </div>
-
-        </div>
-
-      )}
 
     </AdminLayout>
   );

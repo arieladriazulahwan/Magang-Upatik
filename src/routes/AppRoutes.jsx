@@ -7,9 +7,11 @@ import Pegawai from "../pages/pegawai/Pegawai";
 import Monitoring from "../pages/monitoring/Monitoring";
 import UnitKerja from "../pages/unit/UnitKerja";
 import Jadwal from "../pages/jadwal/Jadwal";
+import Shift from "../pages/shift/Shift";
 import Pengajuan from "../pages/pengajuan/Pengajuan";
 import Approval from "../pages/pengajuan/Approval";
 import DetailPengajuan from "../pages/pengajuan/DetailPengajuan";
+import Verifikasi from "../pages/verifikasi/Verifikasi";
 
 function SimplePage({ title }) {
   return (
@@ -56,25 +58,28 @@ function AppRoutes() {
 
 
      <Route
-        path="/jadwal"
-        element={<Jadwal />}
-    />
+  path="/jadwal"
+  element={<Jadwal />}
+/>
 
-      <Route
-      path="/pengajuan"
-  element={<Pengajuan />}
+<Route
+  path="/shift"
+  element={<Shift />}
+/>
+
+    <Route
+        path="/pengajuan"
+        element={<Pengajuan />}
     />
 
     <Route
-      path="/pengajuan/:id"
+       path="/pengajuan/detail"
       element={<DetailPengajuan />}
-    />
+      />
 
-<Route
-  path="/verifikasi"
-  element={
-    <SimplePage title="Verifikasi & Koreksi" />
-  }
+      <Route
+         path="/verifikasi"
+          element={<Verifikasi />}
       />
 
       <Route

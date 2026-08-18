@@ -1,18 +1,48 @@
+import { useLocation, useNavigate } from "react-router-dom";
 import AdminLayout from "../../components/layout/AdminLayout";
 
 function DetailPengajuan() {
-  const pengajuan = {
-    nama: "Siti Rahma",
-    nip: "198704152012022002",
-    unit: "Fakultas Ekonomi",
-    jenis: "Izin",
-    tanggalMulai: "11 Agustus 2026",
-    tanggalSelesai: "11 Agustus 2026",
-    alasan: "Keperluan keluarga",
-    tanggalPengajuan: "10 Agustus 2026, 14:20",
-    status: "Menunggu",
-    catatan: "-",
-  };
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const pengajuan = location.state?.pengajuan;
+
+  // Jika halaman dibuka langsung tanpa memilih data
+  if (!pengajuan) {
+    return (
+      <AdminLayout>
+        <div className="detail-pengajuan-page">
+
+          <div className="data-panel empty-detail">
+
+            <div className="empty-detail-icon">
+              !
+            </div>
+
+            <h3>
+              Data Pengajuan Tidak Ditemukan
+            </h3>
+
+            <p>
+              Silakan kembali ke halaman pengajuan
+              dan pilih data yang ingin dilihat.
+            </p>
+
+            <button
+              className="primary-button"
+              onClick={() =>
+                navigate("/pengajuan")
+              }
+            >
+              ← Kembali ke Pengajuan
+            </button>
+
+          </div>
+
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout>
@@ -24,16 +54,22 @@ function DetailPengajuan() {
         <div className="page-heading">
 
           <div>
-            <h2>Detail Pengajuan</h2>
+
+            <h2>
+              Detail Pengajuan
+            </h2>
 
             <p>
               Informasi lengkap pengajuan pegawai
             </p>
+
           </div>
 
           <button
             className="secondary-button"
-            onClick={() => window.history.back()}
+            onClick={() =>
+              navigate("/pengajuan")
+            }
           >
             ← Kembali
           </button>
@@ -42,15 +78,19 @@ function DetailPengajuan() {
 
         {/* STATUS */}
 
-        <div className="detail-status-card">
+        <section className="detail-status-card">
 
-          <div>
+          <div className="detail-status-left">
 
             <span>
               Status Pengajuan
             </span>
 
-            <strong className="status-menunggu">
+            <strong
+              className={`detail-status ${pengajuan.status
+                ?.toLowerCase()
+                .replace(/\s+/g, "-")}`}
+            >
               {pengajuan.status}
             </strong>
 
@@ -58,15 +98,15 @@ function DetailPengajuan() {
 
           <div className="detail-submitted">
 
-            Diajukan pada{" "}
+            Diajukan pada
 
             <strong>
-              {pengajuan.tanggalPengajuan}
+              {pengajuan.submitted || "-"}
             </strong>
 
           </div>
 
-        </div>
+        </section>
 
         {/* INFORMASI PEGAWAI */}
 
@@ -74,9 +114,17 @@ function DetailPengajuan() {
 
           <div className="detail-section-header">
 
-            <h3>
-              Informasi Pegawai
-            </h3>
+            <div>
+
+              <h3>
+                Informasi Pegawai
+              </h3>
+
+              <p>
+                Data pegawai yang mengajukan
+              </p>
+
+            </div>
 
           </div>
 
@@ -84,23 +132,27 @@ function DetailPengajuan() {
 
             <div className="detail-person">
 
-              <div className="employee-avatar large">
-                {pengajuan.nama.charAt(0)}
+              <div className="employee-avatar detail-avatar">
+
+                {pengajuan.name
+                  ?.charAt(0)
+                  .toUpperCase()}
+
               </div>
 
-              <div>
+              <div className="detail-person-info">
 
                 <strong>
-                  {pengajuan.nama}
+                  {pengajuan.name}
                 </strong>
 
                 <span>
                   NIP. {pengajuan.nip}
                 </span>
 
-                <small>
+                <span>
                   {pengajuan.unit}
-                </small>
+                </span>
 
               </div>
 
@@ -116,9 +168,17 @@ function DetailPengajuan() {
 
           <div className="detail-section-header">
 
-            <h3>
-              Informasi Pengajuan
-            </h3>
+            <div>
+
+              <h3>
+                Informasi Pengajuan
+              </h3>
+
+              <p>
+                Detail izin, cuti, atau dinas
+              </p>
+
+            </div>
 
           </div>
 
@@ -131,7 +191,7 @@ function DetailPengajuan() {
               </span>
 
               <strong>
-                {pengajuan.jenis}
+                {pengajuan.type}
               </strong>
 
             </div>
@@ -143,7 +203,7 @@ function DetailPengajuan() {
               </span>
 
               <strong>
-                {pengajuan.tanggalMulai}
+                {pengajuan.startDate}
               </strong>
 
             </div>
@@ -155,7 +215,7 @@ function DetailPengajuan() {
               </span>
 
               <strong>
-                {pengajuan.tanggalSelesai}
+                {pengajuan.endDate}
               </strong>
 
             </div>
@@ -167,12 +227,14 @@ function DetailPengajuan() {
               </span>
 
               <strong>
-                {pengajuan.tanggalPengajuan}
+                {pengajuan.submitted}
               </strong>
 
             </div>
 
           </div>
+
+          {/* ALASAN */}
 
           <div className="detail-reason">
 
@@ -180,9 +242,65 @@ function DetailPengajuan() {
               Alasan Pengajuan
             </span>
 
-            <p>
-              {pengajuan.alasan}
-            </p>
+            <div className="reason-box">
+
+              {pengajuan.reason ||
+                "Tidak ada alasan yang diberikan."}
+
+            </div>
+
+          </div>
+
+        </section>
+
+        {/* DOKUMEN */}
+
+        <section className="data-panel">
+
+          <div className="detail-section-header">
+
+            <div>
+
+              <h3>
+                Dokumen Pendukung
+              </h3>
+
+              <p>
+                Dokumen yang dilampirkan pada pengajuan
+              </p>
+
+            </div>
+
+          </div>
+
+          <div className="document-item">
+
+            <div className="document-icon">
+              PDF
+            </div>
+
+            <div className="document-info">
+
+              <strong>
+                Dokumen Pendukung
+              </strong>
+
+              <span>
+                Lampiran pengajuan
+              </span>
+
+            </div>
+
+            <button
+              className="action-button"
+              onClick={() =>
+                alert(
+                  "Fitur melihat dokumen akan tersedia setelah backend terhubung."
+                )
+              }
+            >
+              Lihat
+            </button>
 
           </div>
 
@@ -194,17 +312,28 @@ function DetailPengajuan() {
 
           <div className="detail-section-header">
 
-            <h3>
-              Catatan Persetujuan
-            </h3>
+            <div>
+
+              <h3>
+                Catatan
+              </h3>
+
+              <p>
+                Catatan dari proses persetujuan
+              </p>
+
+            </div>
 
           </div>
 
           <div className="detail-content">
 
-            <p className="approval-note">
-              {pengajuan.catatan}
-            </p>
+            <div className="approval-note">
+
+              Belum ada catatan dari pejabat
+              yang melakukan persetujuan.
+
+            </div>
 
           </div>
 
@@ -214,21 +343,48 @@ function DetailPengajuan() {
 
         {pengajuan.status === "Menunggu" && (
 
-          <div className="detail-actions">
+          <section className="detail-action-panel">
 
-            <button
-              className="reject-button large-button"
-            >
-              ✕ Tolak Pengajuan
-            </button>
+            <div>
 
-            <button
-              className="approve-button large-button"
-            >
-              ✓ Setujui Pengajuan
-            </button>
+              <strong>
+                Tindakan Pengajuan
+              </strong>
 
-          </div>
+              <p>
+                Silakan pilih tindakan untuk
+                pengajuan ini.
+              </p>
+
+            </div>
+
+            <div className="detail-actions">
+
+              <button
+                className="reject-button"
+                onClick={() => {
+                  alert(
+                    "Pengajuan akan ditolak."
+                  );
+                }}
+              >
+                ✕ Tolak
+              </button>
+
+              <button
+                className="approve-button"
+                onClick={() => {
+                  alert(
+                    "Pengajuan akan disetujui."
+                  );
+                }}
+              >
+                ✓ Setujui
+              </button>
+
+            </div>
+
+          </section>
 
         )}
 

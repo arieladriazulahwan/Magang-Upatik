@@ -1,56 +1,266 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { apiRequest } from "../../services/api";
 
 function Login() {
   const navigate = useNavigate();
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
 
-    if (username && password) {
-      localStorage.setItem("isLoggedIn", "true");
+    if (!username || !password) {
+      alert("Username dan password wajib diisi.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const data = await apiRequest("/auth/login", {
+        method: "POST",
+
+        body: JSON.stringify({
+          username: username,
+          password: password,
+          device_name: "web",
+        }),
+      });
+
+      console.log("Login berhasil:", data);
+
+      // Simpan token dari backend
+      if (data.token) {
+        localStorage.setItem("token", data.token);
+      }
+
+      // Simpan data user dari backend
+      if (data.user) {
+        localStorage.setItem(
+          "user",
+          JSON.stringify(data.user)
+        );
+      }
+
+      alert("Login berhasil!");
+
       navigate("/dashboard");
+
+    } catch (error) {
+      console.error("Login gagal:", error);
+
+      alert(
+        error.message ||
+        "Username atau password salah."
+      );
+
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <div className="login-page">
-      <div className="login-card">
-        <h1>SI-PRESENSI UNTAD</h1>
 
-        <p>Sistem Informasi Presensi Pegawai</p>
+      <div className="login-container">
 
-        <form onSubmit={handleLogin}>
-          <div className="form-group">
-            <label>Username</label>
+        {/* BAGIAN KIRI */}
+        <div className="login-brand">
 
-            <input
-              type="text"
-              placeholder="Masukkan username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-            />
+          <div className="brand-content">
+
+            <div className="brand-logo">
+              SP
+            </div>
+
+            <h1>
+              SI-PRESENSI
+            </h1>
+
+            <p>
+              Sistem Informasi Presensi
+              <br />
+              Universitas Tadulako
+            </p>
+
           </div>
 
-          <div className="form-group">
-            <label>Password</label>
-
-            <input
-              type="password"
-              placeholder="Masukkan password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
+          <div className="brand-footer">
+            <span>
+              © 2026 SI-PRESENSI
+            </span>
           </div>
 
-          <button type="submit">
-            Masuk
-          </button>
-        </form>
+        </div>
+
+
+        {/* BAGIAN KANAN */}
+        <div className="login-form-section">
+
+          <div className="login-form-wrapper">
+
+            <div className="login-heading">
+
+              <h2>
+                Selamat Datang
+              </h2>
+
+              <p>
+                Silakan masuk untuk melanjutkan
+                ke sistem.
+              </p>
+
+            </div>
+
+
+            {/* FORM LOGIN */}
+            <form onSubmit={handleLogin}>
+
+              {/* USERNAME */}
+              <div className="login-field">
+
+                <label htmlFor="username">
+                  Username
+                </label>
+
+                <div className="login-input-wrapper">
+
+                  <span className="input-icon">
+                    👤
+                  </span>
+
+                  <input
+                    id="username"
+                    type="text"
+                    placeholder="Masukkan username"
+                    value={username}
+                    onChange={(e) =>
+                      setUsername(e.target.value)
+                    }
+                    disabled={loading}
+                    required
+                  />
+
+                </div>
+
+              </div>
+
+
+              {/* PASSWORD */}
+              <div className="login-field">
+
+                <div className="password-label">
+
+                  <label htmlFor="password">
+                    Password
+                  </label>
+
+                  <button
+                    type="button"
+                    className="forgot-button"
+                    onClick={() =>
+                      alert(
+                        "Fitur lupa password akan tersedia."
+                      )
+                    }
+                    disabled={loading}
+                  >
+                    Lupa password?
+                  </button>
+
+                </div>
+
+
+                <div className="login-input-wrapper">
+
+                  <span className="input-icon">
+                    🔒
+                  </span>
+
+                  <input
+                    id="password"
+                    type={
+                      showPassword
+                        ? "text"
+                        : "password"
+                    }
+                    placeholder="Masukkan password"
+                    value={password}
+                    onChange={(e) =>
+                      setPassword(e.target.value)
+                    }
+                    disabled={loading}
+                    required
+                  />
+
+                  <button
+                    type="button"
+                    className="show-password"
+                    onClick={() =>
+                      setShowPassword(!showPassword)
+                    }
+                    disabled={loading}
+                  >
+                    {showPassword ? "◉" : "○"}
+                  </button>
+
+                </div>
+
+              </div>
+
+
+              {/* INGAT SAYA */}
+              <div className="login-options">
+
+                <label className="remember-me">
+
+                  <input
+                    type="checkbox"
+                    disabled={loading}
+                  />
+
+                  <span>
+                    Ingat saya
+                  </span>
+
+                </label>
+
+              </div>
+
+
+              {/* TOMBOL LOGIN */}
+              <button
+                type="submit"
+                className="login-button"
+                disabled={loading}
+              >
+                {loading
+                  ? "Memproses..."
+                  : "Masuk"}
+              </button>
+
+            </form>
+
+
+            {/* INFO */}
+            <div className="login-info">
+
+              <span>
+                Akses hanya untuk pengguna terdaftar
+              </span>
+
+            </div>
+
+          </div>
+
+        </div>
+
       </div>
+
     </div>
   );
 }

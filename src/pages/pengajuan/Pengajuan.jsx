@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import AdminLayout from "../../components/layout/AdminLayout";
 
 const initialSubmissions = [
@@ -53,6 +54,8 @@ const initialSubmissions = [
 ];
 
 function Pengajuan() {
+  const navigate = useNavigate();
+
   const [submissions, setSubmissions] =
     useState(initialSubmissions);
 
@@ -67,48 +70,45 @@ function Pengajuan() {
   const [showModal, setShowModal] =
     useState(false);
 
-  const [selected, setSelected] =
-    useState(null);
+  // Filter data
+  const filteredData = submissions.filter((item) => {
+    const keyword = search.toLowerCase();
 
-  const [detailOpen, setDetailOpen] =
-    useState(false);
+    const matchSearch =
+      item.name.toLowerCase().includes(keyword) ||
+      item.nip.toLowerCase().includes(keyword);
 
-  const filteredData = submissions.filter(
-    (item) => {
-      const keyword =
-        search.toLowerCase();
+    const matchType =
+      typeFilter === "Semua Jenis" ||
+      item.type === typeFilter;
 
-      const matchSearch =
-        item.name
-          .toLowerCase()
-          .includes(keyword) ||
-        item.nip
-          .toLowerCase()
-          .includes(keyword);
+    const matchStatus =
+      statusFilter === "Semua Status" ||
+      item.status === statusFilter;
 
-      const matchType =
-        typeFilter === "Semua Jenis" ||
-        item.type === typeFilter;
+    return (
+      matchSearch &&
+      matchType &&
+      matchStatus
+    );
+  });
 
-      const matchStatus =
-        statusFilter === "Semua Status" ||
-        item.status === statusFilter;
-
-      return (
-        matchSearch &&
-        matchType &&
-        matchStatus
-      );
-    }
-  );
-
+  // Tambah pengajuan
   const handleAddSubmission = (e) => {
     e.preventDefault();
 
     const form = new FormData(e.target);
 
     const newSubmission = {
-      id: submissions.length + 1,
+      id:
+        submissions.length > 0
+          ? Math.max(
+              ...submissions.map(
+                (item) => item.id
+              )
+            ) + 1
+          : 1,
+
       name: form.get("name"),
       nip: form.get("nip"),
       unit: form.get("unit"),
@@ -116,13 +116,16 @@ function Pengajuan() {
       startDate: form.get("startDate"),
       endDate: form.get("endDate"),
       reason: form.get("reason"),
-      submitted: "11 Agustus 2026, sekarang",
+
+      submitted:
+        "11 Agustus 2026, sekarang",
+
       status: "Menunggu",
     };
 
-    setSubmissions([
+    setSubmissions((prev) => [
       newSubmission,
-      ...submissions,
+      ...prev,
     ]);
 
     setShowModal(false);
@@ -141,7 +144,8 @@ function Pengajuan() {
             <h2>Pengajuan</h2>
 
             <p>
-              Kelola pengajuan izin, cuti, dan dinas pegawai
+              Kelola pengajuan izin, cuti,
+              dan dinas pegawai
             </p>
           </div>
 
@@ -161,50 +165,69 @@ function Pengajuan() {
         <div className="submission-summary">
 
           <div className="submission-card">
-            <span>Total Pengajuan</span>
+
+            <span>
+              Total Pengajuan
+            </span>
 
             <strong>
               {submissions.length}
             </strong>
+
           </div>
 
           <div className="submission-card waiting">
-            <span>Menunggu</span>
+
+            <span>
+              Menunggu
+            </span>
 
             <strong>
               {
                 submissions.filter(
                   (item) =>
-                    item.status === "Menunggu"
+                    item.status ===
+                    "Menunggu"
                 ).length
               }
             </strong>
+
           </div>
 
           <div className="submission-card approved">
-            <span>Disetujui</span>
+
+            <span>
+              Disetujui
+            </span>
 
             <strong>
               {
                 submissions.filter(
                   (item) =>
-                    item.status === "Disetujui"
+                    item.status ===
+                    "Disetujui"
                 ).length
               }
             </strong>
+
           </div>
 
           <div className="submission-card rejected">
-            <span>Ditolak</span>
+
+            <span>
+              Ditolak
+            </span>
 
             <strong>
               {
                 submissions.filter(
                   (item) =>
-                    item.status === "Ditolak"
+                    item.status ===
+                    "Ditolak"
                 ).length
               }
             </strong>
+
           </div>
 
         </div>
@@ -212,6 +235,8 @@ function Pengajuan() {
         {/* DATA */}
 
         <section className="data-panel">
+
+          {/* TOOLBAR */}
 
           <div className="data-toolbar">
 
@@ -316,121 +341,143 @@ function Pengajuan() {
 
               <tbody>
 
-                {filteredData.map(
-                  (item) => (
+                {filteredData.map((item) => (
 
-                    <tr key={item.id}>
+                  <tr key={item.id}>
 
-                      <td>
+                    {/* PEGAWAI */}
 
-                        <div className="employee-name">
+                    <td>
 
-                          <div className="employee-avatar">
-                            {item.name.charAt(0)}
-                          </div>
+                      <div className="employee-name">
 
-                          <div>
-
-                            <strong>
-                              {item.name}
-                            </strong>
-
-                            <span>
-                              {item.nip}
-                            </span>
-
-                          </div>
-
+                        <div className="employee-avatar">
+                          {item.name.charAt(0)}
                         </div>
 
-                      </td>
-
-                      <td>
-
-                        <span
-                          className={`submission-type ${item.type.toLowerCase()}`}
-                        >
-                          {item.type}
-                        </span>
-
-                      </td>
-
-                      <td>
-
-                        <div className="submission-date">
+                        <div>
 
                           <strong>
-                            {item.startDate}
+                            {item.name}
                           </strong>
 
-                          {item.startDate !==
-                            item.endDate && (
-                            <span>
-                              s/d {item.endDate}
-                            </span>
-                          )}
+                          <span>
+                            {item.nip}
+                          </span>
 
                         </div>
 
-                      </td>
+                      </div>
 
-                      <td>
+                    </td>
 
-                        <span className="reason-text">
-                          {item.reason}
-                        </span>
+                    {/* JENIS */}
 
-                      </td>
+                    <td>
 
-                      <td>
-                        {item.submitted}
-                      </td>
+                      <span
+                        className={`submission-type ${item.type.toLowerCase()}`}
+                      >
+                        {item.type}
+                      </span>
 
-                      <td>
+                    </td>
 
-                        <span
-                          className={`submission-status ${item.status
-                            .toLowerCase()
-                            .replace(
-                              /\s+/g,
-                              "-"
-                            )}`}
-                        >
-                          {item.status}
-                        </span>
+                    {/* TANGGAL */}
 
-                      </td>
+                    <td>
 
-                      <td>
+                      <div className="submission-date">
 
-                        <button
-                          className="action-button"
-                          onClick={() => {
-                            setSelected(item);
-                            setDetailOpen(true);
-                          }}
-                        >
-                          Detail
-                        </button>
+                        <strong>
+                          {item.startDate}
+                        </strong>
 
-                      </td>
+                        {item.startDate !==
+                          item.endDate && (
+                          <span>
+                            s/d {item.endDate}
+                          </span>
+                        )}
 
-                    </tr>
+                      </div>
 
-                  )
-                )}
+                    </td>
+
+                    {/* ALASAN */}
+
+                    <td>
+
+                      <span className="reason-text">
+                        {item.reason}
+                      </span>
+
+                    </td>
+
+                    {/* DIAJUKAN */}
+
+                    <td>
+                      {item.submitted}
+                    </td>
+
+                    {/* STATUS */}
+
+                    <td>
+
+                      <span
+                        className={`submission-status ${item.status
+                          .toLowerCase()
+                          .replace(
+                            /\s+/g,
+                            "-"
+                          )}`}
+                      >
+                        {item.status}
+                      </span>
+
+                    </td>
+
+                    {/* AKSI */}
+
+                    <td>
+
+                      <button
+                        className="action-button"
+                        onClick={() =>
+                          navigate(
+                            "/pengajuan/detail",
+                            {
+                              state: {
+                                pengajuan: item,
+                              },
+                            }
+                          )
+                        }
+                      >
+                        Detail
+                      </button>
+
+                    </td>
+
+                  </tr>
+
+                ))}
 
               </tbody>
 
             </table>
 
             {filteredData.length === 0 && (
+
               <div className="empty-state">
                 Pengajuan tidak ditemukan.
               </div>
+
             )}
 
           </div>
+
+          {/* FOOTER */}
 
           <div className="table-footer">
 
@@ -442,15 +489,21 @@ function Pengajuan() {
 
             <div className="pagination">
 
-              <button>‹</button>
+              <button>
+                ‹
+              </button>
 
               <button className="current">
                 1
               </button>
 
-              <button>2</button>
+              <button>
+                2
+              </button>
 
-              <button>›</button>
+              <button>
+                ›
+              </button>
 
             </div>
 
@@ -487,7 +540,8 @@ function Pengajuan() {
                 </h3>
 
                 <p>
-                  Tambahkan pengajuan izin, cuti, atau dinas
+                  Tambahkan pengajuan izin,
+                  cuti, atau dinas
                 </p>
 
               </div>
@@ -511,6 +565,8 @@ function Pengajuan() {
 
               <div className="form-grid">
 
+                {/* NAMA */}
+
                 <div className="form-field">
 
                   <label>
@@ -525,6 +581,8 @@ function Pengajuan() {
 
                 </div>
 
+                {/* NIP */}
+
                 <div className="form-field">
 
                   <label>
@@ -538,6 +596,8 @@ function Pengajuan() {
                   />
 
                 </div>
+
+                {/* UNIT */}
 
                 <div className="form-field">
 
@@ -567,6 +627,8 @@ function Pengajuan() {
 
                 </div>
 
+                {/* JENIS */}
+
                 <div className="form-field">
 
                   <label>
@@ -591,6 +653,8 @@ function Pengajuan() {
 
                 </div>
 
+                {/* TANGGAL MULAI */}
+
                 <div className="form-field">
 
                   <label>
@@ -605,6 +669,8 @@ function Pengajuan() {
 
                 </div>
 
+                {/* TANGGAL SELESAI */}
+
                 <div className="form-field">
 
                   <label>
@@ -618,6 +684,8 @@ function Pengajuan() {
                   />
 
                 </div>
+
+                {/* ALASAN */}
 
                 <div className="form-field full-width">
 
@@ -661,153 +729,8 @@ function Pengajuan() {
           </div>
 
         </div>
+
       )}
-
-      {/* DETAIL MODAL */}
-
-      {detailOpen &&
-        selected && (
-
-          <div
-            className="modal-overlay"
-            onClick={() =>
-              setDetailOpen(false)
-            }
-          >
-
-            <div
-              className="employee-modal"
-              onClick={(e) =>
-                e.stopPropagation()
-              }
-            >
-
-              <div className="modal-header">
-
-                <div>
-
-                  <h3>
-                    Detail Pengajuan
-                  </h3>
-
-                  <p>
-                    Informasi lengkap pengajuan pegawai
-                  </p>
-
-                </div>
-
-                <button
-                  className="modal-close"
-                  onClick={() =>
-                    setDetailOpen(false)
-                  }
-                >
-                  ×
-                </button>
-
-              </div>
-
-              <div className="submission-detail">
-
-                <div className="detail-person">
-
-                  <div className="employee-avatar large">
-                    {selected.name.charAt(0)}
-                  </div>
-
-                  <div>
-
-                    <strong>
-                      {selected.name}
-                    </strong>
-
-                    <span>
-                      {selected.nip}
-                    </span>
-
-                    <small>
-                      {selected.unit}
-                    </small>
-
-                  </div>
-
-                </div>
-
-                <div className="detail-grid">
-
-                  <div>
-                    <span>
-                      Jenis Pengajuan
-                    </span>
-
-                    <strong>
-                      {selected.type}
-                    </strong>
-                  </div>
-
-                  <div>
-                    <span>
-                      Status
-                    </span>
-
-                    <strong>
-                      {selected.status}
-                    </strong>
-                  </div>
-
-                  <div>
-                    <span>
-                      Tanggal Mulai
-                    </span>
-
-                    <strong>
-                      {selected.startDate}
-                    </strong>
-                  </div>
-
-                  <div>
-                    <span>
-                      Tanggal Selesai
-                    </span>
-
-                    <strong>
-                      {selected.endDate}
-                    </strong>
-                  </div>
-
-                </div>
-
-                <div className="detail-reason">
-
-                  <span>
-                    Alasan Pengajuan
-                  </span>
-
-                  <p>
-                    {selected.reason}
-                  </p>
-
-                </div>
-
-                <div className="modal-actions">
-
-                  <button
-                    className="secondary-button"
-                    onClick={() =>
-                      setDetailOpen(false)
-                    }
-                  >
-                    Tutup
-                  </button>
-
-                </div>
-
-              </div>
-
-            </div>
-
-          </div>
-        )}
 
     </AdminLayout>
   );
