@@ -34,5 +34,6 @@ expo-web*.log
 # local env files
 .env*.local
 
+
 # typescript
 *.tsbuildinfo

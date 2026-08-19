@@ -7,34 +7,52 @@ import Button from "../../components/Button";
 import MainScreen from "../../components/MainScreen";
 import { Colors } from "../../constants/colors";
 import { AppConfig } from "../../constants/config";
-import { me } from "../../constants/mockData";
+import { logout } from "../../services/auth";
+import { usePrototype } from "../../contexts/PrototypeContext";
 
 export default function ProfilScreen() {
+  const { profile } = usePrototype();
+  const employee = profile?.employee;
+  const fullName = profile?.full_name || profile?.username || "Pegawai";
+  const initials = fullName
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((item) => item[0])
+    .join("")
+    .toUpperCase();
+  const role = profile?.roles?.map((item) => item.name).join(", ") || "Pegawai";
+
+  const handleLogout = async () => {
+    await logout();
+    router.replace("/login");
+  };
+
   return (
     <MainScreen>
       <View style={styles.profileCard}>
-        <Avatar initials={me.initials} size={72} />
-        <Text style={styles.name}>{me.name}</Text>
-        <Text style={styles.role}>{me.role}</Text>
-        <Badge label={me.category} tone="blue" />
+        <Avatar initials={initials || "KP"} size={72} />
+        <Text style={styles.name}>{fullName}</Text>
+        <Text style={styles.role}>{role}</Text>
+        <Badge label={employee?.employee_type || "Pegawai"} tone="blue" />
       </View>
 
       <View style={styles.panel}>
-        <InfoRow label="NIP" value={me.nip} mono />
-        <InfoRow label="Unit kerja" value={me.unit} />
-        <InfoRow label="Status" value={me.status} />
-        <InfoRow label="Pangkat/Golongan" value={me.rank} />
-        <InfoRow label="Minimal kerja" value={me.minWork} />
+        <InfoRow label="NIP" value={employee?.nip || "-"} mono />
+        <InfoRow label="Unit kerja" value={employee?.work_unit?.name || "-"} />
+        <InfoRow label="Status" value={employee?.employment_status || "-"} />
+        <InfoRow label="Pangkat/Golongan" value="-" />
+        <InfoRow label="Minimal kerja" value="-" />
       </View>
 
       <View style={styles.panel}>
-        <MenuRow label="Email" value={me.email} />
-        <MenuRow label="No. HP" value={me.phone} />
+        <MenuRow label="Email" value={profile?.employee?.name ? profile.username : "-"} />
+        <MenuRow label="No. HP" value="-" />
         <MenuRow label="Bahasa" value="Indonesia" />
         <MenuRow label="Notifikasi" value="Aktif" />
       </View>
 
-      <Button title="Keluar" variant="ghost" onPress={() => router.replace("/login")} />
+      <Button title="Keluar" variant="ghost" onPress={handleLogout} />
 
       <Text style={styles.footer}>
         {AppConfig.name} - {AppConfig.university}

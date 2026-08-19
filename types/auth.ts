@@ -7,4 +7,5 @@ export interface LoginCredentials {
 export interface AuthSession {
   token: string;
   userId: string;
+  expiresAt?: string;
 }

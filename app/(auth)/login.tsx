@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -10,17 +11,32 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import Svg, { Circle, Path } from "react-native-svg";
+
 import Button from "../../components/Button";
 import Input from "../../components/Input";
 import LogoMark from "../../components/LogoMark";
+
 import { Colors } from "../../constants/colors";
 import { AppConfig } from "../../constants/config";
+import { login as loginApi } from "../../services/api";
 
 function UserIcon() {
   return (
     <Svg width={18} height={18} viewBox="0 0 24 24">
-      <Circle cx="12" cy="8" r="4" stroke={Colors.textMuted} strokeWidth="1.9" fill="none" />
-      <Path d="M5 21a7 7 0 0 1 14 0" stroke={Colors.textMuted} strokeWidth="1.9" fill="none" />
+      <Circle
+        cx="12"
+        cy="8"
+        r="4"
+        stroke={Colors.textMuted}
+        strokeWidth="1.9"
+        fill="none"
+      />
+      <Path
+        d="M5 21a7 7 0 0 1 14 0"
+        stroke={Colors.textMuted}
+        strokeWidth="1.9"
+        fill="none"
+      />
     </Svg>
   );
 }
@@ -53,8 +69,16 @@ function EyeIcon({ hidden }: { hidden: boolean }) {
         strokeLinejoin="round"
         fill="none"
       />
+
       {!hidden ? (
-        <Circle cx="12" cy="12" r="3" stroke={Colors.textMuted} strokeWidth="1.8" fill="none" />
+        <Circle
+          cx="12"
+          cy="12"
+          r="3"
+          stroke={Colors.textMuted}
+          strokeWidth="1.8"
+          fill="none"
+        />
       ) : null}
     </Svg>
   );
@@ -93,17 +117,122 @@ function CheckIcon() {
 export default function LoginScreen() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [remember, setRemember] = useState(true);
 
-  const login = () => {
-    router.replace("/(main)");
+  const [showPassword, setShowPassword] =
+    useState(false);
+
+  const [remember, setRemember] =
+    useState(true);
+
+  const [loading, setLoading] =
+    useState(false);
+
+  const login = async () => {
+    // Cegah tombol ditekan berkali-kali
+    if (loading) {
+      return;
+    }
+
+    // Validasi username
+    if (!username.trim()) {
+      Alert.alert(
+        "Login gagal",
+        "NIP / Username harus diisi."
+      );
+      return;
+    }
+
+    // Validasi password
+    if (!password) {
+      Alert.alert(
+        "Login gagal",
+        "Kata sandi harus diisi."
+      );
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      console.log("LOGIN DIMULAI");
+      console.log("Username:", username);
+
+      const result = await loginApi({
+        username: username.trim(),
+        password: password,
+        device_name:
+          Platform.OS === "web"
+            ? "Web"
+            : "Android",
+      });
+
+      console.log(
+        "LOGIN BERHASIL:",
+        result
+      );
+
+      Alert.alert(
+        "Login berhasil",
+        `Selamat datang, ${
+          result.user?.full_name ||
+          result.user?.username ||
+          username
+        }`
+      );
+
+      /*
+       * Token sudah disimpan oleh services/api.ts
+       *
+       * Setelah login berhasil,
+       * masuk ke halaman utama.
+       */
+      router.replace("/(main)");
+    } catch (error) {
+      console.error(
+        "LOGIN ERROR:",
+        error
+      );
+
+      let message =
+        "Terjadi kesalahan saat login.";
+
+      if (error instanceof Error) {
+        message = error.message;
+      }
+
+      /*
+       * Pesan khusus apabila frontend
+       * tidak dapat menghubungi Laravel.
+       */
+      if (
+        message.includes(
+          "Network request failed"
+        ) ||
+        message.includes(
+          "Failed to fetch"
+        )
+      ) {
+        message =
+          "Tidak dapat terhubung ke server.\n\n" +
+          "Pastikan Laravel aktif dan alamat IP backend dapat diakses dari perangkat.";
+      }
+
+      Alert.alert(
+        "Login gagal",
+        message
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <KeyboardAvoidingView
       style={styles.root}
-      behavior={Platform.select({ ios: "padding", default: undefined })}
+      behavior={Platform.select({
+        ios: "padding",
+        default: undefined,
+      })}
     >
       <View style={styles.grid} />
       <View style={styles.glowTop} />
@@ -111,30 +240,60 @@ export default function LoginScreen() {
 
       <ScrollView
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={
+          styles.scrollContent
+        }
       >
+        {/* BRAND */}
+
         <View style={styles.brandRow}>
-          <LogoMark size={44} compact />
+          <LogoMark
+            size={44}
+            compact
+          />
+
           <View>
-            <Text style={styles.brand}>{AppConfig.name}</Text>
-            <Text style={styles.university}>{AppConfig.university}</Text>
+            <Text style={styles.brand}>
+              {AppConfig.name}
+            </Text>
+
+            <Text
+              style={styles.university}
+            >
+              {AppConfig.university}
+            </Text>
           </View>
         </View>
+
+        {/* LOGO */}
 
         <View style={styles.scanWrap}>
           <View style={styles.scanPanel}>
-            <LogoMark size={92} variant="scan" />
+            <LogoMark
+              size={92}
+              variant="scan"
+            />
           </View>
         </View>
 
+        {/* TITLE */}
+
         <View style={styles.titleBlock}>
-          <Text style={styles.title}>Masuk ke akun Anda</Text>
+          <Text style={styles.title}>
+            Masuk ke akun Anda
+          </Text>
+
           <Text style={styles.subtitle}>
-            Gunakan NIP/username & kata sandi kepegawaian Untad
+            Gunakan NIP/username & kata sandi
+            kepegawaian Untad
           </Text>
         </View>
 
+        {/* FORM */}
+
         <View style={styles.form}>
+          {/* USERNAME */}
+
           <Input
             label="NIP / Username"
             icon={<UserIcon />}
@@ -142,8 +301,11 @@ export default function LoginScreen() {
             onChangeText={setUsername}
             placeholder="198203152008011002"
             autoCapitalize="none"
-            keyboardType="number-pad"
+            keyboardType="default"
+            editable={!loading}
           />
+
+          {/* PASSWORD */}
 
           <Input
             label="Kata sandi"
@@ -152,32 +314,92 @@ export default function LoginScreen() {
             onChangeText={setPassword}
             placeholder="Masukkan kata sandi"
             secureTextEntry={!showPassword}
+            editable={!loading}
             right={
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
+                accessibilityLabel={
+                  showPassword
+                    ? "Sembunyikan kata sandi"
+                    : "Tampilkan kata sandi"
+                }
                 hitSlop={10}
-                onPress={() => setShowPassword((value) => !value)}
+                disabled={loading}
+                onPress={() =>
+                  setShowPassword(
+                    (value) => !value
+                  )
+                }
               >
-                <EyeIcon hidden={!showPassword} />
+                <EyeIcon
+                  hidden={!showPassword}
+                />
               </Pressable>
             }
           />
 
-          <View style={styles.optionsRow}>
-            <Pressable style={styles.rememberRow} onPress={() => setRemember((value) => !value)}>
-              <View style={[styles.checkbox, remember ? styles.checkboxActive : null]}>
-                {remember ? <CheckIcon /> : null}
+          {/* OPTIONS */}
+
+          <View
+            style={styles.optionsRow}
+          >
+            <Pressable
+              style={styles.rememberRow}
+              disabled={loading}
+              onPress={() =>
+                setRemember(
+                  (value) => !value
+                )
+              }
+            >
+              <View
+                style={[
+                  styles.checkbox,
+                  remember
+                    ? styles.checkboxActive
+                    : null,
+                ]}
+              >
+                {remember ? (
+                  <CheckIcon />
+                ) : null}
               </View>
-              <Text style={styles.optionText}>Ingat saya</Text>
+
+              <Text
+                style={styles.optionText}
+              >
+                Ingat saya
+              </Text>
             </Pressable>
 
-            <Pressable>
-              <Text style={styles.forgotText}>Lupa kata sandi?</Text>
+            <Pressable
+              disabled={loading}
+            >
+              <Text
+                style={styles.forgotText}
+              >
+                Lupa kata sandi?
+              </Text>
             </Pressable>
           </View>
 
-          <Button title="Masuk" icon={<ArrowIcon />} onPress={login} />
+          {/* LOGIN */}
+
+          <Button
+            title={
+              loading
+                ? "Memproses..."
+                : "Masuk"
+            }
+            icon={
+              loading
+                ? undefined
+                : <ArrowIcon />
+            }
+            onPress={login}
+          />
+
+          {/* SSO */}
 
           <Button
             title={`Masuk dengan ${AppConfig.ssoName}`}
@@ -187,13 +409,27 @@ export default function LoginScreen() {
           />
         </View>
 
-        <View style={styles.securityNote}>
-          <View style={styles.securityDot} />
-          <Text style={styles.securityText}>Koneksi aman terenkripsi</Text>
+        {/* SECURITY */}
+
+        <View
+          style={styles.securityNote}
+        >
+          <View
+            style={styles.securityDot}
+          />
+
+          <Text
+            style={styles.securityText}
+          >
+            Koneksi aman terenkripsi
+          </Text>
         </View>
 
+        {/* FOOTER */}
+
         <Text style={styles.footer}>
-          Versi {AppConfig.version} - {AppConfig.ssoName}
+          Versi {AppConfig.version} -{" "}
+          {AppConfig.ssoName}
         </Text>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -206,45 +442,55 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     backgroundColor: Colors.background,
   },
+
   grid: {
     ...StyleSheet.absoluteFillObject,
     opacity: 0.06,
-    backgroundColor: Colors.backgroundMid,
+    backgroundColor:
+      Colors.backgroundMid,
   },
+
   glowTop: {
     position: "absolute",
     width: 360,
     height: 360,
     borderRadius: 180,
-    backgroundColor: "rgba(59,130,246,0.28)",
+    backgroundColor:
+      "rgba(59,130,246,0.28)",
     top: -150,
     right: -130,
   },
+
   glowBottom: {
     position: "absolute",
     width: 280,
     height: 280,
     borderRadius: 140,
-    backgroundColor: "rgba(13,148,136,0.2)",
+    backgroundColor:
+      "rgba(13,148,136,0.2)",
     bottom: 40,
     left: -110,
   },
+
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 26,
     paddingTop: 54,
     paddingBottom: 28,
   },
+
   brandRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
   },
+
   brand: {
     color: Colors.white,
     fontSize: 18,
     fontWeight: "800",
   },
+
   university: {
     color: "#8FB4E8",
     fontSize: 10,
@@ -252,30 +498,37 @@ const styles = StyleSheet.create({
     letterSpacing: 1.6,
     marginTop: 2,
   },
+
   scanWrap: {
     alignItems: "center",
     marginTop: 28,
   },
+
   scanPanel: {
     width: 104,
     height: 104,
     borderRadius: 28,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor:
+      "rgba(255,255,255,0.05)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
+    borderColor:
+      "rgba(255,255,255,0.12)",
   },
+
   titleBlock: {
     alignItems: "center",
     marginTop: 17,
   },
+
   title: {
     color: Colors.white,
     fontSize: 22,
     fontWeight: "800",
     textAlign: "center",
   },
+
   subtitle: {
     color: Colors.textSecondary,
     fontSize: 12.5,
@@ -284,21 +537,26 @@ const styles = StyleSheet.create({
     marginTop: 7,
     textAlign: "center",
   },
+
   form: {
     gap: 15,
     marginTop: 23,
   },
+
   optionsRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent:
+      "space-between",
     marginTop: -2,
   },
+
   rememberRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
   },
+
   checkbox: {
     width: 18,
     height: 18,
@@ -306,25 +564,32 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 5,
     borderWidth: 1.4,
-    borderColor: "rgba(255,255,255,0.3)",
+    borderColor:
+      "rgba(255,255,255,0.3)",
   },
+
   checkboxActive: {
-    backgroundColor: Colors.primaryDark,
+    backgroundColor:
+      Colors.primaryDark,
     borderColor: Colors.primary,
   },
+
   optionText: {
     color: Colors.textSecondary,
     fontSize: 12,
     fontWeight: "600",
   },
+
   forgotText: {
     color: Colors.primarySoft,
     fontSize: 12,
     fontWeight: "700",
   },
+
   ssoButton: {
     marginTop: 1,
   },
+
   securityNote: {
     flexDirection: "row",
     alignItems: "center",
@@ -332,17 +597,21 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 18,
   },
+
   securityDot: {
     width: 7,
     height: 7,
     borderRadius: 4,
-    backgroundColor: Colors.success,
+    backgroundColor:
+      Colors.success,
   },
+
   securityText: {
     color: Colors.textMuted,
     fontSize: 11.5,
     fontWeight: "600",
   },
+
   footer: {
     color: Colors.textMuted,
     fontSize: 11,
