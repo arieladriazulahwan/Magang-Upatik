@@ -14,6 +14,8 @@ import Pengajuan from "../pages/pengajuan/Pengajuan";
 import Approval from "../pages/pengajuan/Approval";
 import DetailPengajuan from "../pages/pengajuan/DetailPengajuan";
 import Verifikasi from "../pages/verifikasi/Verifikasi";
+import LaporanKehadiran from "../pages/laporan/LaporanKehadiran";
+import Lokasi from "../pages/lokasi/Lokasi";
 import ProtectedRoute from "./ProtectedRoute";
 
 function SimplePage({ title }) {
@@ -151,7 +153,7 @@ function AppRoutes() {
         path="/laporan"
         element={
           <ProtectedRoute allowedRoles={["admin", "super_admin", "developer"]}>
-            <SimplePage title="Rekap & Ekspor" />
+            <LaporanKehadiran />
           </ProtectedRoute>
         }
       />
@@ -169,7 +171,7 @@ function AppRoutes() {
         path="/geofence"
         element={
           <ProtectedRoute allowedRoles={["super_admin", "developer"]}>
-            <SimplePage title="Lokasi & Geofence" />
+            <Lokasi />
           </ProtectedRoute>
         }
       />
