@@ -2,6 +2,30 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiRequest } from "../../services/api";
 
+const normalizeRole = (user, payload) => {
+  const roles = user?.roles || payload?.roles || payload?.data?.roles;
+  const roleValue = user?.role || payload?.role || payload?.user_role;
+  const firstRole = Array.isArray(roles) ? roles[0] : roles;
+  const roleName =
+    (typeof firstRole === "object" ? firstRole?.name : firstRole) ||
+    (typeof roleValue === "object" ? roleValue?.name : roleValue) ||
+    "admin";
+
+  const normalized = String(roleName)
+    .trim()
+    .toLowerCase()
+    .replace(/[ -]+/g, "_");
+
+  if (normalized === "superadmin" || normalized === "super_admin") {
+    return "super_admin";
+  }
+
+  if (normalized.includes("developer")) return "developer";
+  if (normalized.startsWith("admin")) return "admin";
+
+  return normalized || "admin";
+};
+
 function Login() {
   const navigate = useNavigate();
 
@@ -21,7 +45,7 @@ function Login() {
     setLoading(true);
 
     try {
-      const data = await apiRequest("/auth/login", {
+      const response = await apiRequest("/auth/login", {
         method: "POST",
 
         body: JSON.stringify({
@@ -31,23 +55,30 @@ function Login() {
         }),
       });
 
-      console.log("Login berhasil:", data);
+      const payload = response?.data || response;
+      const user = payload?.user || payload?.data?.user || payload?.employee || {};
+      const token =
+        payload?.token ||
+        payload?.access_token ||
+        payload?.data?.token ||
+        payload?.data?.access_token ||
+        "";
+      const role = normalizeRole(user, payload);
 
-      // Simpan token dari backend
-      if (data.token) {
-        localStorage.setItem("token", data.token);
+      console.log("Login berhasil:", response);
+
+      if (token) {
+        localStorage.setItem("token", token);
       }
 
-      // Simpan data user dari backend
-      if (data.user) {
-        localStorage.setItem(
-          "user",
-          JSON.stringify(data.user)
-        );
+      if (user && Object.keys(user).length > 0) {
+        localStorage.setItem("user", JSON.stringify(user));
       }
+
+      localStorage.setItem("isLoggedIn", "true");
+      localStorage.setItem("role", role);
 
       alert("Login berhasil!");
-
       navigate("/dashboard");
 
     } catch (error) {

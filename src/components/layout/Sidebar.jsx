@@ -90,7 +90,76 @@ const navGroups = [
   },
 ];
 
+function getStoredUser() {
+  try {
+    const raw = localStorage.getItem("user");
+    return raw ? JSON.parse(raw) : {};
+  } catch (error) {
+    console.error("Gagal membaca user dari localStorage:", error);
+    return {};
+  }
+}
+
 function Sidebar() {
+  const user = getStoredUser();
+  const role = String(localStorage.getItem("role") || "").toLowerCase();
+
+  const displayName = user.name || user.full_name || "Administrator";
+  const roleLabel =
+    role === "super_admin"
+      ? "Super Admin"
+      : role === "developer"
+      ? "Developer"
+      : "Admin";
+
+  const visibleRoutes = {
+    admin: [
+      "/dashboard",
+      "/monitoring",
+      "/pegawai",
+      "/unit",
+      "/shift",
+      "/verifikasi",
+      "/persetujuan",
+      "/laporan",
+    ],
+    super_admin: [
+      "/dashboard",
+      "/monitoring",
+      "/pegawai",
+      "/unit",
+      "/shift",
+      "/verifikasi",
+      "/persetujuan",
+      "/laporan",
+      "/siga8",
+      "/geofence",
+      "/kalender",
+      "/pengaturan",
+    ],
+    developer: [
+      "/dashboard",
+      "/monitoring",
+      "/pegawai",
+      "/unit",
+      "/shift",
+      "/verifikasi",
+      "/persetujuan",
+      "/laporan",
+      "/siga8",
+      "/geofence",
+      "/kalender",
+      "/pengaturan",
+    ],
+  };
+
+  const allowedPaths = visibleRoutes[role] || visibleRoutes.admin;
+
+  const filteredGroups = navGroups.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => allowedPaths.includes(item.path)),
+  }));
+
   return (
     <aside className="sidebar">
 
@@ -109,7 +178,7 @@ function Sidebar() {
       {/* Navigation */}
       <nav className="sidebar-nav">
 
-        {navGroups.map((group) => (
+        {filteredGroups.map((group) => (
           <div
             className="nav-group"
             key={group.title}
@@ -154,8 +223,8 @@ function Sidebar() {
         </div>
 
         <div className="sidebar-user-info">
-          <strong>Administrator</strong>
-          <span>Super Admin</span>
+          <strong>{displayName}</strong>
+          <span>{roleLabel}</span>
         </div>
 
         <span className="user-more">

@@ -1,71 +1,65 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import AdminLayout from "../../components/layout/AdminLayout";
+import { apiRequest } from "../../services/api";
 
-const initialShifts = [
-  {
-    id: 1,
-    code: "PAGI",
-    name: "Shift Pagi",
-    unit: "UPT Teknologi Informasi",
-    masuk: "07:00",
-    pulang: "15:00",
-    istirahat: "1 jam",
-    workDays: "Senin - Sabtu",
-    status: "Aktif",
-  },
-  {
-    id: 2,
-    code: "SIANG",
-    name: "Shift Siang",
-    unit: "UPT Teknologi Informasi",
-    masuk: "15:00",
-    pulang: "23:00",
-    istirahat: "1 jam",
-    workDays: "Senin - Sabtu",
-    status: "Aktif",
-  },
-  {
-    id: 3,
-    code: "MALAM",
-    name: "Shift Malam",
-    unit: "Instalasi Rawat Inap",
-    masuk: "23:00",
-    pulang: "07:00",
-    istirahat: "1 jam",
-    workDays: "Senin - Jumat",
-    status: "Aktif",
-  },
-  {
-    id: 4,
-    code: "REG",
-    name: "Jam Kerja Reguler",
-    unit: "Semua Unit",
-    masuk: "08:00",
-    pulang: "16:00",
-    istirahat: "1 jam",
-    workDays: "Senin - Jumat",
-    status: "Aktif",
-  },
-];
+const normalizeShifts = (payload) => {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload?.items)) return payload.items;
+  if (Array.isArray(payload?.shifts)) return payload.shifts;
+  return [];
+};
+
+const formatRestTime = (value) => {
+  if (value === null || value === undefined || value === "") return "-";
+  if (typeof value === "number") return `${value} jam`;
+  if (String(value).includes("jam")) return value;
+  return `${value} jam`;
+};
 
 function Shift() {
-  const [shifts, setShifts] = useState(initialShifts);
+  const [shifts, setShifts] = useState([]);
   const [search, setSearch] = useState("");
   const [unitFilter, setUnitFilter] = useState("Semua Unit");
   const [showModal, setShowModal] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const fetchShifts = async () => {
+    try {
+      setLoading(true);
+      setError("");
+
+      const response = await apiRequest("/shifts");
+      setShifts(normalizeShifts(response));
+    } catch (err) {
+      console.error("Gagal mengambil data shift:", err);
+      setError(err.message || "Gagal mengambil data shift.");
+      setShifts([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchShifts();
+  }, []);
 
   const filteredShifts = shifts.filter((item) => {
     const keyword = search.toLowerCase();
+    const name = String(item.name || item.nama || item.shift_name || "").toLowerCase();
+    const code = String(item.code || item.kode || item.shift_code || "").toLowerCase();
+    const unit = String(item.unit || item.unit_kerja || item.unitName || item.unit_name || "").toLowerCase();
 
     const matchSearch =
-      item.name.toLowerCase().includes(keyword) ||
-      item.code.toLowerCase().includes(keyword) ||
-      item.unit.toLowerCase().includes(keyword);
+      name.includes(keyword) ||
+      code.includes(keyword) ||
+      unit.includes(keyword);
 
     const matchUnit =
       unitFilter === "Semua Unit" ||
-      item.unit === unitFilter ||
-      item.unit === "Semua Unit";
+      String(item.unit || item.unit_kerja || item.unitName || item.unit_name || "") === unitFilter ||
+      String(item.unit || item.unit_kerja || item.unitName || item.unit_name || "") === "Semua Unit";
 
     return matchSearch && matchUnit;
   });
@@ -77,13 +71,13 @@ function Shift() {
 
     const newShift = {
       id: shifts.length + 1,
-      code: form.get("code").toUpperCase(),
-      name: form.get("name"),
-      unit: form.get("unit"),
-      masuk: form.get("masuk"),
-      pulang: form.get("pulang"),
-      istirahat: `${form.get("istirahat")} jam`,
-      workDays: form.get("workDays"),
+      code: String(form.get("code") || "").toUpperCase(),
+      name: form.get("name") || "Shift Baru",
+      unit: form.get("unit") || "Semua Unit",
+      masuk: form.get("masuk") || "07:00",
+      pulang: form.get("pulang") || "15:00",
+      istirahat: formatRestTime(form.get("istirahat") || 1),
+      workDays: form.get("workDays") || "Senin - Jumat",
       status: "Aktif",
     };
 
@@ -109,24 +103,33 @@ function Shift() {
         </div>
 
         <div className="shift-cards">
-          {shifts.slice(0, 3).map((item) => (
-            <div className="shift-card" key={item.id}>
-              <div className="shift-card-top">
-                <span className="shift-code">{item.code}</span>
-                <span className="status-pill active">{item.status}</span>
+          {shifts.slice(0, 3).map((item) => {
+            const code = item.code || item.kode || item.shift_code || "SHIFT";
+            const name = item.name || item.nama || item.shift_name || "Shift";
+            const masuk = item.masuk || item.jam_masuk || item.start_time || item.startTime || "00:00";
+            const pulang = item.pulang || item.jam_pulang || item.end_time || item.endTime || "00:00";
+            const workDays = item.workDays || item.hari_kerja || item.work_days || "Senin - Jumat";
+            const status = item.status || (item.is_active ? "Aktif" : "Tidak Aktif");
+
+            return (
+              <div className="shift-card" key={item.id || code}>
+                <div className="shift-card-top">
+                  <span className="shift-code">{code}</span>
+                  <span className="status-pill active">{status}</span>
+                </div>
+
+                <h3>{name}</h3>
+
+                <div className="shift-time">
+                  <strong>{masuk}</strong>
+                  <span>—</span>
+                  <strong>{pulang}</strong>
+                </div>
+
+                <p>{workDays}</p>
               </div>
-
-              <h3>{item.name}</h3>
-
-              <div className="shift-time">
-                <strong>{item.masuk}</strong>
-                <span>—</span>
-                <strong>{item.pulang}</strong>
-              </div>
-
-              <p>{item.workDays}</p>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         <section className="data-panel">
@@ -162,64 +165,90 @@ function Shift() {
             </select>
           </div>
 
-          <div className="employee-table-wrapper">
-            <table className="employee-table schedule-table">
-              <thead>
-                <tr>
-                  <th>Kode</th>
-                  <th>Nama Shift</th>
-                  <th>Unit Kerja</th>
-                  <th>Jam Masuk</th>
-                  <th>Jam Pulang</th>
-                  <th>Istirahat</th>
-                  <th>Hari Kerja</th>
-                  <th>Status</th>
-                  <th>Aksi</th>
-                </tr>
-              </thead>
+          {loading && (
+            <div className="empty-state">Memuat data shift...</div>
+          )}
 
-              <tbody>
-                {filteredShifts.map((item) => (
-                  <tr key={item.id}>
-                    <td>
-                      <span className="unit-code">{item.code}</span>
-                    </td>
+          {!loading && error && (
+            <div className="empty-state">
+              <p>{error}</p>
+              <button className="secondary-button" onClick={fetchShifts}>
+                Coba Lagi
+              </button>
+            </div>
+          )}
 
-                    <td>
-                      <strong className="schedule-name">{item.name}</strong>
-                    </td>
-
-                    <td>{item.unit}</td>
-
-                    <td>
-                      <span className="schedule-time">{item.masuk}</span>
-                    </td>
-
-                    <td>
-                      <span className="schedule-time">{item.pulang}</span>
-                    </td>
-
-                    <td>{item.istirahat}</td>
-
-                    <td>{item.workDays}</td>
-
-                    <td>
-                      <span className="status-pill active">{item.status}</span>
-                    </td>
-
-                    <td>
-                      <button className="action-button">Edit</button>
-                      <button className="action-button">Detail</button>
-                    </td>
+          {!loading && !error && (
+            <div className="employee-table-wrapper">
+              <table className="employee-table schedule-table">
+                <thead>
+                  <tr>
+                    <th>Kode</th>
+                    <th>Nama Shift</th>
+                    <th>Unit Kerja</th>
+                    <th>Jam Masuk</th>
+                    <th>Jam Pulang</th>
+                    <th>Istirahat</th>
+                    <th>Hari Kerja</th>
+                    <th>Status</th>
+                    <th>Aksi</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
 
-            {filteredShifts.length === 0 && (
-              <div className="empty-state">Shift tidak ditemukan.</div>
-            )}
-          </div>
+                <tbody>
+                  {filteredShifts.map((item) => {
+                    const code = item.code || item.kode || item.shift_code || "SHIFT";
+                    const name = item.name || item.nama || item.shift_name || "Shift";
+                    const unit = item.unit || item.unit_kerja || item.unitName || item.unit_name || "-";
+                    const masuk = item.masuk || item.jam_masuk || item.start_time || item.startTime || "00:00";
+                    const pulang = item.pulang || item.jam_pulang || item.end_time || item.endTime || "00:00";
+                    const istirahat = formatRestTime(item.istirahat || item.rest_time || item.break_minutes || item.breakTime || 1);
+                    const workDays = item.workDays || item.hari_kerja || item.work_days || "Senin - Jumat";
+                    const status = item.status || (item.is_active ? "Aktif" : "Tidak Aktif");
+
+                    return (
+                      <tr key={item.id || code}>
+                        <td>
+                          <span className="unit-code">{code}</span>
+                        </td>
+
+                        <td>
+                          <strong className="schedule-name">{name}</strong>
+                        </td>
+
+                        <td>{unit}</td>
+
+                        <td>
+                          <span className="schedule-time">{masuk}</span>
+                        </td>
+
+                        <td>
+                          <span className="schedule-time">{pulang}</span>
+                        </td>
+
+                        <td>{istirahat}</td>
+
+                        <td>{workDays}</td>
+
+                        <td>
+                          <span className="status-pill active">{status}</span>
+                        </td>
+
+                        <td>
+                          <button className="action-button">Edit</button>
+                          <button className="action-button">Detail</button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+
+              {filteredShifts.length === 0 && (
+                <div className="empty-state">Shift tidak ditemukan.</div>
+              )}
+            </div>
+          )}
 
           <div className="table-footer">
             <span>Menampilkan {filteredShifts.length} shift</span>

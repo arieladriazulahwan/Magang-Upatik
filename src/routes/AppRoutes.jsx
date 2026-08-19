@@ -12,6 +12,7 @@ import Pengajuan from "../pages/pengajuan/Pengajuan";
 import Approval from "../pages/pengajuan/Approval";
 import DetailPengajuan from "../pages/pengajuan/DetailPengajuan";
 import Verifikasi from "../pages/verifikasi/Verifikasi";
+import ProtectedRoute from "./ProtectedRoute";
 
 function SimplePage({ title }) {
   return (
@@ -37,88 +38,137 @@ function AppRoutes() {
       {/* DASHBOARD */}
       <Route
         path="/dashboard"
-        element={<Dashboard />}
+        element={
+          <ProtectedRoute>
+            <Dashboard />
+          </ProtectedRoute>
+        }
       />
 
       {/* MENU */}
       <Route
-            path="/monitoring"
-            element={<Monitoring />}
-        />
-
-      <Route
-            path="/pegawai"
-            element={<Pegawai />}
-    />
-
-      <Route
-    path="/unit"
-     element={<UnitKerja />}
-    />
-
-
-     <Route
-  path="/jadwal"
-  element={<Jadwal />}
-/>
-
-<Route
-  path="/shift"
-  element={<Shift />}
-/>
-
-    <Route
-        path="/pengajuan"
-        element={<Pengajuan />}
-    />
-
-    <Route
-       path="/pengajuan/detail"
-      element={<DetailPengajuan />}
+        path="/monitoring"
+        element={
+          <ProtectedRoute allowedRoles={["admin", "super_admin", "developer"]}>
+            <Monitoring />
+          </ProtectedRoute>
+        }
       />
 
       <Route
-         path="/verifikasi"
-          element={<Verifikasi />}
+        path="/pegawai"
+        element={
+          <ProtectedRoute allowedRoles={["admin", "super_admin", "developer"]}>
+            <Pegawai />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/unit"
+        element={
+          <ProtectedRoute allowedRoles={["admin", "super_admin", "developer"]}>
+            <UnitKerja />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/jadwal"
+        element={
+          <ProtectedRoute allowedRoles={["admin", "super_admin", "developer"]}>
+            <Jadwal />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/shift"
+        element={
+          <ProtectedRoute allowedRoles={["admin", "super_admin", "developer"]}>
+            <Shift />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/pengajuan"
+        element={
+          <ProtectedRoute allowedRoles={["admin", "super_admin", "developer"]}>
+            <Pengajuan />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/pengajuan/detail"
+        element={
+          <ProtectedRoute allowedRoles={["admin", "super_admin", "developer"]}>
+            <DetailPengajuan />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/verifikasi"
+        element={
+          <ProtectedRoute allowedRoles={["admin", "super_admin", "developer"]}>
+            <Verifikasi />
+          </ProtectedRoute>
+        }
       />
 
       <Route
         path="/persetujuan"
-        element={<Approval />}
+        element={
+          <ProtectedRoute allowedRoles={["admin", "super_admin", "developer"]}>
+            <Approval />
+          </ProtectedRoute>
+        }
       />
 
       <Route
         path="/laporan"
         element={
-          <SimplePage title="Rekap & Ekspor" />
+          <ProtectedRoute allowedRoles={["admin", "super_admin", "developer"]}>
+            <SimplePage title="Rekap & Ekspor" />
+          </ProtectedRoute>
         }
       />
 
       <Route
         path="/siga8"
         element={
-          <SimplePage title="Pemetaan SIGA8" />
+          <ProtectedRoute allowedRoles={["super_admin", "developer"]}>
+            <SimplePage title="Pemetaan SIGA8" />
+          </ProtectedRoute>
         }
       />
 
       <Route
         path="/geofence"
         element={
-          <SimplePage title="Lokasi & Geofence" />
+          <ProtectedRoute allowedRoles={["super_admin", "developer"]}>
+            <SimplePage title="Lokasi & Geofence" />
+          </ProtectedRoute>
         }
       />
 
       <Route
         path="/kalender"
         element={
-          <SimplePage title="Google Calendar" />
+          <ProtectedRoute allowedRoles={["super_admin", "developer"]}>
+            <SimplePage title="Google Calendar" />
+          </ProtectedRoute>
         }
       />
 
       <Route
         path="/pengaturan"
         element={
-          <SimplePage title="Pengaturan" />
+          <ProtectedRoute allowedRoles={["super_admin", "developer"]}>
+            <SimplePage title="Pengaturan" />
+          </ProtectedRoute>
         }
       />
 
