@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
+import { apiRequest } from "../../services/api";
 
 const navGroups = [
   {
@@ -43,13 +45,11 @@ const navGroups = [
         path: "/verifikasi",
         label: "Verifikasi & Koreksi",
         icon: "✓",
-        badge: "12",
       },
       {
         path: "/persetujuan",
         label: "Persetujuan",
         icon: "▤",
-        badge: "5",
       },
     ],
   },
@@ -101,8 +101,44 @@ function getStoredUser() {
 }
 
 function Sidebar() {
+  const [pendingCounts, setPendingCounts] = useState({
+    verifikasi: 0,
+    persetujuan: 0,
+  });
   const user = getStoredUser();
   const role = String(localStorage.getItem("role") || "").toLowerCase();
+
+  useEffect(() => {
+    const fetchPendingCounts = async () => {
+      const [attendanceResult, leaveResult] = await Promise.allSettled([
+        apiRequest("/attendance"),
+        apiRequest("/leave-requests"),
+      ]);
+      const getItems = (result) => {
+        if (result.status !== "fulfilled") return [];
+        const payload = result.value;
+        if (Array.isArray(payload)) return payload;
+        if (Array.isArray(payload?.data)) return payload.data;
+        if (Array.isArray(payload?.items)) return payload.items;
+        return [];
+      };
+      const attendance = getItems(attendanceResult);
+      const leaveRequests = getItems(leaveResult);
+      const isPending = (item) => {
+        const status = String(
+          item.status || item.verification_status || item.approval_status || ""
+        ).toLowerCase();
+        return ["menunggu", "diajukan", "diproses", "pending"].includes(status);
+      };
+
+      setPendingCounts({
+        verifikasi: attendance.filter(isPending).length,
+        persetujuan: leaveRequests.filter(isPending).length,
+      });
+    };
+
+    fetchPendingCounts();
+  }, []);
 
   const displayName = user.name || user.full_name || "Administrator";
   const roleLabel =
@@ -166,11 +202,11 @@ function Sidebar() {
       {/* Logo */}
       <div className="sidebar-brand">
         <div className="sidebar-logo">
-          U
+          KP
         </div>
 
         <div>
-          <h2>SI-PRESENSI</h2>
+          <h2>KlikPresensi</h2>
           <span>UNIVERSITAS TADULAKO</span>
         </div>
       </div>
@@ -203,9 +239,11 @@ function Sidebar() {
                   {item.label}
                 </span>
 
-                {item.badge && (
+                {(["/verifikasi", "/persetujuan"].includes(item.path)) && (
                   <span className="nav-badge">
-                    {item.badge}
+                    {item.path === "/verifikasi"
+                      ? pendingCounts.verifikasi
+                      : pendingCounts.persetujuan}
                   </span>
                 )}
               </NavLink>

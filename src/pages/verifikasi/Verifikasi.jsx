@@ -69,6 +69,7 @@ function Verifikasi() {
   const [unitFilter, setUnitFilter] = useState("Semua Unit");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [correcting, setCorrecting] = useState(false);
 
   const fetchVerifications = async () => {
     try {
@@ -90,6 +91,32 @@ function Verifikasi() {
   useEffect(() => {
     fetchVerifications();
   }, []);
+
+  const handleCorrect = async (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+
+    try {
+      setCorrecting(true);
+      setError("");
+
+      await apiRequest(`/attendance/${selectedData.id}/correct`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          check_in: form.get("check_in") || null,
+          check_out: form.get("check_out") || null,
+          note: form.get("note") || null,
+        }),
+      });
+
+      setSelectedData(null);
+      await fetchVerifications();
+    } catch (err) {
+      setError(err.message || "Gagal menyimpan koreksi presensi.");
+    } finally {
+      setCorrecting(false);
+    }
+  };
 
   const filteredData = data.filter((item) => {
     const keyword = search.toLowerCase();
@@ -319,7 +346,7 @@ function Verifikasi() {
                   </div>
                 </div>
 
-                <div className="detail-grid">
+                <form className="detail-grid" onSubmit={handleCorrect}>
                   <div className="detail-item">
                     <span>Tanggal</span>
                     <strong>{selectedData.tanggal}</strong>
@@ -332,29 +359,28 @@ function Verifikasi() {
 
                   <div className="detail-item">
                     <span>Jam Masuk</span>
-                    <strong>{selectedData.jamMasuk}</strong>
+                    <input name="check_in" type="time" defaultValue={selectedData.jamMasuk === "-" ? "" : selectedData.jamMasuk} />
                   </div>
 
                   <div className="detail-item">
                     <span>Jam Pulang</span>
-                    <strong>{selectedData.jamPulang}</strong>
+                    <input name="check_out" type="time" defaultValue={selectedData.jamPulang === "-" ? "" : selectedData.jamPulang} />
                   </div>
+                  <div className="detail-item full-width">
+                    <span>Keterangan koreksi</span>
+                    <textarea name="note" defaultValue={selectedData.keterangan === "-" ? "" : selectedData.keterangan} rows="3" required />
+                  </div>
+                  <div className="modal-actions full-width">
+                    <button type="button" className="secondary-button" onClick={() => setSelectedData(null)}>
+                      Batal
+                    </button>
+                    <button type="submit" className="approve-submit" disabled={correcting}>
+                      {correcting ? "Menyimpan..." : "Simpan Koreksi"}
+                    </button>
+                  </div>
+                </form>
+
                 </div>
-
-                <div className="detail-reason">
-                  <span>Keterangan</span>
-                  <p>{selectedData.keterangan}</p>
-                </div>
-              </div>
-
-              <div className="modal-actions">
-                <button className="secondary-button" onClick={() => setSelectedData(null)}>
-                  Tutup
-                </button>
-
-                <button className="reject-submit">Tolak</button>
-                <button className="approve-submit">Verifikasi</button>
-              </div>
             </div>
           </div>
         )}

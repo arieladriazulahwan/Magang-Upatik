@@ -4,6 +4,8 @@ import Login from "../pages/auth/Login";
 import Dashboard from "../pages/dashboard/Dashboard";
 import AdminLayout from "../components/layout/AdminLayout";
 import Pegawai from "../pages/pegawai/Pegawai";
+import TambahPegawai from "../pages/pegawai/TambahPegawai";
+import DetailPegawai from "../pages/pegawai/DetailPegawai";
 import Monitoring from "../pages/monitoring/Monitoring";
 import UnitKerja from "../pages/unit/UnitKerja";
 import Jadwal from "../pages/jadwal/Jadwal";
@@ -60,6 +62,24 @@ function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={["admin", "super_admin", "developer"]}>
             <Pegawai />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/pegawai/tambah"
+        element={
+          <ProtectedRoute allowedRoles={["admin", "super_admin", "developer"]}>
+            <TambahPegawai />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/pegawai/:id"
+        element={
+          <ProtectedRoute allowedRoles={["admin", "super_admin", "developer"]}>
+            <DetailPegawai />
           </ProtectedRoute>
         }
       />

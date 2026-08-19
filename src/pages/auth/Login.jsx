@@ -26,6 +26,30 @@ const normalizeRole = (user, payload) => {
   return normalized || "admin";
 };
 
+const storeLoginSession = (response) => {
+  const payload = response?.data || response;
+  const user = payload?.user || payload?.data?.user || payload?.employee || {};
+  const token =
+    payload?.token ||
+    payload?.access_token ||
+    payload?.data?.token ||
+    payload?.data?.access_token ||
+    "";
+
+  if (!token) {
+    throw new Error("Login berhasil tetapi token tidak dikirim server.");
+  }
+
+  localStorage.setItem("token", token);
+
+  if (Object.keys(user).length > 0) {
+    localStorage.setItem("user", JSON.stringify(user));
+  }
+
+  localStorage.setItem("isLoggedIn", "true");
+  localStorage.setItem("role", normalizeRole(user, payload));
+};
+
 function Login() {
   const navigate = useNavigate();
 
@@ -33,6 +57,34 @@ function Login() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const handleSsoLogin = async () => {
+    if (!username || !password) {
+      alert("Isi username dan password untuk simulasi login SSO SIGA8.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const response = await apiRequest("/mock/siga8/login", {
+        method: "POST",
+        body: JSON.stringify({
+          username,
+          password,
+          device_name: "web",
+        }),
+      });
+
+      storeLoginSession(response);
+      navigate("/dashboard");
+    } catch (error) {
+      console.error("Login SSO gagal:", error);
+      alert(error.message || "Login SSO SIGA8 gagal.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -55,28 +107,7 @@ function Login() {
         }),
       });
 
-      const payload = response?.data || response;
-      const user = payload?.user || payload?.data?.user || payload?.employee || {};
-      const token =
-        payload?.token ||
-        payload?.access_token ||
-        payload?.data?.token ||
-        payload?.data?.access_token ||
-        "";
-      const role = normalizeRole(user, payload);
-
-      console.log("Login berhasil:", response);
-
-      if (token) {
-        localStorage.setItem("token", token);
-      }
-
-      if (user && Object.keys(user).length > 0) {
-        localStorage.setItem("user", JSON.stringify(user));
-      }
-
-      localStorage.setItem("isLoggedIn", "true");
-      localStorage.setItem("role", role);
+      storeLoginSession(response);
 
       alert("Login berhasil!");
       navigate("/dashboard");
@@ -105,15 +136,15 @@ function Login() {
           <div className="brand-content">
 
             <div className="brand-logo">
-              SP
+              KP
             </div>
 
             <h1>
-              SI-PRESENSI
+              KlikPresensi
             </h1>
 
             <p>
-              Sistem Informasi Presensi
+              Konsol administrasi presensi pegawai
               <br />
               Universitas Tadulako
             </p>
@@ -145,6 +176,20 @@ function Login() {
                 ke sistem.
               </p>
 
+            </div>
+
+            <button
+              type="button"
+              className="sso-login-button"
+              onClick={handleSsoLogin}
+              disabled={loading}
+            >
+              <span className="sso-icon">✓</span>
+              {loading ? "Menghubungkan..." : "Masuk dengan SSO SIGA8"}
+            </button>
+
+            <div className="login-divider">
+              <span>ATAU MASUK MANUAL</span>
             </div>
 
 

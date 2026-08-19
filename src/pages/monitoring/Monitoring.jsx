@@ -25,9 +25,7 @@ function Monitoring() {
     try {
       setLoading(true);
 
-      const response = await apiRequest(
-        "/monitoring/kehadiran"
-      );
+      const response = await apiRequest("/attendance");
 
       console.log(
         "Data monitoring dari backend:",

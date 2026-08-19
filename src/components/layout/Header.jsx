@@ -62,9 +62,24 @@ const pageTitles = {
   },
 };
 
+function getStoredUser() {
+  try {
+    return JSON.parse(localStorage.getItem("user") || "{}");
+  } catch {
+    return {};
+  }
+}
+
 function Header() {
   const location = useLocation();
   const navigate = useNavigate();
+  const user = getStoredUser();
+  const role = String(localStorage.getItem("role") || "admin");
+  const displayName = user.name || user.full_name || user.username || "Administrator";
+  const roleLabel = role
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+  const avatar = displayName.charAt(0).toUpperCase();
 
   const page =
     pageTitles[location.pathname] ||
@@ -112,12 +127,12 @@ function Header() {
         <div className="header-profile">
 
           <div className="header-avatar">
-            A
+            {avatar}
           </div>
 
           <div className="header-user-info">
-            <strong>Administrator</strong>
-            <small>Super Admin</small>
+            <strong>{displayName}</strong>
+            <small>{roleLabel}</small>
           </div>
 
           <button

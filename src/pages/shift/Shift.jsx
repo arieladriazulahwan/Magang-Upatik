@@ -64,25 +64,36 @@ function Shift() {
     return matchSearch && matchUnit;
   });
 
-  const handleAddShift = (e) => {
+  const handleAddShift = async (e) => {
     e.preventDefault();
 
     const form = new FormData(e.target);
 
-    const newShift = {
-      id: shifts.length + 1,
-      code: String(form.get("code") || "").toUpperCase(),
-      name: form.get("name") || "Shift Baru",
-      unit: form.get("unit") || "Semua Unit",
-      masuk: form.get("masuk") || "07:00",
-      pulang: form.get("pulang") || "15:00",
-      istirahat: formatRestTime(form.get("istirahat") || 1),
-      workDays: form.get("workDays") || "Senin - Jumat",
-      status: "Aktif",
-    };
+    try {
+      setLoading(true);
+      setError("");
 
-    setShifts([...shifts, newShift]);
-    setShowModal(false);
+      await apiRequest("/shifts", {
+        method: "POST",
+        body: JSON.stringify({
+          code: String(form.get("code") || "").toUpperCase(),
+          name: form.get("name") || "Shift Baru",
+          unit: form.get("unit") || null,
+          start_time: form.get("masuk") || "07:00",
+          end_time: form.get("pulang") || "15:00",
+          break_minutes: Number(form.get("istirahat") || 60),
+          work_days: form.get("workDays") || "Senin - Jumat",
+          is_active: true,
+        }),
+      });
+
+      setShowModal(false);
+      await fetchShifts();
+    } catch (err) {
+      console.error("Gagal menambahkan shift:", err);
+      setError(err.message || "Gagal menambahkan shift.");
+      setLoading(false);
+    }
   };
 
   return (

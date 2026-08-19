@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import AdminLayout from "../../components/layout/AdminLayout";
 import { apiRequest } from "../../services/api";
 
@@ -19,6 +18,27 @@ const getNestedValue = (obj, keys) => {
   return "";
 };
 
+const normalizeApprovalStatus = (value) => {
+  const lower = String(value || "").trim().toLowerCase();
+  if (["disetujui", "approved", "approve", "setuju"].includes(lower)) {
+    return "Disetujui";
+  }
+  if (["ditolak", "rejected", "reject", "tolak"].includes(lower)) {
+    return "Ditolak";
+  }
+  return "Menunggu";
+};
+
+const normalizeType = (value) => {
+  const type = String(value || "izin").trim().toLowerCase();
+  if (type.includes("cuti")) return "Cuti";
+  if (type.includes("sakit")) return "Sakit";
+  if (type.includes("wfh")) return "WFH";
+  if (type.includes("lembur")) return "Lembur";
+  if (type.includes("dinas")) return "Dinas";
+  return "Izin";
+};
+
 const normalizeApprovalData = (item, index) => {
   const employee = item.employee || item.user || item.pegawai || {};
   const name =
@@ -33,8 +53,9 @@ const normalizeApprovalData = (item, index) => {
     getNestedValue(item, ["unit", "unit_kerja", "unit_name"]) ||
     getNestedValue(employee, ["unit", "unit_kerja", "unit_name"]) ||
     "-";
-  const type =
-    getNestedValue(item, ["type", "jenis", "leave_type", "category"]) || "Izin";
+  const type = normalizeType(
+    getNestedValue(item, ["type", "jenis", "leave_type", "category"])
+  );
   const startDate =
     getNestedValue(item, ["start_date", "tanggal_mulai", "startDate"]) || "-";
   const endDate =
@@ -52,10 +73,7 @@ const normalizeApprovalData = (item, index) => {
   } else if (typeof item.isRejected === "boolean") {
     status = item.isRejected ? "Ditolak" : status;
   } else if (statusRaw) {
-    const lower = String(statusRaw).toLowerCase();
-    if (lower.includes("approve") || lower.includes("approved")) status = "Disetujui";
-    else if (lower.includes("reject") || lower.includes("rejected")) status = "Ditolak";
-    else if (lower.includes("pending") || lower.includes("wait")) status = "Menunggu";
+    status = normalizeApprovalStatus(statusRaw);
   }
 
   return {
@@ -73,10 +91,11 @@ const normalizeApprovalData = (item, index) => {
 };
 
 function Approval() {
-  const navigate = useNavigate();
   const [data, setData] = useState([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("Menunggu");
+  const [typeFilter, setTypeFilter] = useState("Semua Jenis");
+  const [selectedApproval, setSelectedApproval] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -111,7 +130,11 @@ function Approval() {
       statusFilter === "Semua Status" ||
       item.status === statusFilter;
 
-    return matchSearch && matchStatus;
+    const matchType =
+      typeFilter === "Semua Jenis" ||
+      item.type.toLowerCase() === typeFilter.toLowerCase();
+
+    return matchSearch && matchStatus && matchType;
   });
 
   const handleApprove = async (id) => {
@@ -125,6 +148,7 @@ function Approval() {
           item.id === id ? { ...item, status: "Disetujui" } : item
         )
       );
+      setSelectedApproval(null);
     } catch (err) {
       console.error("Gagal menyetujui pengajuan:", err);
       setError(err.message || "Gagal menyetujui pengajuan.");
@@ -142,6 +166,7 @@ function Approval() {
           item.id === id ? { ...item, status: "Ditolak" } : item
         )
       );
+      setSelectedApproval(null);
     } catch (err) {
       console.error("Gagal menolak pengajuan:", err);
       setError(err.message || "Gagal menolak pengajuan.");
@@ -158,33 +183,19 @@ function Approval() {
           </div>
         </div>
 
-        <div className="approval-summary">
-          <div className="approval-summary-card">
-            <span>Menunggu Persetujuan</span>
-            <strong>{data.filter((item) => item.status === "Menunggu").length}</strong>
-          </div>
-
-          <div className="approval-summary-card approved">
-            <span>Disetujui</span>
-            <strong>{data.filter((item) => item.status === "Disetujui").length}</strong>
-          </div>
-
-          <div className="approval-summary-card rejected">
-            <span>Ditolak</span>
-            <strong>{data.filter((item) => item.status === "Ditolak").length}</strong>
-          </div>
-        </div>
-
         <section className="data-panel">
-          <div className="data-toolbar">
-            <div className="search-box">
-              <span>⌕</span>
-              <input
-                type="text"
-                placeholder="Cari nama atau NIP..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
+          <div className="approval-toolbar">
+            <div className="approval-chips">
+              {["Semua Jenis", "Cuti", "Izin", "Sakit", "WFH", "Lembur", "Dinas"].map((type) => (
+                <button
+                  key={type}
+                  className={typeFilter === type ? "approval-chip active" : "approval-chip"}
+                  onClick={() => setTypeFilter(type)}
+                >
+                  {type}
+                  <span>{type === "Semua Jenis" ? data.length : data.filter((item) => item.type === type).length}</span>
+                </button>
+              ))}
             </div>
 
             <select
@@ -199,6 +210,18 @@ function Approval() {
             </select>
           </div>
 
+          <div className="approval-search-row">
+            <div className="search-box">
+              <span>⌕</span>
+              <input
+                type="text"
+                placeholder="Cari nama atau NIP..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+          </div>
+
           {loading && <div className="empty-state">Memuat data persetujuan...</div>}
 
           {!loading && error && (
@@ -211,85 +234,24 @@ function Approval() {
           )}
 
           {!loading && !error && (
-            <div className="employee-table-wrapper">
-              <table className="employee-table approval-table">
-                <thead>
-                  <tr>
-                    <th>Pegawai</th>
-                    <th>Jenis</th>
-                    <th>Tanggal</th>
-                    <th>Alasan</th>
-                    <th>Diajukan</th>
-                    <th>Status</th>
-                    <th>Aksi</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {filteredData.map((item) => (
-                    <tr key={item.id}>
-                      <td>
-                        <div className="employee-name">
-                          <div className="employee-avatar">{item.name.charAt(0)}</div>
-                          <div>
-                            <strong>{item.name}</strong>
-                            <span>{item.nip}</span>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td>
-                        <span className={`submission-type ${item.type.toLowerCase()}`}>
-                          {item.type}
-                        </span>
-                      </td>
-
-                      <td>
-                        <div className="submission-date">
-                          <strong>{item.startDate}</strong>
-                          {item.startDate !== item.endDate && <span>s/d {item.endDate}</span>}
-                        </div>
-                      </td>
-
-                      <td>
-                        <span className="reason-text">{item.reason}</span>
-                      </td>
-
-                      <td>{item.submitted}</td>
-
-                      <td>
-                        <span className={`submission-status ${item.status.toLowerCase().replace(/\s+/g, "-")}`}>
-                          {item.status}
-                        </span>
-                      </td>
-
-                      <td>
-                        <div className="approval-actions">
-                          <button
-                            className="action-button"
-                            onClick={() =>
-                              navigate("/pengajuan/detail", { state: { pengajuan: item } })
-                            }
-                          >
-                            Detail
-                          </button>
-
-                          {item.status === "Menunggu" && (
-                            <>
-                              <button className="approve-small" onClick={() => handleApprove(item.id)}>
-                                ✓
-                              </button>
-                              <button className="reject-small" onClick={() => handleReject(item.id)}>
-                                ✕
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="approval-list">
+              {filteredData.map((item) => (
+                <button className="approval-row" key={item.id} onClick={() => setSelectedApproval(item)}>
+                  <div className="approval-avatar">{item.name.charAt(0)}</div>
+                  <div className="approval-row-main">
+                    <div className="approval-row-title">
+                      <strong>{item.name}</strong>
+                      <span className={`approval-type-badge ${item.type.toLowerCase()}`}>{item.type}</span>
+                    </div>
+                    <div className="approval-row-meta">
+                      {item.unit} · {item.startDate}{item.startDate !== item.endDate ? ` - ${item.endDate}` : ""} · {item.reason}
+                    </div>
+                  </div>
+                  <span className={`approval-status-badge ${item.status.toLowerCase()}`}>{item.status}</span>
+                  <span className="approval-submitted">{item.submitted}</span>
+                  <span className="approval-chevron">›</span>
+                </button>
+              ))}
 
               {filteredData.length === 0 && (
                 <div className="empty-state">Tidak ada pengajuan yang ditemukan.</div>
@@ -297,6 +259,42 @@ function Approval() {
             </div>
           )}
         </section>
+
+        {selectedApproval && (
+          <div className="modal-overlay" onClick={() => setSelectedApproval(null)}>
+            <div className="approval-detail-modal" onClick={(event) => event.stopPropagation()}>
+              <div className="modal-header">
+                <div>
+                  <h3>Detail Persetujuan</h3>
+                  <p>{selectedApproval.name} · {selectedApproval.unit}</p>
+                </div>
+                <button className="modal-close" onClick={() => setSelectedApproval(null)}>×</button>
+              </div>
+              <div className="approval-detail-body">
+                <div className="approval-detail-badges">
+                  <span className={`approval-type-badge ${selectedApproval.type.toLowerCase()}`}>{selectedApproval.type}</span>
+                  <span className={`approval-status-badge ${selectedApproval.status.toLowerCase()}`}>{selectedApproval.status}</span>
+                </div>
+                <div className="approval-detail-fields">
+                  <div><span>Mulai</span><strong>{selectedApproval.startDate}</strong></div>
+                  <div><span>Selesai</span><strong>{selectedApproval.endDate}</strong></div>
+                  <div><span>Diajukan</span><strong>{selectedApproval.submitted}</strong></div>
+                  <div><span>NIP</span><strong>{selectedApproval.nip}</strong></div>
+                </div>
+                <div className="approval-reason-box">
+                  <span>Alasan Pengajuan</span>
+                  <p>{selectedApproval.reason}</p>
+                </div>
+              </div>
+              {selectedApproval.status === "Menunggu" && (
+                <div className="modal-actions">
+                  <button className="reject-submit" onClick={() => handleReject(selectedApproval.id)}>Tolak</button>
+                  <button className="approve-submit" onClick={() => handleApprove(selectedApproval.id)}>Setujui</button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </AdminLayout>
   );
