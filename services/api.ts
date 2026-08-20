@@ -15,7 +15,7 @@ import * as SecureStore from "expo-secure-store";
 
 const DEFAULT_API_URL =
   Platform.OS === "android"
-    ? "http://10.10.16.241:8000/api"
+    ? "192.168.111.133/api"
     : "http://127.0.0.1:8000/api";
 
 export const API_URL =
@@ -209,52 +209,17 @@ export type ApiWfhRequest = {
 
 /**
  * ============================================================
- * LEAVE TYPE
- * ============================================================
- */
-
-export type ApiLeaveType = {
-  id: number;
-  code: string;
-  name: string;
-  category: string;
-
-  requires_attachment: boolean;
-  requires_doctor_letter: boolean;
-};
-
-/**
- * ============================================================
- * LEAVE BALANCE
- * ============================================================
- */
-
-export type ApiLeaveBalance = {
-  id: number;
-
-  leave_type: {
-    id: number;
-    name: string;
-    category: string;
-  } | null;
-
-  year: number;
-
-  entitlement: number;
-  previous_year_balance: number;
-  used: number;
-  remaining: number;
-};
-
-/**
- * ============================================================
  * OVERTIME
  * ============================================================
  */
 
 export type ApiOvertimeRequest = {
   id: number;
-  employee_id: number;
+
+  employee: Pick<
+    ApiEmployee,
+    "id" | "name" | "nip"
+  > | null;
 
   date: string | null;
 
@@ -270,13 +235,36 @@ export type ApiOvertimeRequest = {
 
   status: string;
 
-  approved_by: number | null;
+  approver?: {
+    id: number;
+    name: string;
+  } | null;
+
   approved_at: string | null;
 
   note: string | null;
 
   created_at: string | null;
 };
+
+/**
+ * ============================================================
+ * NOTIFICATION
+ * ============================================================
+ */
+
+export type ApiNotification = {
+  id: number;
+  title: string;
+  message: string | null;
+  type: string | null;
+  target_url: string | null;
+  is_read: boolean;
+  read_at: string | null;
+  created_at: string | null;
+};
+
+
 
 /**
  * ============================================================
@@ -734,12 +722,6 @@ export async function getLeaveRequests(
   );
 }
 
-export async function getLeaveTypes() {
-  return apiRequest<{
-    data: ApiLeaveType[];
-  }>("/leave-types");
-}
-
 export async function postLeaveRequest(
   payload:
     | FormData
@@ -754,18 +736,6 @@ export async function postLeaveRequest(
         ? payload
         : JSON.stringify(payload),
   });
-}
-
-/**
- * ============================================================
- * LEAVE BALANCE
- * ============================================================
- */
-
-export async function getLeaveBalances() {
-  return apiRequest<{
-    data: ApiLeaveBalance[];
-  }>("/leave-balances");
 }
 
 /**
@@ -866,6 +836,59 @@ export async function decideWfhRequest(
       body: JSON.stringify({
         note,
       }),
+    }
+  );
+}
+
+/**
+ * ============================================================
+ * NOTIFICATIONS
+ * ============================================================
+ */
+
+export async function getNotifications(
+  params?: {
+    unread_only?: boolean;
+    per_page?: number;
+  }
+) {
+  return apiRequest<{
+    data: ApiNotification[];
+
+    meta?: {
+      current_page: number;
+      per_page: number;
+      total: number;
+      last_page: number;
+      unread_count: number;
+    };
+  }>(
+    `/notifications${buildQuery(
+      params
+    )}`
+  );
+}
+
+export async function markNotificationRead(
+  id: number | string
+) {
+  return apiRequest<{
+    data: ApiNotification;
+  }>(
+    `/notifications/${id}/read`,
+    {
+      method: "PATCH",
+    }
+  );
+}
+
+export async function markAllNotificationsRead() {
+  return apiRequest<{
+    message: string;
+  }>(
+    "/notifications/read-all",
+    {
+      method: "PATCH",
     }
   );
 }

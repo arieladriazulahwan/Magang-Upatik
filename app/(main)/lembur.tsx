@@ -4,9 +4,16 @@ import { router } from "expo-router";
 import Badge from "../../components/Badge";
 import MainScreen from "../../components/MainScreen";
 import { Colors } from "../../constants/colors";
-import { overtimeRows } from "../../constants/mockData";
+import { usePrototype } from "../../contexts/PrototypeContext";
 
 export default function LemburScreen() {
+  const { overtimeRequests } = usePrototype();
+
+  const pendingCount =
+    overtimeRequests.filter(
+      (item) => item.status === "Menunggu"
+    ).length;
+
   return (
     <MainScreen>
       <View style={styles.headerRow}>
@@ -15,25 +22,40 @@ export default function LemburScreen() {
         </Pressable>
         <View>
           <Text style={styles.title}>Lembur</Text>
-          <Text style={styles.subtitle}>Total bulan ini: 6j 30m</Text>
+          <Text style={styles.subtitle}>Rencana dan realisasi lembur</Text>
         </View>
       </View>
 
       <View style={styles.summaryCard}>
         <Text style={styles.summaryLabel}>Lembur menunggu persetujuan</Text>
-        <Text style={styles.summaryValue}>1 pengajuan</Text>
+        <Text style={styles.summaryValue}>{pendingCount} pengajuan</Text>
       </View>
 
-      {overtimeRows.map((item) => (
-        <View key={`${item.date}-${item.time}`} style={styles.card}>
+      {overtimeRequests.map((item) => (
+        <View key={item.id} style={styles.card}>
           <View style={styles.cardTop}>
             <Text style={styles.date}>{item.date}</Text>
-            <Badge label={item.status} tone={item.status === "Menunggu" ? "amber" : "green"} />
+            <Badge
+              label={item.status}
+              tone={
+                item.status === "Menunggu"
+                  ? "amber"
+                  : item.status === "Ditolak"
+                  ? "red"
+                  : "green"
+              }
+            />
           </View>
           <Text style={styles.time}>{item.time} - {item.duration}</Text>
           <Text style={styles.desc}>{item.desc}</Text>
         </View>
       ))}
+
+      {overtimeRequests.length === 0 ? (
+        <View style={styles.empty}>
+          <Text style={styles.emptyText}>Belum ada pengajuan lembur</Text>
+        </View>
+      ) : null}
     </MainScreen>
   );
 }
@@ -112,5 +134,18 @@ const styles = StyleSheet.create({
     color: "#7A8699",
     fontSize: 12,
     fontWeight: "600",
+  },
+  empty: {
+    alignItems: "center",
+    padding: 26,
+    borderRadius: 15,
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.line,
+  },
+  emptyText: {
+    color: "#94A0B3",
+    fontSize: 13,
+    fontWeight: "700",
   },
 });

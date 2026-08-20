@@ -7,21 +7,28 @@ import React, {
 } from "react";
 
 import {
+  checkIn,
+  checkOut,
+  clearSession,
   decideLeaveRequest,
   decideWfhRequest,
   getAttendance,
-  getLeaveTypes,
   getLeaveRequests,
+  getNotifications,
+  getOvertimeRequests,
   getProfile,
   getStoredUser,
   getToken,
   getWfhRequests,
   postLeaveRequest,
   postWfhRequest,
+  markNotificationRead as markBackendNotificationRead,
   type ApiUser,
   type ApiAttendance,
   type ApiLeaveRequest,
+  type ApiOvertimeRequest,
   type ApiWfhRequest,
+  type ApiNotification,
 } from "../services/api";
 
 /* =====================================================
@@ -89,6 +96,15 @@ export interface NotificationItem {
   status?: NotificationStatus;
 }
 
+export interface OvertimeItem {
+  id: string;
+  date: string;
+  time: string;
+  duration: string;
+  desc: string;
+  status: string;
+}
+
 /* =====================================================
    CONTEXT VALUE
 ===================================================== */
@@ -113,6 +129,8 @@ interface PrototypeContextValue {
   approvalHistory: ApprovalHistoryItem[];
 
   notifications: NotificationItem[];
+
+  overtimeRequests: OvertimeItem[];
 
   unreadCount: number;
 
@@ -170,20 +188,12 @@ const PrototypeContext =
    HELPER
 ===================================================== */
 
-function nowTime() {
-  const now = new Date();
-
-  return `${String(
-    now.getHours()
-  ).padStart(
-    2,
-    "0"
-  )}:${String(
-    now.getMinutes()
-  ).padStart(
-    2,
-    "0"
-  )}`;
+function localDateKey(date = new Date()) {
+  return `${date.getFullYear()}-${String(
+    date.getMonth() + 1
+  ).padStart(2, "0")}-${String(
+    date.getDate()
+  ).padStart(2, "0")}`;
 }
 
 function flash(
@@ -278,6 +288,32 @@ function statusToRequestStatus(
   }
 
   return "Menunggu";
+}
+
+const LEAVE_TYPE_IDS = {
+  Cuti: 1,
+  Sakit: 3,
+  Izin: 8,
+} as const;
+
+function photoFileFromUri(
+  uri: string,
+  type: "masuk" | "pulang"
+) {
+  const extension =
+    uri.split(".").pop()?.toLowerCase() ||
+    "jpg";
+
+  const mimeType =
+    extension === "png"
+      ? "image/png"
+      : "image/jpeg";
+
+  return {
+    uri,
+    name: `presensi-${type}-${Date.now()}.${extension}`,
+    type: mimeType,
+  };
 }
 
 /* =====================================================
@@ -470,6 +506,55 @@ function mapAttendance(
   };
 }
 
+function mapNotification(
+  item: ApiNotification
+): NotificationItem {
+  return {
+    id: String(item.id),
+    title: item.title,
+    desc: item.message ?? "",
+    time: item.created_at
+      ? formatTime(item.created_at)
+      : "-",
+    unread: !item.is_read,
+  };
+}
+
+function formatDuration(
+  minutes?: number | null
+) {
+  if (!minutes) {
+    return "Menunggu realisasi";
+  }
+
+  return `${Math.floor(minutes / 60)}j ${minutes % 60}m`;
+}
+
+function mapOvertime(
+  item: ApiOvertimeRequest
+): OvertimeItem {
+  const start =
+    item.planned_start_time?.slice(0, 5) ||
+    "--:--";
+  const end =
+    item.planned_end_time?.slice(0, 5) ||
+    "--:--";
+
+  return {
+    id: String(item.id),
+    date: item.date || "-",
+    time: `${start} - ${end}`,
+    duration: formatDuration(
+      item.duration_minutes
+    ),
+    desc: item.work_description,
+    status:
+      statusToRequestStatus(
+        item.status
+      ),
+  };
+}
+
 /* =====================================================
    PROVIDER
 ===================================================== */
@@ -552,6 +637,14 @@ export function PrototypeProvider({
     >([]);
 
   const [
+    overtimeRequests,
+    setOvertimeRequests,
+  ] =
+    useState<OvertimeItem[]>(
+      []
+    );
+
+  const [
     toast,
     setToast,
   ] =
@@ -608,6 +701,8 @@ export function PrototypeProvider({
           attendanceResponse,
           leaveResponse,
           wfhResponse,
+          notificationResponse,
+          overtimeResponse,
         ] =
           await Promise.all([
             getAttendance({
@@ -617,6 +712,12 @@ export function PrototypeProvider({
             getLeaveRequests(),
 
             getWfhRequests(),
+
+            getNotifications({
+              per_page: 20,
+            }),
+
+            getOvertimeRequests(),
           ]);
 
         if (!active) {
@@ -632,6 +733,37 @@ export function PrototypeProvider({
             mapAttendance
           )
         );
+
+        const today =
+          localDateKey();
+
+        const todayAttendance =
+          attendanceResponse.data.find(
+            (item) =>
+              item.date === today
+          );
+
+        if (todayAttendance) {
+          setJamMasuk(
+            formatTime(
+              todayAttendance.check_in
+            )
+          );
+
+          setJamPulang(
+            todayAttendance.check_out
+              ? formatTime(
+                  todayAttendance.check_out
+                )
+              : null
+          );
+
+          setAttendanceState(
+            todayAttendance.check_out
+              ? "selesai"
+              : "masuk"
+          );
+        }
 
         const backendRequests =
           [
@@ -669,7 +801,32 @@ export function PrototypeProvider({
               mapWfhApproval
             ),
         ]);
+
+        setNotifications(
+          notificationResponse.data.map(
+            mapNotification
+          )
+        );
+
+        setOvertimeRequests(
+          overtimeResponse.data.map(
+            mapOvertime
+          )
+        );
       } catch (error) {
+        if (
+          error instanceof Error &&
+          error.message === "Unauthenticated."
+        ) {
+          await clearSession();
+
+          if (active) {
+            setProfile(null);
+          }
+
+          return;
+        }
+
         console.log(
           "Backend sync failed:",
           error instanceof Error
@@ -729,6 +886,8 @@ export function PrototypeProvider({
 
           notifications,
 
+          overtimeRequests,
+
           unreadCount,
 
           toast,
@@ -748,29 +907,39 @@ export function PrototypeProvider({
             longitude
           ) {
             try {
-              /*
-               * Untuk sementara proses dibuat
-               * asynchronous agar UI prototype
-               * memiliki tahap loading.
-               *
-               * Nanti bagian ini dapat diganti
-               * dengan API upload foto presensi.
-               */
-
-              await delay(1200);
-
-              console.log(
-                "ATTENDANCE SUBMIT:",
-                {
-                  type,
+              const photo =
+                photoFileFromUri(
                   photoUri,
-                  latitude,
-                  longitude,
-                }
-              );
+                  type
+                );
+
+              const response =
+                type === "masuk"
+                  ? await checkIn({
+                      type: "wfo",
+                      latitude,
+                      longitude,
+                      photo,
+                      device_info:
+                        "KlikPresensi Mobile",
+                    })
+                  : await checkOut({
+                      latitude,
+                      longitude,
+                      photo,
+                      device_info:
+                        "KlikPresensi Mobile",
+                    });
+
+              const attendance =
+                response.data;
 
               const time =
-                nowTime();
+                formatTime(
+                  type === "masuk"
+                    ? attendance.check_in
+                    : attendance.check_out
+                );
 
               if (
                 type === "masuk"
@@ -794,69 +963,31 @@ export function PrototypeProvider({
 
               /*
                * Tambahkan riwayat presensi
-               * secara lokal untuk prototype.
+               * dari response backend.
                */
-
-              const now =
-                new Date();
-
-              const date =
-                `${now.getFullYear()}-${String(
-                  now.getMonth() +
-                    1
-                ).padStart(
-                  2,
-                  "0"
-                )}-${String(
-                  now.getDate()
-                ).padStart(
-                  2,
-                  "0"
-                )}`;
-
-              const day =
-                now
-                  .toLocaleDateString(
-                    "id-ID",
-                    {
-                      weekday:
-                        "short",
-                    }
-                  )
-                  .toUpperCase();
 
               setAttendanceHistory(
                 (
                   current
-                ) => [
-                  {
-                    date: String(
-                      now.getDate()
-                    ).padStart(
-                      2,
-                      "0"
+                ) => {
+                  const next =
+                    mapAttendance(
+                      attendance
+                    );
+
+                  return [
+                    next,
+                    ...current.filter(
+                      (item) =>
+                        !(
+                          item.date ===
+                            next.date &&
+                          item.day ===
+                            next.day
+                        )
                     ),
-
-                    day,
-
-                    time:
-                      type ===
-                      "masuk"
-                        ? `${time} - --:--`
-                        : `--:-- - ${time}`,
-
-                    duration:
-                      "0j 0m",
-
-                    status:
-                      "Hadir",
-
-                    mode:
-                      "WFO",
-                  },
-
-                  ...current,
-                ]
+                  ];
+                }
               );
 
               /*
@@ -1019,6 +1150,7 @@ export function PrototypeProvider({
                         payload.endDate,
 
                       reason:
+                        payload.reason ||
                         payload.title,
                     }
                   );
@@ -1033,44 +1165,14 @@ export function PrototypeProvider({
                   ]
                 );
               } else {
-                const leaveTypes =
-                  await getLeaveTypes();
+                const selectedTypeId =
+                  LEAVE_TYPE_IDS[
+                    payload.type as keyof typeof LEAVE_TYPE_IDS
+                  ];
 
-                const selectedType =
-                  leaveTypes.data.find(
-                    (item) => {
-                      if (
-                        payload.type ===
-                        "Sakit"
-                      ) {
-                        return (
-                          item.category ===
-                          "sakit"
-                        );
-                      }
-
-                      if (
-                        payload.type ===
-                        "Izin"
-                      ) {
-                        return (
-                          item.category ===
-                          "izin"
-                        );
-                      }
-
-                      return (
-                        item.code ===
-                        "cuti_tahunan"
-                      );
-                    }
-                  );
-
-                if (
-                  !selectedType
-                ) {
+                if (!selectedTypeId) {
                   throw new Error(
-                    "Jenis pengajuan tidak tersedia dari backend."
+                    "Jenis pengajuan belum didukung oleh backend mobile."
                   );
                 }
 
@@ -1078,7 +1180,7 @@ export function PrototypeProvider({
                   await postLeaveRequest(
                     {
                       leave_type_id:
-                        selectedType.id,
+                        selectedTypeId,
 
                       start_date:
                         payload.startDate,
@@ -1408,6 +1510,19 @@ export function PrototypeProvider({
           markNotificationRead(
             id
           ) {
+            if (/^\d+$/.test(id)) {
+              void markBackendNotificationRead(
+                id
+              ).catch((error) => {
+                console.log(
+                  "Mark notification failed:",
+                  error instanceof Error
+                    ? error.message
+                    : error
+                );
+              });
+            }
+
             setNotifications(
               (current) =>
                 current.map(
@@ -1432,6 +1547,7 @@ export function PrototypeProvider({
         jamMasuk,
         jamPulang,
         notifications,
+        overtimeRequests,
         profile,
         requests,
         toast,

@@ -1,4 +1,5 @@
 import React, {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -9,6 +10,8 @@ import {
   Alert,
   Platform,
   Pressable,
+  SafeAreaView,
+  StatusBar,
   StyleSheet,
   Text,
   View,
@@ -23,111 +26,152 @@ import * as Location from "expo-location";
 
 import { router } from "expo-router";
 
-import Svg, {
-  Path,
-  Circle,
-} from "react-native-svg";
+import { Ionicons } from "@expo/vector-icons";
 
 import {
-  usePrototype,
-} from "../../contexts/PrototypeContext";
+  ApiAttendance,
+  checkIn,
+  checkOut,
+  getAttendance,
+} from "../../services/api";
 
-/* =====================================================
-   ICONS
-===================================================== */
+/* ============================================================
+   COLORS
+============================================================ */
 
-function BackIcon() {
-  return (
-    <Svg
-      width={22}
-      height={22}
-      viewBox="0 0 24 24"
-      fill="none"
-    >
-      <Path
-        d="M15 18l-6-6 6-6"
-        stroke="#fff"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </Svg>
-  );
-}
+const COLORS = {
+  navy: "#0d2747",
+  navyDark: "#0a1d36",
 
-function CameraIcon() {
-  return (
-    <Svg
-      width={22}
-      height={22}
-      viewBox="0 0 24 24"
-      fill="none"
-    >
-      <Path
-        d="M4 7h4l1.5-2h5L16 7h4v12H4z"
-        stroke="#fff"
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-      />
+  blue: "#1d4ed8",
+  blueLight: "#3b82f6",
 
-      <Circle
-        cx="12"
-        cy="13"
-        r="3.2"
-        stroke="#fff"
-        strokeWidth="1.8"
-      />
-    </Svg>
-  );
-}
+  background: "#eef1f6",
+  white: "#ffffff",
 
-function CheckIcon() {
-  return (
-    <Svg
-      width={48}
-      height={48}
-      viewBox="0 0 24 24"
-      fill="none"
-    >
-      <Path
-        d="M5 12l5 5L20 6"
-        stroke="#fff"
-        strokeWidth="2.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </Svg>
-  );
-}
+  text: "#16223a",
+  textSecondary: "#7a8699",
 
-/* =====================================================
-   TYPE
-===================================================== */
+  border: "#e4e9f2",
+
+  green: "#0f766e",
+  greenLight: "#e2f3f0",
+
+  red: "#dc2626",
+  redLight: "#fde8e8",
+
+  orange: "#b45309",
+  orangeLight: "#fdf2dd",
+};
+
+/* ============================================================
+   TYPES
+============================================================ */
 
 type Step =
+  | "loading"
   | "camera"
-  | "proses"
-  | "hasil";
+  | "processing"
+  | "result";
 
-/* =====================================================
+type AttendanceKind =
+  | "masuk"
+  | "pulang";
+
+/* ============================================================
+   HELPERS
+============================================================ */
+
+function formatTime(
+  value: string | null | undefined
+) {
+  if (!value) {
+    return "--:--";
+  }
+
+  const date = new Date(value);
+
+  if (!Number.isNaN(date.getTime())) {
+    return date.toLocaleTimeString("id-ID", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+  }
+
+  return value.slice(0, 5);
+}
+
+function formatDate(
+  value: Date
+) {
+  return value.toLocaleDateString(
+    "id-ID",
+    {
+      weekday: "long",
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    }
+  );
+}
+
+function getErrorMessage(
+  error: unknown
+) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "Terjadi kesalahan saat melakukan presensi.";
+}
+
+/* ============================================================
    SCREEN
-===================================================== */
+============================================================ */
 
 export default function PresensiScreen() {
-  const {
-    attendanceState,
-    submitAttendance,
-  } = usePrototype();
+  /* ==========================================================
+     CAMERA
+  ========================================================== */
 
   const [
     cameraPermission,
     requestCameraPermission,
   ] = useCameraPermissions();
 
+  const cameraRef =
+    useRef<CameraView | null>(null);
+
   const [
-    step,
-    setStep,
-  ] = useState<Step>("camera");
+    cameraReady,
+    setCameraReady,
+  ] = useState(false);
+
+  /* ==========================================================
+     ATTENDANCE
+  ========================================================== */
+
+  const [
+    todayAttendance,
+    setTodayAttendance,
+  ] =
+    useState<ApiAttendance | null>(null);
+
+  const [
+    attendanceLoading,
+    setAttendanceLoading,
+  ] = useState(true);
+
+  const [
+    attendanceKind,
+    setAttendanceKind,
+  ] =
+    useState<AttendanceKind>("masuk");
+
+  /* ==========================================================
+     LOCATION
+  ========================================================== */
 
   const [
     location,
@@ -142,96 +186,126 @@ export default function PresensiScreen() {
     setLocationLoading,
   ] = useState(false);
 
+  /* ==========================================================
+     PROCESS
+  ========================================================== */
+
   const [
-    cameraReady,
-    setCameraReady,
-  ] = useState(false);
+    step,
+    setStep,
+  ] = useState<Step>("loading");
 
   const [
     processing,
     setProcessing,
   ] = useState(false);
 
+  /* ==========================================================
+     RESULT
+  ========================================================== */
+
   const [
     resultTime,
     setResultTime,
-  ] = useState<string | null>(
-    null
-  );
+  ] = useState("--:--");
 
   const [
     resultMessage,
     setResultMessage,
   ] = useState("");
 
-  const cameraRef =
-    useRef<CameraView | null>(null);
+  const [
+    resultAttendance,
+    setResultAttendance,
+  ] =
+    useState<ApiAttendance | null>(null);
 
-  const jenis =
-    attendanceState === "belum"
-      ? "masuk"
-      : "pulang";
+  /* ==========================================================
+     DETERMINE TODAY ATTENDANCE
+  ========================================================== */
 
-  const jenisLabel =
-    jenis === "masuk"
-      ? "Masuk"
-      : "Pulang";
-
-  /* ===================================================
-     REQUEST LOCATION
-  =================================================== */
-
-  const getLocation =
-    async (): Promise<boolean> => {
+  const loadTodayAttendance =
+    useCallback(async () => {
       try {
-        setLocationLoading(true);
+        setAttendanceLoading(true);
 
-        const permission =
-          await Location.requestForegroundPermissionsAsync();
+        const today =
+          new Date()
+            .toISOString()
+            .slice(0, 10);
 
-        if (
-          permission.status !==
-          Location.PermissionStatus.GRANTED
-        ) {
-          Alert.alert(
-            "Lokasi diperlukan",
-            "Izinkan aplikasi mengakses lokasi untuk melakukan presensi."
-          );
+        const response =
+          await getAttendance({
+            date_from: today,
+            date_to: today,
+            per_page: 10,
+          });
 
-          return false;
-        }
+        const items =
+          response?.data || [];
 
         const current =
-          await Location.getCurrentPositionAsync(
-            {
-              accuracy:
-                Location.Accuracy.High,
-            }
-          );
+          items.find(
+            (item: ApiAttendance) =>
+              item.check_in ||
+              item.check_out
+          ) ||
+          items[0] ||
+          null;
 
-        setLocation(current);
+        setTodayAttendance(current);
 
-        return true;
+        /*
+         * Belum masuk
+         */
+        if (!current?.check_in) {
+          setAttendanceKind("masuk");
+        }
+
+        /*
+         * Sudah masuk tetapi belum pulang
+         */
+        else if (
+          current.check_in &&
+          !current.check_out
+        ) {
+          setAttendanceKind("pulang");
+        }
+
+        /*
+         * Sudah masuk dan pulang
+         */
+        else {
+          setAttendanceKind("pulang");
+        }
       } catch (error) {
         console.error(
-          "LOCATION ERROR:",
+          "LOAD ATTENDANCE ERROR:",
           error
         );
 
-        Alert.alert(
-          "Lokasi gagal",
-          "Lokasi perangkat tidak dapat diperoleh. Pastikan GPS aktif."
-        );
-
-        return false;
+        /*
+         * Jika gagal mengambil data,
+         * default ke absen masuk.
+         */
+        setAttendanceKind("masuk");
       } finally {
-        setLocationLoading(false);
+        setAttendanceLoading(false);
+        setStep("camera");
       }
-    };
+    }, []);
 
-  /* ===================================================
+  /* ==========================================================
+     INITIAL LOAD
+  ========================================================== */
+
+  useEffect(() => {
+    loadTodayAttendance();
+  }, [loadTodayAttendance]);
+
+  /* ==========================================================
      CAMERA PERMISSION
-  =================================================== */
+  ========================================================== */
 
   useEffect(() => {
     if (
@@ -240,337 +314,1169 @@ export default function PresensiScreen() {
     ) {
       requestCameraPermission();
     }
-  }, []);
+  }, [
+    cameraPermission,
+    requestCameraPermission,
+  ]);
 
-  /* ===================================================
-     TAKE PHOTO
-  =================================================== */
+  /* ==========================================================
+     LABEL
+  ========================================================== */
 
-  const takePhoto =
-    async () => {
+  const jenisLabel =
+    attendanceKind === "masuk"
+      ? "Masuk"
+      : "Pulang";
+
+  const alreadyCheckedIn =
+    Boolean(todayAttendance?.check_in);
+
+  /* ==========================================================
+     GET LOCATION
+  ========================================================== */
+
+  const getCurrentLocation = async (): Promise<{
+    latitude: number;
+    longitude: number;
+  } | null> => {
+    try {
+      setLocationLoading(true);
+
+      const permission =
+        await Location.requestForegroundPermissionsAsync();
+
+      if (permission.status !== "granted") {
+        Alert.alert(
+          "Lokasi diperlukan",
+          "Izinkan akses lokasi agar sistem dapat memverifikasi lokasi presensi."
+        );
+
+        return null;
+      }
+
+      const current =
+        await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.High,
+        });
+
+      console.log("CURRENT LOCATION:", current);
+
       if (
-        !cameraRef.current ||
-        processing ||
-        !cameraReady
+        !current ||
+        !current.coords ||
+        typeof current.coords.latitude !== "number" ||
+        typeof current.coords.longitude !== "number"
       ) {
+        throw new Error(
+          "Koordinat lokasi tidak berhasil diperoleh."
+        );
+      }
+
+      setLocation(current);
+
+      return {
+        latitude: current.coords.latitude,
+        longitude: current.coords.longitude,
+      };
+    } catch (error) {
+      console.error(
+        "LOCATION ERROR:",
+        error
+      );
+
+      Alert.alert(
+        "Lokasi gagal",
+        getErrorMessage(error)
+      );
+
+      return null;
+    } finally {
+      setLocationLoading(false);
+    }
+  };
+
+/* ==========================================================
+   TAKE PHOTO
+========================================================== */
+
+  const takePhoto = async () => {
+    if (
+      processing ||
+      locationLoading ||
+      !cameraRef.current ||
+      !cameraReady
+    ) {
+      return;
+    }
+
+    try {
+      setProcessing(true);
+
+      /*
+      * =====================================================
+      * 1. AMBIL LOKASI
+      * =====================================================
+      */
+
+      const currentLocation =
+        await getCurrentLocation();
+
+      if (!currentLocation) {
+        setProcessing(false);
         return;
       }
 
-      try {
-        setProcessing(true);
+      console.log(
+        "LOCATION FOR ATTENDANCE:",
+        currentLocation
+      );
 
-        /*
-         * Lokasi diambil sebelum foto
-         * dikirim.
-         */
-        const locationSuccess =
-          location
-            ? true
-            : await getLocation();
+      /*
+      * =====================================================
+      * 2. AMBIL FOTO
+      * =====================================================
+      */
 
-        if (!locationSuccess) {
-          setProcessing(false);
-          return;
-        }
+      const photo =
+        await cameraRef.current.takePictureAsync({
+          quality: 0.8,
+          base64: false,
+        });
 
-        /*
-         * Ambil foto wajah.
-         */
-        const photo =
-          await cameraRef.current.takePictureAsync(
-            {
-              quality: 0.8,
-              base64: false,
-            }
-          );
-
-        if (!photo?.uri) {
-          throw new Error(
-            "Foto tidak berhasil diambil."
-          );
-        }
-
-        /*
-         * Masuk ke halaman proses.
-         */
-        setStep("proses");
-
-        /*
-         * Kirim presensi.
-         */
-        await processAttendance(
-          photo.uri
-        );
-      } catch (error) {
-        console.error(
-          "CAMERA ERROR:",
-          error
-        );
-
-        setProcessing(false);
-
-        Alert.alert(
-          "Presensi gagal",
-          error instanceof Error
-            ? error.message
-            : "Foto tidak dapat diambil."
+      if (!photo?.uri) {
+        throw new Error(
+          "Foto wajah tidak berhasil diambil."
         );
       }
-    };
 
-  /* ===================================================
-     PROCESS ATTENDANCE
-  =================================================== */
+      /*
+      * =====================================================
+      * 3. MASUK KE PROSES
+      * =====================================================
+      */
 
-  const processAttendance =
-    async (
-      photoUri: string
+      setStep("processing");
+
+      /*
+      * =====================================================
+      * 4. KIRIM KE BACKEND
+      * =====================================================
+      */
+
+      await submitToBackend(
+        photo.uri,
+        currentLocation
+      );
+    } catch (error) {
+      console.error(
+        "TAKE PHOTO ERROR:",
+        error
+      );
+
+      setProcessing(false);
+      setStep("camera");
+
+      Alert.alert(
+        "Presensi gagal",
+        getErrorMessage(error)
+      );
+    }
+  };
+  /* ==========================================================
+     SUBMIT ATTENDANCE
+  ========================================================== */
+
+    const submitToBackend = async (
+      photoUri: string,
+      currentLocation: {
+        latitude: number;
+        longitude: number;
+      }
     ) => {
-      if (!location) {
-        Alert.alert(
-          "Lokasi belum tersedia",
-          "Lokasi belum berhasil diperoleh."
-        );
-
-        setStep("camera");
-        setProcessing(false);
-
-        return;
-      }
 
       try {
         /*
-         * Fungsi context menerima:
-         *
-         * jenis
-         * foto
-         * latitude
-         * longitude
+         * Format file untuk multipart/form-data
          */
-        const success =
-          await submitAttendance(
-            jenis,
-            photoUri,
-            location.coords.latitude,
-            location.coords.longitude
-          );
+        const photoFile = {
+          uri: photoUri,
+          name: `presensi-${Date.now()}.jpg`,
+          type: "image/jpeg",
+        };
 
-        if (!success) {
-          setStep("camera");
-          return;
+        const deviceInfo =
+          `${Platform.OS} ${String(
+            Platform.Version
+          )}`;
+
+        let response;
+
+        /*
+         * =====================================================
+         * CHECK IN
+         * =====================================================
+         */
+
+        if (
+          attendanceKind ===
+          "masuk"
+        ) {
+          response =
+            await checkIn({
+              type: "wfo",
+
+              latitude:
+                currentLocation.latitude,
+
+              longitude:
+                currentLocation.longitude,
+
+              photo: photoFile,
+
+              device_info:
+                deviceInfo,
+            });
         }
 
-        const now =
-          new Date();
+        /*
+         * =====================================================
+         * CHECK OUT
+         * =====================================================
+         */
 
-        const formatted =
-          `${String(
-            now.getHours()
-          ).padStart(2, "0")}:${String(
-            now.getMinutes()
-          ).padStart(2, "0")}`;
+        else {
+          response =
+            await checkOut({
+              latitude:
+                currentLocation.latitude,
 
-        setResultTime(formatted);
+              longitude:
+                currentLocation.longitude,
+
+              photo: photoFile,
+
+              device_info:
+                deviceInfo,
+            });
+        }
+
+        console.log(
+          "ATTENDANCE RESPONSE:",
+          response
+        );
+
+        /*
+         * Backend mengembalikan:
+         *
+         * {
+         *   data: ApiAttendance
+         * }
+         */
+
+        const attendance =
+          response?.data ||
+          null;
+
+        setResultAttendance(
+          attendance
+        );
+
+        /*
+         * Ambil waktu dari backend.
+         * Jangan menggunakan waktu lokal
+         * jika backend sudah memberikan
+         * check_in/check_out.
+         */
+
+        let serverTime: string | null =
+          null;
+
+        if (
+          attendanceKind ===
+          "masuk"
+        ) {
+          serverTime =
+            attendance?.check_in ||
+            null;
+        } else {
+          serverTime =
+            attendance?.check_out ||
+            null;
+        }
+
+        /*
+         * Fallback ke waktu perangkat
+         * jika response backend tidak
+         * mengembalikan waktu.
+         */
+
+        const finalTime =
+          serverTime
+            ? formatTime(serverTime)
+            : new Date().toLocaleTimeString(
+                "id-ID",
+                {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  hour12: false,
+                }
+              );
+
+        setResultTime(
+          finalTime
+        );
 
         setResultMessage(
-          jenis === "masuk"
+          attendanceKind ===
+          "masuk"
             ? "Presensi masuk berhasil dicatat."
             : "Presensi pulang berhasil dicatat."
         );
 
-        setStep("hasil");
+        /*
+         * Selesai
+         */
+        setProcessing(false);
+        setStep("result");
       } catch (error) {
         console.error(
-          "ATTENDANCE ERROR:",
+          "SUBMIT ATTENDANCE ERROR:",
           error
         );
 
+        setProcessing(false);
+        setStep("camera");
+
         Alert.alert(
           "Presensi gagal",
-          error instanceof Error
-            ? error.message
-            : "Presensi gagal dikirim."
+          getErrorMessage(error)
         );
-
-        setStep("camera");
-      } finally {
-        setProcessing(false);
       }
     };
 
-  /* ===================================================
+  /* ==========================================================
      BACK
-  =================================================== */
+  ========================================================== */
 
-  const handleBack = () => {
-    if (processing) {
-      return;
-    }
+  const handleBack =
+    () => {
+      if (processing) {
+        return;
+      }
 
-    router.back();
-  };
+      router.back();
+    };
 
-  /* ===================================================
-     PERMISSION LOADING
-  =================================================== */
+  /* ==========================================================
+     BACK TO DASHBOARD
+  ========================================================== */
+
+  const handleDone =
+    () => {
+      /*
+       * Kembali ke dashboard.
+       *
+       * Dashboard akan dapat mengambil
+       * data terbaru ketika screen
+       * dimuat kembali.
+       */
+
+      router.replace(
+        "/(main)"
+      );
+    };
+
+  /* ==========================================================
+     LOADING
+  ========================================================== */
+
+  if (
+    attendanceLoading ||
+    step === "loading"
+  ) {
+    return (
+      <SafeAreaView
+        style={styles.safeArea}
+      >
+        <StatusBar
+          barStyle="light-content"
+          backgroundColor={
+            COLORS.navy
+          }
+        />
+
+        <View
+          style={styles.loadingScreen}
+        >
+          <View
+            style={
+              styles.loadingIcon
+            }
+          >
+            <Ionicons
+              name="finger-print-outline"
+              size={38}
+              color="#fff"
+            />
+          </View>
+
+          <ActivityIndicator
+            size="large"
+            color="#fff"
+          />
+
+          <Text
+            style={
+              styles.loadingTitle
+            }
+          >
+            Menyiapkan presensi
+          </Text>
+
+          <Text
+            style={
+              styles.loadingSubtitle
+            }
+          >
+            Memeriksa status presensi hari ini...
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  /* ==========================================================
+     CAMERA PERMISSION LOADING
+  ========================================================== */
 
   if (!cameraPermission) {
     return (
-      <View style={styles.root}>
-        <Header
-          title={`Absen ${jenisLabel}`}
-          subtitle="Verifikasi wajah"
-          onBack={handleBack}
+      <SafeAreaView
+        style={styles.safeArea}
+      >
+        <StatusBar
+          barStyle="light-content"
+          backgroundColor={
+            COLORS.navy
+          }
         />
 
-        <View style={styles.centerContent}>
-          <ActivityIndicator
-            size="large"
-            color="#2563EB"
+        <View
+          style={
+            styles.permissionScreen
+          }
+        >
+          <Header
+            title={`Absen ${jenisLabel}`}
+            subtitle="Verifikasi wajah"
+            onBack={handleBack}
           />
 
-          <Text style={styles.loadingText}>
-            Memeriksa kamera...
-          </Text>
-        </View>
-      </View>
-    );
-  }
-
-  /* ===================================================
-     CAMERA PERMISSION DENIED
-  =================================================== */
-
-  if (!cameraPermission.granted) {
-    return (
-      <View style={styles.root}>
-        <Header
-          title={`Absen ${jenisLabel}`}
-          subtitle="Verifikasi wajah"
-          onBack={handleBack}
-        />
-
-        <View style={styles.centerContent}>
-          <Text style={styles.permissionTitle}>
-            Kamera diperlukan
-          </Text>
-
-          <Text style={styles.permissionText}>
-            Kamera digunakan untuk
-            mengambil foto wajah sebagai
-            bukti presensi.
-          </Text>
-
-          <Pressable
-            style={styles.primaryButton}
-            onPress={() =>
-              requestCameraPermission()
+          <View
+            style={
+              styles.centerContent
             }
           >
+            <ActivityIndicator
+              size="large"
+              color={
+                COLORS.blue
+              }
+            />
+
             <Text
-              style={styles.primaryButtonText}
+              style={
+                styles.centerTitle
+              }
             >
-              Izinkan Kamera
+              Memeriksa kamera...
             </Text>
-          </Pressable>
+          </View>
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
-  /* ===================================================
-     CAMERA
-  =================================================== */
+  /* ==========================================================
+     CAMERA PERMISSION DENIED
+  ========================================================== */
 
-  if (step === "camera") {
+  if (
+    !cameraPermission.granted
+  ) {
     return (
-      <View style={styles.cameraRoot}>
+      <SafeAreaView
+        style={styles.safeArea}
+      >
+        <StatusBar
+          barStyle="light-content"
+          backgroundColor={
+            COLORS.navy
+          }
+        />
+
+        <View
+          style={
+            styles.permissionScreen
+          }
+        >
+          <Header
+            title={`Absen ${jenisLabel}`}
+            subtitle="Verifikasi wajah"
+            onBack={handleBack}
+          />
+
+          <View
+            style={
+              styles.centerContent
+            }
+          >
+            <View
+              style={
+                styles.permissionIcon
+              }
+            >
+              <Ionicons
+                name="camera-outline"
+                size={42}
+                color={
+                  COLORS.blue
+                }
+              />
+            </View>
+
+            <Text
+              style={
+                styles.centerTitle
+              }
+            >
+              Kamera diperlukan
+            </Text>
+
+            <Text
+              style={
+                styles.centerDescription
+              }
+            >
+              Kamera digunakan untuk
+              mengambil foto wajah
+              sebagai bukti presensi.
+            </Text>
+
+            <Pressable
+              style={
+                styles.primaryButton
+              }
+              onPress={() =>
+                requestCameraPermission()
+              }
+            >
+              <Ionicons
+                name="camera-outline"
+                size={20}
+                color="#fff"
+              />
+
+              <Text
+                style={
+                  styles.primaryButtonText
+                }
+              >
+                Izinkan Kamera
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  /* ==========================================================
+     PROCESSING
+  ========================================================== */
+
+  if (
+    step === "processing"
+  ) {
+    return (
+      <SafeAreaView
+        style={styles.safeArea}
+      >
+        <StatusBar
+          barStyle="light-content"
+          backgroundColor={
+            COLORS.navyDark
+          }
+        />
+
+        <View
+          style={
+            styles.processingScreen
+          }
+        >
+          <Header
+            title={`Absen ${jenisLabel}`}
+            subtitle="Memproses presensi"
+            onBack={() => {}}
+            disabled
+          />
+
+          <View
+            style={
+              styles.processingContent
+            }
+          >
+            <View
+              style={
+                styles.processingCircle
+              }
+            >
+              <ActivityIndicator
+                size="large"
+                color="#fff"
+              />
+            </View>
+
+            <Text
+              style={
+                styles.processingTitle
+              }
+            >
+              Memproses presensi
+            </Text>
+
+            <Text
+              style={
+                styles.processingDescription
+              }
+            >
+              Foto dan lokasi sedang
+              diverifikasi oleh sistem.
+            </Text>
+
+            <View
+              style={
+                styles.processingSteps
+              }
+            >
+              <ProcessItem
+                icon="checkmark-circle"
+                text="Foto wajah berhasil diambil"
+                done
+              />
+
+              <ProcessItem
+                icon="location"
+                text="Lokasi sedang diverifikasi"
+                active
+              />
+
+              <ProcessItem
+                icon="cloud-upload-outline"
+                text="Menyimpan data presensi"
+              />
+            </View>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  /* ==========================================================
+     RESULT
+  ========================================================== */
+
+  if (
+    step === "result"
+  ) {
+    return (
+      <SafeAreaView
+        style={styles.safeArea}
+      >
+        <StatusBar
+          barStyle="light-content"
+          backgroundColor={
+            COLORS.navy
+          }
+        />
+
+        <View
+          style={
+            styles.resultScreen
+          }
+        >
+          <Header
+            title="Presensi Berhasil"
+            subtitle="Data berhasil disimpan"
+            onBack={handleDone}
+          />
+
+          <View
+            style={
+              styles.resultContent
+            }
+          >
+            <View
+              style={
+                styles.successCircle
+              }
+            >
+              <Ionicons
+                name="checkmark"
+                size={54}
+                color="#fff"
+              />
+            </View>
+
+            <Text
+              style={
+                styles.resultTitle
+              }
+            >
+              Absen {jenisLabel} Berhasil
+            </Text>
+
+            <Text
+              style={
+                styles.resultDescription
+              }
+            >
+              {resultMessage}
+            </Text>
+
+            <View
+              style={
+                styles.resultCard
+              }
+            >
+              <View
+                style={
+                  styles.resultRow
+                }
+              >
+                <View
+                  style={
+                    styles.resultRowLeft
+                  }
+                >
+                  <View
+                    style={
+                      styles.resultSmallIcon
+                    }
+                  >
+                    <Ionicons
+                      name="calendar-outline"
+                      size={18}
+                      color={
+                        COLORS.blue
+                      }
+                    />
+                  </View>
+
+                  <Text
+                    style={
+                      styles.resultLabel
+                    }
+                  >
+                    Tanggal
+                  </Text>
+                </View>
+
+                <Text
+                  style={
+                    styles.resultValue
+                  }
+                >
+                  {formatDate(
+                    new Date()
+                  )}
+                </Text>
+              </View>
+
+              <View
+                style={
+                  styles.divider
+                }
+              />
+
+              <View
+                style={
+                  styles.resultRow
+                }
+              >
+                <View
+                  style={
+                    styles.resultRowLeft
+                  }
+                >
+                  <View
+                    style={
+                      styles.resultSmallIcon
+                    }
+                  >
+                    <Ionicons
+                      name="time-outline"
+                      size={18}
+                      color={
+                        COLORS.blue
+                      }
+                    />
+                  </View>
+
+                  <Text
+                    style={
+                      styles.resultLabel
+                    }
+                  >
+                    Waktu
+                  </Text>
+                </View>
+
+                <Text
+                  style={
+                    styles.resultTime
+                  }
+                >
+                  {resultTime}
+                </Text>
+              </View>
+
+              <View
+                style={
+                  styles.divider
+                }
+              />
+
+              <View
+                style={
+                  styles.resultRow
+                }
+              >
+                <View
+                  style={
+                    styles.resultRowLeft
+                  }
+                >
+                  <View
+                    style={
+                      styles.resultSmallIcon
+                    }
+                  >
+                    <Ionicons
+                      name="location-outline"
+                      size={18}
+                      color={
+                        COLORS.blue
+                      }
+                    />
+                  </View>
+
+                  <Text
+                    style={
+                      styles.resultLabel
+                    }
+                  >
+                    Lokasi
+                  </Text>
+                </View>
+
+                <View
+                  style={
+                    styles.verifiedBadge
+                  }
+                >
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={15}
+                    color={
+                      COLORS.green
+                    }
+                  />
+
+                  <Text
+                    style={
+                      styles.verifiedText
+                    }
+                  >
+                    Terverifikasi
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            <View
+              style={
+                styles.infoBox
+              }
+            >
+              <Ionicons
+                name="information-circle-outline"
+                size={20}
+                color={
+                  COLORS.blue
+                }
+              />
+
+              <Text
+                style={
+                  styles.infoText
+                }
+              >
+                Data presensi telah
+                tersimpan pada sistem.
+              </Text>
+            </View>
+
+            <Pressable
+              style={
+                styles.primaryButton
+              }
+              onPress={
+                handleDone
+              }
+            >
+              <Ionicons
+                name="home-outline"
+                size={20}
+                color="#fff"
+              />
+
+              <Text
+                style={
+                  styles.primaryButtonText
+                }
+              >
+                Kembali ke Beranda
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  /* ==========================================================
+     CAMERA SCREEN
+  ========================================================== */
+
+  return (
+    <SafeAreaView
+      style={styles.safeArea}
+    >
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor={
+          COLORS.navyDark
+        }
+      />
+
+      <View
+        style={
+          styles.cameraScreen
+        }
+      >
         <Header
           title={`Absen ${jenisLabel}`}
           subtitle="Verifikasi wajah"
           onBack={handleBack}
         />
 
-        <View style={styles.cameraContainer}>
+        {/* ====================================================
+            CAMERA
+        ==================================================== */}
+
+        <View
+          style={
+            styles.cameraContainer
+          }
+        >
           <CameraView
             ref={cameraRef}
-            style={StyleSheet.absoluteFillObject}
+            style={
+              StyleSheet.absoluteFillObject
+            }
             facing="front"
             onCameraReady={() =>
               setCameraReady(true)
             }
           />
 
-          {/* OVERLAY */}
+          {/* DARK OVERLAY */}
 
-          <View style={styles.cameraOverlay}>
-            {/* CORNER TOP LEFT */}
+          <View
+            style={
+              styles.cameraOverlay
+            }
+          />
+
+          {/* FACE FRAME */}
+
+          <View
+            style={
+              styles.faceFrame
+            }
+          >
             <View
               style={[
-                styles.corner,
-                styles.topLeft,
+                styles.frameCorner,
+                styles.frameTopLeft,
               ]}
             />
 
-            {/* CORNER TOP RIGHT */}
             <View
               style={[
-                styles.corner,
-                styles.topRight,
+                styles.frameCorner,
+                styles.frameTopRight,
               ]}
             />
 
-            {/* CORNER BOTTOM LEFT */}
             <View
               style={[
-                styles.corner,
-                styles.bottomLeft,
+                styles.frameCorner,
+                styles.frameBottomLeft,
               ]}
             />
 
-            {/* CORNER BOTTOM RIGHT */}
             <View
               style={[
-                styles.corner,
-                styles.bottomRight,
+                styles.frameCorner,
+                styles.frameBottomRight,
               ]}
             />
 
-            {/* FACE FRAME */}
+            <View
+              style={
+                styles.scanLine
+              }
+            />
+          </View>
 
-            <View style={styles.faceFrame}>
-              <View
-                style={styles.scanLine}
-              />
-            </View>
+          {/* CAMERA STATUS */}
 
-            {/* LIVENESS */}
+          <View
+            style={
+              styles.cameraStatus
+            }
+          >
+            <View
+              style={
+                styles.liveDot
+              }
+            />
 
-            <View style={styles.liveness}>
-              <View
-                style={styles.livenessDot}
-              />
-
-              <Text style={styles.livenessText}>
-                Posisikan wajah di dalam
-                bingkai
-              </Text>
-            </View>
+            <Text
+              style={
+                styles.cameraStatusText
+              }
+            >
+              Posisikan wajah di dalam
+              bingkai
+            </Text>
           </View>
         </View>
 
-        {/* CAMERA BOTTOM */}
+        {/* ====================================================
+            BOTTOM CAMERA PANEL
+        ==================================================== */}
 
-        <View style={styles.cameraBottom}>
-          <Text style={styles.cameraTitle}>
+        <View
+          style={
+            styles.cameraBottom
+          }
+        >
+          <View
+            style={
+              styles.attendanceBadge
+            }
+          >
+            <Ionicons
+              name={
+                attendanceKind ===
+                "masuk"
+                  ? "log-in-outline"
+                  : "log-out-outline"
+              }
+              size={16}
+              color={
+                COLORS.blue
+              }
+            />
+
+            <Text
+              style={
+                styles.attendanceBadgeText
+              }
+            >
+              Presensi {jenisLabel}
+            </Text>
+          </View>
+
+          <Text
+            style={
+              styles.cameraTitle
+            }
+          >
             Verifikasi wajah
           </Text>
 
-          <Text style={styles.cameraSubtitle}>
+          <Text
+            style={
+              styles.cameraSubtitle
+            }
+          >
             Pastikan wajah terlihat jelas,
             pencahayaan cukup, dan tidak
             menggunakan masker.
           </Text>
+
+          {alreadyCheckedIn &&
+          attendanceKind ===
+            "pulang" ? (
+            <View
+              style={
+                styles.lastAttendance
+              }
+            >
+              <View
+                style={
+                  styles.lastAttendanceIcon
+                }
+              >
+                <Ionicons
+                  name="checkmark-circle"
+                  size={20}
+                  color={
+                    COLORS.green
+                  }
+                />
+              </View>
+
+              <View
+                style={
+                  styles.lastAttendanceContent
+                }
+              >
+                <Text
+                  style={
+                    styles.lastAttendanceTitle
+                  }
+                >
+                  Absen masuk sudah tercatat
+                </Text>
+
+                <Text
+                  style={
+                    styles.lastAttendanceText
+                  }
+                >
+                  Pukul{" "}
+                  {formatTime(
+                    todayAttendance?.check_in
+                  )}
+                </Text>
+              </View>
+            </View>
+          ) : null}
 
           <Pressable
             style={[
@@ -585,708 +1491,859 @@ export default function PresensiScreen() {
               processing ||
               locationLoading
             }
-            onPress={takePhoto}
+            onPress={
+              takePhoto
+            }
           >
             {processing ||
             locationLoading ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator
+                color="#fff"
+              />
             ) : (
-              <CameraIcon />
+              <Ionicons
+                name="camera-outline"
+                size={23}
+                color="#fff"
+              />
             )}
 
-            <Text style={styles.captureText}>
+            <Text
+              style={
+                styles.captureText
+              }
+            >
               {locationLoading
                 ? "Mendeteksi lokasi..."
                 : "Ambil Foto & Verifikasi"}
             </Text>
           </Pressable>
-        </View>
-      </View>
-    );
-  }
 
-  /* ===================================================
-     PROCESS
-  =================================================== */
-
-  if (step === "proses") {
-    return (
-      <View style={styles.cameraRoot}>
-        <Header
-          title={`Absen ${jenisLabel}`}
-          subtitle="Memproses presensi"
-          onBack={() => {
-            if (!processing) {
-              router.back();
-            }
-          }}
-        />
-
-        <View style={styles.processingContent}>
-          <View style={styles.processingCircle}>
-            <ActivityIndicator
-              size="large"
-              color="#60A5FA"
-            />
-          </View>
-
-          <Text style={styles.processingTitle}>
-            Memverifikasi presensi
-          </Text>
-
-          <Text
-            style={styles.processingSubtitle}
-          >
-            Foto, lokasi, dan data
-            presensi sedang diproses.
-          </Text>
-
-          <View style={styles.processingSteps}>
-            <ProcessRow
-              done
-              text="Foto wajah diterima"
-            />
-
-            <ProcessRow
-              done
-              text="Lokasi GPS diperoleh"
-            />
-
-            <ProcessRow
-              loading
-              text="Menyimpan presensi"
-            />
-          </View>
-        </View>
-      </View>
-    );
-  }
-
-  /* ===================================================
-     RESULT
-  =================================================== */
-
-  return (
-    <View style={styles.cameraRoot}>
-      <Header
-        title="Presensi"
-        subtitle="Berhasil"
-        onBack={() => router.back()}
-      />
-
-      <View style={styles.resultContent}>
-        <View style={styles.resultCircleOuter}>
-          <View style={styles.resultCircle}>
-            <CheckIcon />
-          </View>
-        </View>
-
-        <Text style={styles.resultTitle}>
-          Absen {jenisLabel}
-          {"\n"}
-          Berhasil
-        </Text>
-
-        <Text style={styles.resultTime}>
-          {resultTime}
-        </Text>
-
-        <Text style={styles.resultWita}>
-          WITA · Hari ini
-        </Text>
-
-        <View style={styles.resultBadge}>
           <View
-            style={styles.resultBadgeDot}
-          />
-
-          <Text
-            style={styles.resultBadgeText}
-          >
-            {resultMessage}
-          </Text>
-        </View>
-
-        <View style={styles.resultInfo}>
-          <InfoRow
-            label="Lokasi"
-            value={
-              location
-                ? `${location.coords.latitude.toFixed(
-                    6
-                  )}, ${location.coords.longitude.toFixed(
-                    6
-                  )}`
-                : "-"
+            style={
+              styles.locationHint
             }
-          />
-
-          <InfoRow
-            label="Metode"
-            value="WFO · Foto wajah"
-          />
-        </View>
-
-        <Pressable
-          style={styles.primaryButton}
-          onPress={() => router.back()}
-        >
-          <Text
-            style={styles.primaryButtonText}
           >
-            Kembali ke Beranda
-          </Text>
-        </Pressable>
+            <Ionicons
+              name="location-outline"
+              size={16}
+              color={
+                COLORS.textSecondary
+              }
+            />
+
+            <Text
+              style={
+                styles.locationHintText
+              }
+            >
+              Lokasi akan diverifikasi
+              otomatis oleh sistem.
+            </Text>
+          </View>
+        </View>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
-/* =====================================================
+/* ============================================================
    HEADER
-===================================================== */
+============================================================ */
+
+type HeaderProps = {
+  title: string;
+  subtitle: string;
+  onBack: () => void;
+  disabled?: boolean;
+};
 
 function Header({
   title,
   subtitle,
   onBack,
-}: {
-  title: string;
-  subtitle: string;
-  onBack: () => void;
-}) {
+  disabled = false,
+}: HeaderProps) {
   return (
-    <View style={styles.header}>
+    <View
+      style={
+        styles.header
+      }
+    >
       <Pressable
-        style={styles.backButton}
+        disabled={disabled}
         onPress={onBack}
+        style={[
+          styles.backButton,
+          disabled &&
+            styles.backButtonDisabled,
+        ]}
       >
-        <BackIcon />
+        <Ionicons
+          name="chevron-back"
+          size={23}
+          color="#fff"
+        />
       </Pressable>
 
-      <View style={styles.headerText}>
-        <Text style={styles.headerTitle}>
+      <View
+        style={
+          styles.headerText
+        }
+      >
+        <Text
+          style={
+            styles.headerTitle
+          }
+        >
           {title}
         </Text>
 
-        <Text style={styles.headerSubtitle}>
+        <Text
+          style={
+            styles.headerSubtitle
+          }
+        >
           {subtitle}
         </Text>
+      </View>
+
+      <View
+        style={
+          styles.headerRight
+        }
+      >
+        <Ionicons
+          name="shield-checkmark-outline"
+          size={22}
+          color="rgba(255,255,255,0.8)"
+        />
       </View>
     </View>
   );
 }
 
-/* =====================================================
-   PROCESS ROW
-===================================================== */
+/* ============================================================
+   PROCESS ITEM
+============================================================ */
 
-function ProcessRow({
-  done,
-  loading,
-  text,
-}: {
-  done?: boolean;
-  loading?: boolean;
+type ProcessItemProps = {
+  icon: keyof typeof Ionicons.glyphMap;
   text: string;
-}) {
+  done?: boolean;
+  active?: boolean;
+};
+
+function ProcessItem({
+  icon,
+  text,
+  done = false,
+  active = false,
+}: ProcessItemProps) {
   return (
-    <View style={styles.processRow}>
+    <View
+      style={
+        styles.processItem
+      }
+    >
       <View
         style={[
           styles.processIcon,
           done &&
-            styles.processDone,
+            styles.processIconDone,
+          active &&
+            styles.processIconActive,
         ]}
       >
-        {done ? (
-          <Text style={styles.processCheck}>
-            ✓
-          </Text>
-        ) : loading ? (
+        {active ? (
           <ActivityIndicator
             size="small"
-            color="#60A5FA"
+            color="#fff"
           />
-        ) : null}
+        ) : (
+          <Ionicons
+            name={icon}
+            size={18}
+            color={
+              done
+                ? "#fff"
+                : "rgba(255,255,255,0.45)"
+            }
+          />
+        )}
       </View>
 
-      <Text style={styles.processText}>
+      <Text
+        style={[
+          styles.processText,
+          done &&
+            styles.processTextDone,
+          active &&
+            styles.processTextActive,
+        ]}
+      >
         {text}
       </Text>
     </View>
   );
 }
 
-/* =====================================================
-   INFO ROW
-===================================================== */
-
-function InfoRow({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <View style={styles.infoRow}>
-      <Text style={styles.infoLabel}>
-        {label}
-      </Text>
-
-      <Text style={styles.infoValue}>
-        {value}
-      </Text>
-    </View>
-  );
-}
-
-/* =====================================================
+/* ============================================================
    STYLES
-===================================================== */
+============================================================ */
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: "#081222",
-  },
-
-  cameraRoot: {
-    flex: 1,
-    backgroundColor: "#081222",
-  },
-
-  header: {
-    height: 76,
-    paddingHorizontal: 18,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    backgroundColor: "#0A1428",
-  },
-
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor:
-      "rgba(255,255,255,0.07)",
-    borderWidth: 1,
-    borderColor:
-      "rgba(255,255,255,0.12)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  headerText: {
-    flex: 1,
-  },
-
-  headerTitle: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "800",
-  },
-
-  headerSubtitle: {
-    color: "#8FB4E8",
-    fontSize: 11,
-    fontWeight: "500",
-    marginTop: 3,
-  },
-
-  centerContent: {
-    flex: 1,
-    padding: 30,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  loadingText: {
-    color: "#AFC3DF",
-    fontSize: 13,
-    fontWeight: "600",
-    marginTop: 14,
-  },
-
-  permissionTitle: {
-    color: "#FFFFFF",
-    fontSize: 20,
-    fontWeight: "800",
-    textAlign: "center",
-  },
-
-  permissionText: {
-    color: "#9FB5D4",
-    fontSize: 12,
-    lineHeight: 19,
-    textAlign: "center",
-    marginTop: 8,
-    maxWidth: 300,
-  },
-
-  primaryButton: {
-    minWidth: 220,
-    height: 52,
-    borderRadius: 15,
-    backgroundColor: "#2563EB",
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 18,
-    paddingHorizontal: 20,
-  },
-
-  primaryButtonText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "800",
-  },
-
-  /* CAMERA */
-
-  cameraContainer: {
-    flex: 1,
-    marginHorizontal: 18,
-    borderRadius: 24,
-    overflow: "hidden",
-    position: "relative",
-    backgroundColor: "#0A1322",
-  },
-
-  cameraOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  faceFrame: {
-    width: 205,
-    height: 270,
-    borderRadius: 110,
-    borderWidth: 3,
-    borderColor: "#60A5FA",
-    overflow: "hidden",
-    backgroundColor:
-      "rgba(8,16,32,0.16)",
-  },
-
-  scanLine: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    top: "40%",
-    height: 2,
-    backgroundColor: "#60A5FA",
-    opacity: 0.9,
-  },
-
-  corner: {
-    position: "absolute",
-    width: 28,
-    height: 28,
-    borderColor: "#60A5FA",
-  },
-
-  topLeft: {
-    top: 16,
-    left: 16,
-    borderTopWidth: 3,
-    borderLeftWidth: 3,
-    borderTopLeftRadius: 6,
-  },
-
-  topRight: {
-    top: 16,
-    right: 16,
-    borderTopWidth: 3,
-    borderRightWidth: 3,
-    borderTopRightRadius: 6,
-  },
-
-  bottomLeft: {
-    bottom: 16,
-    left: 16,
-    borderBottomWidth: 3,
-    borderLeftWidth: 3,
-    borderBottomLeftRadius: 6,
-  },
-
-  bottomRight: {
-    bottom: 16,
-    right: 16,
-    borderBottomWidth: 3,
-    borderRightWidth: 3,
-    borderBottomRightRadius: 6,
-  },
-
-  liveness: {
-    position: "absolute",
-    left: 16,
-    right: 16,
-    bottom: 16,
-    padding: 11,
-    borderRadius: 13,
-    backgroundColor:
-      "rgba(8,18,38,0.78)",
-    borderWidth: 1,
-    borderColor:
-      "rgba(96,165,250,0.25)",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-  },
-
-  livenessDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#FBBF24",
-  },
-
-  livenessText: {
-    color: "#E8F0FC",
-    fontSize: 11,
-    fontWeight: "700",
-  },
-
-  cameraBottom: {
-    paddingHorizontal: 22,
-    paddingTop: 15,
-    paddingBottom:
-      Platform.OS === "android"
-        ? 24
-        : 18,
-  },
-
-  cameraTitle: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "800",
-    textAlign: "center",
-  },
-
-  cameraSubtitle: {
-    color: "#9FB5D4",
-    fontSize: 11,
-    lineHeight: 17,
-    textAlign: "center",
-    marginTop: 5,
-  },
-
-  captureButton: {
-    height: 52,
-    borderRadius: 15,
-    marginTop: 15,
-    backgroundColor: "#2563EB",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 9,
-  },
-
-  captureText: {
-    color: "#FFFFFF",
-    fontSize: 13.5,
-    fontWeight: "800",
-  },
-
-  buttonDisabled: {
-    opacity: 0.55,
-  },
-
-  /* PROCESS */
-
-  processingContent: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 28,
-  },
-
-  processingCircle: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor:
-      "rgba(59,130,246,0.12)",
-    borderWidth: 1,
-    borderColor:
-      "rgba(96,165,250,0.25)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  processingTitle: {
-    color: "#FFFFFF",
-    fontSize: 21,
-    fontWeight: "800",
-    marginTop: 22,
-    textAlign: "center",
-  },
-
-  processingSubtitle: {
-    color: "#9FB5D4",
-    fontSize: 12,
-    lineHeight: 18,
-    textAlign: "center",
-    marginTop: 7,
-    maxWidth: 300,
-  },
-
-  processingSteps: {
-    width: "100%",
-    marginTop: 30,
-    gap: 13,
-  },
-
-  processRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 11,
-  },
-
-  processIcon: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor:
-      "rgba(255,255,255,0.18)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  processDone: {
-    backgroundColor: "#16A34A",
-    borderColor: "#16A34A",
-  },
-
-  processCheck: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "900",
-  },
-
-  processText: {
-    color: "#CFE0F5",
-    fontSize: 12,
-    fontWeight: "600",
-  },
-
-  /* RESULT */
-
-  resultContent: {
-    flex: 1,
-    paddingHorizontal: 22,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  resultCircleOuter: {
-    width: 112,
-    height: 112,
-    borderRadius: 56,
-    backgroundColor:
-      "rgba(52,211,153,0.13)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  resultCircle: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    backgroundColor: "#10B981",
-    alignItems: "center",
-    justifyContent: "center",
-    elevation: 10,
-    shadowColor: "#10B981",
-    shadowOpacity: 0.5,
-    shadowRadius: 18,
-    shadowOffset: {
-      width: 0,
-      height: 8,
+const styles =
+  StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor:
+        COLORS.navyDark,
     },
-  },
 
-  resultTitle: {
-    color: "#FFFFFF",
-    fontSize: 22,
-    fontWeight: "800",
-    textAlign: "center",
-    marginTop: 20,
-  },
+    /* ========================================================
+       GENERAL
+    ======================================================== */
 
-  resultTime: {
-    color: "#FFFFFF",
-    fontSize: 42,
-    fontWeight: "800",
-    marginTop: 8,
-  },
+    cameraScreen: {
+      flex: 1,
+      backgroundColor:
+        COLORS.navyDark,
+    },
 
-  resultWita: {
-    color: "#9FB5D4",
-    fontSize: 12,
-    marginTop: 2,
-  },
+    permissionScreen: {
+      flex: 1,
+      backgroundColor:
+        COLORS.background,
+    },
 
-  resultBadge: {
-    marginTop: 15,
-    paddingHorizontal: 13,
-    paddingVertical: 9,
-    borderRadius: 12,
-    backgroundColor:
-      "rgba(52,211,153,0.12)",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
-  },
+    /* ========================================================
+       HEADER
+    ======================================================== */
 
-  resultBadgeDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#34D399",
-  },
+    header: {
+      height: 70,
+      backgroundColor:
+        COLORS.navy,
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 16,
+    },
 
-  resultBadgeText: {
-    color: "#A7F3D0",
-    fontSize: 11,
-    fontWeight: "700",
-  },
+    backButton: {
+      width: 42,
+      height: 42,
+      borderRadius: 13,
+      borderWidth: 1,
+      borderColor:
+        "rgba(255,255,255,0.16)",
+      backgroundColor:
+        "rgba(255,255,255,0.08)",
+      alignItems: "center",
+      justifyContent: "center",
+    },
 
-  resultInfo: {
-    width: "100%",
-    marginTop: 25,
-    padding: 16,
-    borderRadius: 16,
-    backgroundColor:
-      "rgba(255,255,255,0.06)",
-    borderWidth: 1,
-    borderColor:
-      "rgba(255,255,255,0.08)",
-  },
+    backButtonDisabled: {
+      opacity: 0,
+    },
 
-  infoRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 20,
-    paddingVertical: 7,
-  },
+    headerText: {
+      flex: 1,
+      marginLeft: 12,
+    },
 
-  infoLabel: {
-    color: "#8195B3",
-    fontSize: 11,
-    fontWeight: "600",
-  },
+    headerTitle: {
+      color: "#fff",
+      fontSize: 17,
+      fontWeight: "800",
+    },
 
-  infoValue: {
-    color: "#E8F0FC",
-    fontSize: 11,
-    fontWeight: "700",
-    textAlign: "right",
-    flex: 1,
-  },
-});
+    headerSubtitle: {
+      marginTop: 2,
+      color:
+        "rgba(255,255,255,0.62)",
+      fontSize: 11.5,
+      fontWeight: "500",
+    },
+
+    headerRight: {
+      width: 42,
+      alignItems: "flex-end",
+    },
+
+    /* ========================================================
+       LOADING
+    ======================================================== */
+
+    loadingScreen: {
+      flex: 1,
+      backgroundColor:
+        COLORS.navy,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 30,
+    },
+
+    loadingIcon: {
+      width: 78,
+      height: 78,
+      borderRadius: 24,
+      backgroundColor:
+        "rgba(255,255,255,0.08)",
+      borderWidth: 1,
+      borderColor:
+        "rgba(255,255,255,0.12)",
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 24,
+    },
+
+    loadingTitle: {
+      marginTop: 20,
+      color: "#fff",
+      fontSize: 18,
+      fontWeight: "800",
+    },
+
+    loadingSubtitle: {
+      marginTop: 8,
+      color:
+        "rgba(255,255,255,0.62)",
+      fontSize: 13,
+      textAlign: "center",
+    },
+
+    /* ========================================================
+       CENTER
+    ======================================================== */
+
+    centerContent: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 32,
+    },
+
+    centerTitle: {
+      marginTop: 18,
+      color: COLORS.text,
+      fontSize: 18,
+      fontWeight: "800",
+      textAlign: "center",
+    },
+
+    centerDescription: {
+      marginTop: 9,
+      color:
+        COLORS.textSecondary,
+      fontSize: 13,
+      lineHeight: 20,
+      textAlign: "center",
+      maxWidth: 310,
+    },
+
+    permissionIcon: {
+      width: 88,
+      height: 88,
+      borderRadius: 28,
+      backgroundColor:
+        "#e7eefc",
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 4,
+    },
+
+    primaryButton: {
+      minHeight: 52,
+      paddingHorizontal: 22,
+      borderRadius: 15,
+      backgroundColor:
+        COLORS.blue,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 9,
+      marginTop: 24,
+    },
+
+    primaryButtonText: {
+      color: "#fff",
+      fontSize: 14,
+      fontWeight: "800",
+    },
+
+    /* ========================================================
+       CAMERA
+    ======================================================== */
+
+    cameraContainer: {
+      flex: 1,
+      minHeight: 300,
+      backgroundColor: "#111",
+      position: "relative",
+      overflow: "hidden",
+    },
+
+    cameraOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor:
+        "rgba(0,0,0,0.18)",
+    },
+
+    faceFrame: {
+      position: "absolute",
+      width: 225,
+      height: 285,
+      borderRadius: 115,
+      left: "50%",
+      top: "50%",
+      marginLeft: -112.5,
+      marginTop: -142.5,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    frameCorner: {
+      position: "absolute",
+      width: 36,
+      height: 36,
+      borderColor:
+        "rgba(255,255,255,0.9)",
+    },
+
+    frameTopLeft: {
+      top: 0,
+      left: 0,
+      borderTopWidth: 3,
+      borderLeftWidth: 3,
+      borderTopLeftRadius: 18,
+    },
+
+    frameTopRight: {
+      top: 0,
+      right: 0,
+      borderTopWidth: 3,
+      borderRightWidth: 3,
+      borderTopRightRadius: 18,
+    },
+
+    frameBottomLeft: {
+      bottom: 0,
+      left: 0,
+      borderBottomWidth: 3,
+      borderLeftWidth: 3,
+      borderBottomLeftRadius: 18,
+    },
+
+    frameBottomRight: {
+      bottom: 0,
+      right: 0,
+      borderBottomWidth: 3,
+      borderRightWidth: 3,
+      borderBottomRightRadius: 18,
+    },
+
+    scanLine: {
+      width: 190,
+      height: 1,
+      backgroundColor:
+        "rgba(96,165,250,0.8)",
+      opacity: 0.75,
+    },
+
+    cameraStatus: {
+      position: "absolute",
+      top: 18,
+      alignSelf: "center",
+      paddingHorizontal: 14,
+      paddingVertical: 9,
+      borderRadius: 20,
+      backgroundColor:
+        "rgba(0,0,0,0.48)",
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+
+    liveDot: {
+      width: 7,
+      height: 7,
+      borderRadius: 4,
+      backgroundColor:
+        "#4ade80",
+    },
+
+    cameraStatusText: {
+      color: "#fff",
+      fontSize: 11.5,
+      fontWeight: "600",
+    },
+
+    /* ========================================================
+       CAMERA BOTTOM
+    ======================================================== */
+
+    cameraBottom: {
+      backgroundColor:
+        COLORS.white,
+      paddingHorizontal: 20,
+      paddingTop: 18,
+      paddingBottom: 22,
+      borderTopLeftRadius: 26,
+      borderTopRightRadius: 26,
+      marginTop: -20,
+      zIndex: 5,
+    },
+
+    attendanceBadge: {
+      alignSelf: "flex-start",
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 10,
+      backgroundColor:
+        "#e7eefc",
+    },
+
+    attendanceBadgeText: {
+      color: COLORS.blue,
+      fontSize: 11.5,
+      fontWeight: "800",
+    },
+
+    cameraTitle: {
+      marginTop: 13,
+      color: COLORS.text,
+      fontSize: 19,
+      fontWeight: "800",
+    },
+
+    cameraSubtitle: {
+      marginTop: 6,
+      color:
+        COLORS.textSecondary,
+      fontSize: 12.5,
+      lineHeight: 19,
+    },
+
+    lastAttendance: {
+      marginTop: 14,
+      padding: 12,
+      borderRadius: 13,
+      backgroundColor:
+        COLORS.greenLight,
+      flexDirection: "row",
+      alignItems: "center",
+    },
+
+    lastAttendanceIcon: {
+      width: 35,
+      height: 35,
+      borderRadius: 11,
+      backgroundColor:
+        "rgba(15,118,110,0.1)",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    lastAttendanceContent: {
+      marginLeft: 10,
+    },
+
+    lastAttendanceTitle: {
+      color: COLORS.text,
+      fontSize: 12,
+      fontWeight: "800",
+    },
+
+    lastAttendanceText: {
+      marginTop: 2,
+      color:
+        COLORS.textSecondary,
+      fontSize: 11,
+    },
+
+    captureButton: {
+      height: 54,
+      borderRadius: 16,
+      backgroundColor:
+        COLORS.blue,
+      marginTop: 17,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 9,
+    },
+
+    buttonDisabled: {
+      opacity: 0.55,
+    },
+
+    captureText: {
+      color: "#fff",
+      fontSize: 14,
+      fontWeight: "800",
+    },
+
+    locationHint: {
+      marginTop: 11,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 5,
+    },
+
+    locationHintText: {
+      color:
+        COLORS.textSecondary,
+      fontSize: 10.5,
+    },
+
+    /* ========================================================
+       PROCESSING
+    ======================================================== */
+
+    processingScreen: {
+      flex: 1,
+      backgroundColor:
+        COLORS.navyDark,
+    },
+
+    processingContent: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 30,
+    },
+
+    processingCircle: {
+      width: 112,
+      height: 112,
+      borderRadius: 56,
+      backgroundColor:
+        "rgba(59,130,246,0.14)",
+      borderWidth: 1,
+      borderColor:
+        "rgba(96,165,250,0.25)",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    processingTitle: {
+      marginTop: 26,
+      color: "#fff",
+      fontSize: 20,
+      fontWeight: "800",
+    },
+
+    processingDescription: {
+      marginTop: 8,
+      color:
+        "rgba(255,255,255,0.6)",
+      fontSize: 13,
+      lineHeight: 20,
+      textAlign: "center",
+      maxWidth: 300,
+    },
+
+    processingSteps: {
+      marginTop: 32,
+      width: "100%",
+      maxWidth: 320,
+    },
+
+    processItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: 15,
+    },
+
+    processIcon: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      backgroundColor:
+        "rgba(255,255,255,0.08)",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    processIconDone: {
+      backgroundColor:
+        COLORS.green,
+    },
+
+    processIconActive: {
+      backgroundColor:
+        COLORS.blue,
+    },
+
+    processText: {
+      marginLeft: 11,
+      color:
+        "rgba(255,255,255,0.4)",
+      fontSize: 12.5,
+      fontWeight: "600",
+    },
+
+    processTextDone: {
+      color:
+        "rgba(255,255,255,0.85)",
+    },
+
+    processTextActive: {
+      color: "#fff",
+    },
+
+    /* ========================================================
+       RESULT
+    ======================================================== */
+
+    resultScreen: {
+      flex: 1,
+      backgroundColor:
+        COLORS.background,
+    },
+
+    resultContent: {
+      flex: 1,
+      alignItems: "center",
+      paddingHorizontal: 20,
+      paddingTop: 34,
+    },
+
+    successCircle: {
+      width: 100,
+      height: 100,
+      borderRadius: 50,
+      backgroundColor:
+        COLORS.green,
+      alignItems: "center",
+      justifyContent: "center",
+      shadowColor: "#000",
+      shadowOpacity: 0.12,
+      shadowRadius: 14,
+      shadowOffset: {
+        width: 0,
+        height: 6,
+      },
+      elevation: 5,
+    },
+
+    resultTitle: {
+      marginTop: 22,
+      color: COLORS.text,
+      fontSize: 21,
+      fontWeight: "800",
+      textAlign: "center",
+    },
+
+    resultDescription: {
+      marginTop: 7,
+      color:
+        COLORS.textSecondary,
+      fontSize: 13,
+      textAlign: "center",
+      lineHeight: 19,
+    },
+
+    resultCard: {
+      width: "100%",
+      marginTop: 25,
+      borderRadius: 18,
+      backgroundColor:
+        COLORS.white,
+      paddingHorizontal: 16,
+      paddingVertical: 5,
+      borderWidth: 1,
+      borderColor:
+        COLORS.border,
+    },
+
+    resultRow: {
+      minHeight: 62,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+
+    resultRowLeft: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
+
+    resultSmallIcon: {
+      width: 36,
+      height: 36,
+      borderRadius: 11,
+      backgroundColor:
+        "#e7eefc",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    resultLabel: {
+      marginLeft: 10,
+      color:
+        COLORS.textSecondary,
+      fontSize: 12.5,
+      fontWeight: "600",
+    },
+
+    resultValue: {
+      maxWidth: 160,
+      color: COLORS.text,
+      fontSize: 12,
+      fontWeight: "700",
+      textAlign: "right",
+    },
+
+    resultTime: {
+      color: COLORS.text,
+      fontSize: 19,
+      fontWeight: "800",
+    },
+
+    divider: {
+      height: 1,
+      backgroundColor:
+        "#edf0f5",
+    },
+
+    verifiedBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 5,
+      paddingHorizontal: 9,
+      paddingVertical: 6,
+      borderRadius: 9,
+      backgroundColor:
+        COLORS.greenLight,
+    },
+
+    verifiedText: {
+      color: COLORS.green,
+      fontSize: 10.5,
+      fontWeight: "800",
+    },
+
+    infoBox: {
+      width: "100%",
+      marginTop: 13,
+      padding: 13,
+      borderRadius: 13,
+      backgroundColor:
+        "#e7eefc",
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 9,
+    },
+
+    infoText: {
+      flex: 1,
+      color: COLORS.text,
+      fontSize: 11.5,
+      lineHeight: 17,
+    },
+  });
