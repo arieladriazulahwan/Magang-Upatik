@@ -7,6 +7,10 @@ import React, {
 } from "react";
 
 import {
+  Platform,
+} from "react-native";
+
+import {
   checkIn,
   checkOut,
   clearSession,
@@ -48,6 +52,13 @@ type RequestStatus =
 type Decision =
   | "Disetujui"
   | "Ditolak";
+
+export type RequestAttachment = {
+  uri: string;
+  name: string;
+  mimeType: string;
+  size?: number;
+};
 
 export interface RequestItem {
   id: string;
@@ -140,13 +151,6 @@ interface PrototypeContextValue {
 
   loadingApprovalId: string | null;
 
-  /*
-   * Presensi sekarang menerima:
-   * - jenis
-   * - foto
-   * - latitude
-   * - longitude
-   */
   submitAttendance: (
     type: "masuk" | "pulang",
     photoUri: string,
@@ -162,6 +166,7 @@ interface PrototypeContextValue {
       startDate: string;
       endDate: string;
       reason: string;
+      attachment?: RequestAttachment | null;
     }
   ) => Promise<boolean>;
 
@@ -188,7 +193,9 @@ const PrototypeContext =
    HELPER
 ===================================================== */
 
-function localDateKey(date = new Date()) {
+function localDateKey(
+  date = new Date()
+) {
   return `${date.getFullYear()}-${String(
     date.getMonth() + 1
   ).padStart(2, "0")}-${String(
@@ -209,7 +216,9 @@ function flash(
   }, 2200);
 }
 
-function delay(ms: number) {
+function delay(
+  ms: number
+) {
   return new Promise<void>(
     (resolve) => {
       setTimeout(
@@ -227,9 +236,8 @@ function formatTime(
     return "--:--";
   }
 
-  const date = new Date(
-    value
-  );
+  const date =
+    new Date(value);
 
   if (
     Number.isNaN(
@@ -274,15 +282,13 @@ function statusToRequestStatus(
   status?: string | null
 ): RequestStatus {
   if (
-    status ===
-    "disetujui"
+    status === "disetujui"
   ) {
     return "Disetujui";
   }
 
   if (
-    status ===
-    "ditolak"
+    status === "ditolak"
   ) {
     return "Ditolak";
   }
@@ -296,12 +302,19 @@ const LEAVE_TYPE_IDS = {
   Izin: 8,
 } as const;
 
+/* =====================================================
+   PHOTO FILE
+===================================================== */
+
 function photoFileFromUri(
   uri: string,
   type: "masuk" | "pulang"
 ) {
   const extension =
-    uri.split(".").pop()?.toLowerCase() ||
+    uri
+      .split(".")
+      .pop()
+      ?.toLowerCase() ||
     "jpg";
 
   const mimeType =
@@ -311,9 +324,133 @@ function photoFileFromUri(
 
   return {
     uri,
+
     name: `presensi-${type}-${Date.now()}.${extension}`,
+
     type: mimeType,
   };
+}
+
+/* =====================================================
+   ATTACHMENT WEB / NATIVE
+===================================================== */
+
+/**
+ * Membuat attachment yang sesuai
+ * dengan platform.
+ *
+ * WEB:
+ *   URI → Blob → FormData
+ *
+ * Android/iOS:
+ *   { uri, name, type } → FormData
+ */
+
+async function createAttachmentForUpload(
+  attachment: RequestAttachment
+): Promise<
+  Blob | {
+    uri: string;
+    name: string;
+    type: string;
+  }
+> {
+  const mimeType =
+    attachment.mimeType ||
+    "application/octet-stream";
+
+  const fileName =
+    attachment.name ||
+    `attachment-${Date.now()}`;
+
+  /**
+   * =================================================
+   * WEB
+   * =================================================
+   */
+
+  if (
+    Platform.OS === "web"
+  ) {
+    console.log(
+      "ATTACHMENT WEB: mulai mengambil Blob"
+    );
+
+    const response =
+      await fetch(
+        attachment.uri
+      );
+
+    if (!response.ok) {
+      throw new Error(
+        "File attachment tidak dapat dibaca oleh browser."
+      );
+    }
+
+    const blob =
+      await response.blob();
+
+    console.log(
+      "ATTACHMENT WEB:",
+      {
+        name: fileName,
+        size: blob.size,
+        type:
+          blob.type ||
+          mimeType,
+      }
+    );
+
+    return new Blob(
+      [blob],
+      {
+        type:
+          blob.type ||
+          mimeType,
+      }
+    );
+  }
+
+  /**
+   * =================================================
+   * ANDROID / IOS
+   * =================================================
+   */
+
+  const nativeFile = {
+    uri: attachment.uri,
+    name: fileName,
+    type: mimeType,
+  };
+
+  console.log(
+    "ATTACHMENT NATIVE:",
+    nativeFile
+  );
+
+  return nativeFile;
+}
+
+/* =====================================================
+   ERROR HELPER
+===================================================== */
+
+function getErrorMessage(
+  error: unknown
+) {
+  if (
+    error instanceof Error
+  ) {
+    return error.message;
+  }
+
+  if (
+    typeof error === "string"
+  ) {
+    return error;
+  }
+
+  return "Terjadi kesalahan pada server.";
 }
 
 /* =====================================================
@@ -330,10 +467,11 @@ function mapLeaveRequest(
       item.leave_type?.name ||
       "Pengajuan",
 
-    meta: formatDateRange(
-      item.start_date,
-      item.end_date
-    ),
+    meta:
+      formatDateRange(
+        item.start_date,
+        item.end_date
+      ),
 
     days: item.total_days
       ? `${item.total_days} hari`
@@ -373,10 +511,11 @@ function mapLeaveApproval(
       item.leave_type?.name ||
       "Pengajuan",
 
-    range: formatDateRange(
-      item.start_date,
-      item.end_date
-    ),
+    range:
+      formatDateRange(
+        item.start_date,
+        item.end_date
+      ),
 
     reason:
       item.reason ||
@@ -397,10 +536,11 @@ function mapWfhRequest(
     title:
       "Work From Home",
 
-    meta: formatDateRange(
-      item.start_date,
-      item.end_date
-    ),
+    meta:
+      formatDateRange(
+        item.start_date,
+        item.end_date
+      ),
 
     days: item.total_days
       ? `${item.total_days} hari`
@@ -432,10 +572,11 @@ function mapWfhApproval(
     type:
       "Work From Home",
 
-    range: formatDateRange(
-      item.start_date,
-      item.end_date
-    ),
+    range:
+      formatDateRange(
+        item.start_date,
+        item.end_date
+      ),
 
     reason:
       item.reason ||
@@ -485,11 +626,12 @@ function mapAttendance(
     date,
     day,
 
-    time: `${formatTime(
-      item.check_in
-    )} - ${formatTime(
-      item.check_out
-    )}`,
+    time:
+      `${formatTime(
+        item.check_in
+      )} - ${formatTime(
+        item.check_out
+      )}`,
 
     duration,
 
@@ -510,13 +652,25 @@ function mapNotification(
   item: ApiNotification
 ): NotificationItem {
   return {
-    id: String(item.id),
-    title: item.title,
-    desc: item.message ?? "",
-    time: item.created_at
-      ? formatTime(item.created_at)
-      : "-",
-    unread: !item.is_read,
+    id: String(
+      item.id
+    ),
+
+    title:
+      item.title,
+
+    desc:
+      item.message ?? "",
+
+    time:
+      item.created_at
+        ? formatTime(
+            item.created_at
+          )
+        : "-",
+
+    unread:
+      !item.is_read,
   };
 }
 
@@ -527,27 +681,49 @@ function formatDuration(
     return "Menunggu realisasi";
   }
 
-  return `${Math.floor(minutes / 60)}j ${minutes % 60}m`;
+  return `${Math.floor(
+    minutes / 60
+  )}j ${
+    minutes % 60
+  }m`;
 }
 
 function mapOvertime(
   item: ApiOvertimeRequest
 ): OvertimeItem {
   const start =
-    item.planned_start_time?.slice(0, 5) ||
+    item.planned_start_time?.slice(
+      0,
+      5
+    ) ||
     "--:--";
+
   const end =
-    item.planned_end_time?.slice(0, 5) ||
+    item.planned_end_time?.slice(
+      0,
+      5
+    ) ||
     "--:--";
 
   return {
-    id: String(item.id),
-    date: item.date || "-",
-    time: `${start} - ${end}`,
-    duration: formatDuration(
-      item.duration_minutes
+    id: String(
+      item.id
     ),
-    desc: item.work_description,
+
+    date:
+      item.date || "-",
+
+    time:
+      `${start} - ${end}`,
+
+    duration:
+      formatDuration(
+        item.duration_minutes
+      ),
+
+    desc:
+      item.work_description,
+
     status:
       statusToRequestStatus(
         item.status
@@ -694,17 +870,54 @@ export function PrototypeProvider({
           );
         }
 
-        const profileResponse =
-          await getProfile();
+        let profileResponse;
 
-        const [
-          attendanceResponse,
-          leaveResponse,
-          wfhResponse,
-          notificationResponse,
-          overtimeResponse,
-        ] =
-          await Promise.all([
+        try {
+          profileResponse =
+            await getProfile();
+
+          if (
+            active &&
+            profileResponse.user
+          ) {
+            setProfile(
+              profileResponse.user
+            );
+          }
+        } catch (error) {
+          const message =
+            getErrorMessage(
+              error
+            );
+
+          if (
+            message ===
+              "Unauthenticated." ||
+            message
+              .toLowerCase()
+              .includes(
+                "unauthenticated"
+              )
+          ) {
+            await clearSession();
+
+            if (active) {
+              setProfile(
+                null
+              );
+            }
+
+            return;
+          }
+
+          console.log(
+            "PROFILE LOAD ERROR:",
+            message
+          );
+        }
+
+        const results =
+          await Promise.allSettled([
             getAttendance({
               per_page: 15,
             }),
@@ -724,64 +937,153 @@ export function PrototypeProvider({
           return;
         }
 
-        setProfile(
-          profileResponse.user
-        );
+        const [
+          attendanceResult,
+          leaveResult,
+          wfhResult,
+          notificationResult,
+          overtimeResult,
+        ] = results;
 
-        setAttendanceHistory(
-          attendanceResponse.data.map(
-            mapAttendance
-          )
-        );
+        /* ATTENDANCE */
 
-        const today =
-          localDateKey();
+        if (
+          attendanceResult.status ===
+          "fulfilled"
+        ) {
+          const attendanceResponse =
+            attendanceResult.value;
 
-        const todayAttendance =
-          attendanceResponse.data.find(
-            (item) =>
-              item.date === today
-          );
-
-        if (todayAttendance) {
-          setJamMasuk(
-            formatTime(
-              todayAttendance.check_in
+          setAttendanceHistory(
+            attendanceResponse.data.map(
+              mapAttendance
             )
           );
 
-          setJamPulang(
-            todayAttendance.check_out
-              ? formatTime(
-                  todayAttendance.check_out
-                )
-              : null
+          const today =
+            localDateKey();
+
+          const todayAttendance =
+            attendanceResponse.data.find(
+              (item) =>
+                item.date ===
+                today
+            );
+
+          if (
+            todayAttendance
+          ) {
+            setJamMasuk(
+              formatTime(
+                todayAttendance.check_in
+              )
+            );
+
+            setJamPulang(
+              todayAttendance.check_out
+                ? formatTime(
+                    todayAttendance.check_out
+                  )
+                : null
+            );
+
+            setAttendanceState(
+              todayAttendance.check_out
+                ? "selesai"
+                : "masuk"
+            );
+          } else {
+            setJamMasuk(
+              null
+            );
+
+            setJamPulang(
+              null
+            );
+
+            setAttendanceState(
+              "belum"
+            );
+          }
+        } else {
+          console.log(
+            "ATTENDANCE LOAD ERROR:",
+            getErrorMessage(
+              attendanceResult.reason
+            )
           );
 
-          setAttendanceState(
-            todayAttendance.check_out
-              ? "selesai"
-              : "masuk"
+          setAttendanceHistory(
+            []
           );
         }
 
-        const backendRequests =
-          [
-            ...leaveResponse.data.map(
-              mapLeaveRequest
-            ),
+        /* LEAVE */
 
-            ...wfhResponse.data.map(
-              mapWfhRequest
-            ),
-          ];
+        let leaveData:
+          | ApiLeaveRequest[]
+          | undefined;
+
+        if (
+          leaveResult.status ===
+          "fulfilled"
+        ) {
+          leaveData =
+            leaveResult.value.data;
+        } else {
+          console.log(
+            "LEAVE LOAD ERROR:",
+            getErrorMessage(
+              leaveResult.reason
+            )
+          );
+
+          leaveData = [];
+        }
+
+        /* WFH */
+
+        let wfhData:
+          | ApiWfhRequest[]
+          | undefined;
+
+        if (
+          wfhResult.status ===
+          "fulfilled"
+        ) {
+          wfhData =
+            wfhResult.value.data;
+        } else {
+          console.log(
+            "WFH LOAD ERROR:",
+            getErrorMessage(
+              wfhResult.reason
+            )
+          );
+
+          wfhData = [];
+        }
+
+        /* REQUESTS */
+
+        const backendRequests = [
+          ...leaveData.map(
+            mapLeaveRequest
+          ),
+
+          ...wfhData.map(
+            mapWfhRequest
+          ),
+        ];
 
         setRequests(
           backendRequests
         );
 
+        /* APPROVALS */
+
         setApprovals([
-          ...leaveResponse.data
+          ...leaveData
             .filter(
               (item) =>
                 item.status ===
@@ -791,7 +1093,7 @@ export function PrototypeProvider({
               mapLeaveApproval
             ),
 
-          ...wfhResponse.data
+          ...wfhData
             .filter(
               (item) =>
                 item.status ===
@@ -802,36 +1104,75 @@ export function PrototypeProvider({
             ),
         ]);
 
-        setNotifications(
-          notificationResponse.data.map(
-            mapNotification
-          )
-        );
+        /* NOTIFICATIONS */
 
-        setOvertimeRequests(
-          overtimeResponse.data.map(
-            mapOvertime
-          )
-        );
-      } catch (error) {
         if (
-          error instanceof Error &&
-          error.message === "Unauthenticated."
+          notificationResult.status ===
+          "fulfilled"
         ) {
-          await clearSession();
+          setNotifications(
+            notificationResult.value.data.map(
+              mapNotification
+            )
+          );
+        } else {
+          console.log(
+            "NOTIFICATION LOAD ERROR:",
+            getErrorMessage(
+              notificationResult.reason
+            )
+          );
+        }
 
-          if (active) {
-            setProfile(null);
-          }
+        /* OVERTIME */
 
-          return;
+        if (
+          overtimeResult.status ===
+          "fulfilled"
+        ) {
+          setOvertimeRequests(
+            overtimeResult.value.data.map(
+              mapOvertime
+            )
+          );
+        } else {
+          console.log(
+            "OVERTIME LOAD ERROR:",
+            getErrorMessage(
+              overtimeResult.reason
+            )
+          );
+
+          setOvertimeRequests(
+            []
+          );
         }
 
         console.log(
-          "Backend sync failed:",
-          error instanceof Error
-            ? error.message
-            : error
+          "BACKEND SYNC SELESAI:",
+          {
+            attendance:
+              attendanceResult.status,
+
+            leave:
+              leaveResult.status,
+
+            wfh:
+              wfhResult.status,
+
+            notifications:
+              notificationResult.status,
+
+            overtime:
+              overtimeResult.status,
+          }
+        );
+      } catch (error) {
+        console.error(
+          "BACKEND SYNC ERROR:",
+          getErrorMessage(
+            error
+          )
         );
       }
     }
@@ -961,11 +1302,6 @@ export function PrototypeProvider({
                 );
               }
 
-              /*
-               * Tambahkan riwayat presensi
-               * dari response backend.
-               */
-
               setAttendanceHistory(
                 (
                   current
@@ -977,6 +1313,7 @@ export function PrototypeProvider({
 
                   return [
                     next,
+
                     ...current.filter(
                       (item) =>
                         !(
@@ -989,10 +1326,6 @@ export function PrototypeProvider({
                   ];
                 }
               );
-
-              /*
-               * Notifikasi presensi berhasil.
-               */
 
               setNotifications(
                 (
@@ -1044,6 +1377,11 @@ export function PrototypeProvider({
                 error
               );
 
+              const message =
+                getErrorMessage(
+                  error
+                );
+
               setNotifications(
                 (
                   current
@@ -1055,7 +1393,7 @@ export function PrototypeProvider({
                       "Presensi gagal",
 
                     desc:
-                      "Terjadi kesalahan saat menyimpan presensi.",
+                      message,
 
                     time:
                       "Baru saja",
@@ -1073,7 +1411,7 @@ export function PrototypeProvider({
 
               flash(
                 setToast,
-                "Presensi gagal"
+                message
               );
 
               return false;
@@ -1136,6 +1474,10 @@ export function PrototypeProvider({
                 100
               );
 
+              /* =====================================
+                 WFH
+              ===================================== */
+
               if (
                 payload.type ===
                 "WFH"
@@ -1164,7 +1506,13 @@ export function PrototypeProvider({
                     ...current,
                   ]
                 );
-              } else {
+              }
+
+              /* =====================================
+                 CUTI / IZIN / SAKIT
+              ===================================== */
+
+              else {
                 const selectedTypeId =
                   LEAVE_TYPE_IDS[
                     payload.type as keyof typeof LEAVE_TYPE_IDS
@@ -1176,22 +1524,145 @@ export function PrototypeProvider({
                   );
                 }
 
+                const formData =
+                  new FormData();
+
+                /* DATA UTAMA */
+
+                formData.append(
+                  "leave_type_id",
+                  String(
+                    selectedTypeId
+                  )
+                );
+
+                formData.append(
+                  "start_date",
+                  payload.startDate
+                );
+
+                formData.append(
+                  "end_date",
+                  payload.endDate
+                );
+
+                formData.append(
+                  "reason",
+                  payload.reason ||
+                    payload.title
+                );
+
+                /* =================================
+                   ATTACHMENT
+                ================================= */
+
+                if (
+                  payload.attachment
+                ) {
+                  console.log(
+                    "========== ATTACHMENT UPLOAD =========="
+                  );
+
+                  console.log(
+                    "Platform:",
+                    Platform.OS
+                  );
+
+                  console.log(
+                    "URI:",
+                    payload
+                      .attachment
+                      .uri
+                  );
+
+                  console.log(
+                    "Name:",
+                    payload
+                      .attachment
+                      .name
+                  );
+
+                  console.log(
+                    "MIME:",
+                    payload
+                      .attachment
+                      .mimeType
+                  );
+
+                  console.log(
+                    "Size:",
+                    payload
+                      .attachment
+                      .size
+                  );
+
+                  const file =
+                    await createAttachmentForUpload(
+                      payload.attachment
+                    );
+
+                  formData.append(
+                    "attachment",
+                    file as any
+                  );
+
+                  console.log(
+                    "ATTACHMENT BERHASIL DITAMBAHKAN KE FORMDATA"
+                  );
+
+                  console.log(
+                    "========================================"
+                  );
+                } else {
+                  console.log(
+                    "ATTACHMENT: tidak ada file"
+                  );
+                }
+
+                /* =================================
+                   DEBUG REQUEST
+                ================================= */
+
+                console.log(
+                  "========== LEAVE REQUEST =========="
+                );
+
+                console.log(
+                  "leave_type_id:",
+                  selectedTypeId
+                );
+
+                console.log(
+                  "start_date:",
+                  payload.startDate
+                );
+
+                console.log(
+                  "end_date:",
+                  payload.endDate
+                );
+
+                console.log(
+                  "reason:",
+                  payload.reason
+                );
+
+                console.log(
+                  "attachment:",
+                  payload.attachment
+                );
+
+                console.log(
+                  "==================================="
+                );
+
+                /* =================================
+                   SEND TO LARAVEL
+                ================================= */
+
                 const response =
                   await postLeaveRequest(
-                    {
-                      leave_type_id:
-                        selectedTypeId,
-
-                      start_date:
-                        payload.startDate,
-
-                      end_date:
-                        payload.endDate,
-
-                      reason:
-                        payload.reason ||
-                        payload.title,
-                    }
+                    formData
                   );
 
                 setRequests(
@@ -1204,6 +1675,10 @@ export function PrototypeProvider({
                   ]
                 );
               }
+
+              /* =====================================
+                 SUCCESS NOTIFICATION
+              ===================================== */
 
               setNotifications(
                 (current) =>
@@ -1242,6 +1717,16 @@ export function PrototypeProvider({
                 error
               );
 
+              const message =
+                getErrorMessage(
+                  error
+                );
+
+              console.error(
+                "SUBMIT REQUEST MESSAGE:",
+                message
+              );
+
               setNotifications(
                 (current) =>
                   current.map(
@@ -1255,7 +1740,7 @@ export function PrototypeProvider({
                               "Pengajuan gagal dikirim",
 
                             desc:
-                              "Terjadi kesalahan. Silakan coba lagi.",
+                              message,
 
                             status:
                               "error",
@@ -1269,7 +1754,7 @@ export function PrototypeProvider({
 
               flash(
                 setToast,
-                "Pengajuan gagal dikirim"
+                message
               );
 
               return false;
@@ -1356,49 +1841,39 @@ export function PrototypeProvider({
                 100
               );
 
-              try {
-                const [
-                  kind,
-                  rawId,
-                ] =
-                  id.split(
-                    "-"
-                  );
-
-                const apiDecision =
-                  decision ===
-                  "Disetujui"
-                    ? "approve"
-                    : "reject";
-
-                if (
-                  kind ===
-                  "wfh"
-                ) {
-                  await decideWfhRequest(
-                    rawId,
-                    apiDecision
-                  );
-                } else if (
-                  kind ===
-                  "leave"
-                ) {
-                  await decideLeaveRequest(
-                    rawId,
-                    apiDecision
-                  );
-                }
-              } catch (error) {
-                console.log(
-                  "Backend approval skipped:",
-                  error instanceof
-                    Error
-                    ? error.message
-                    : error
+              const [
+                kind,
+                rawId,
+              ] =
+                id.split(
+                  "-"
                 );
 
-                await delay(
-                  700
+              const apiDecision =
+                decision ===
+                "Disetujui"
+                  ? "approve"
+                  : "reject";
+
+              if (
+                kind ===
+                "wfh"
+              ) {
+                await decideWfhRequest(
+                  rawId,
+                  apiDecision
+                );
+              } else if (
+                kind ===
+                "leave"
+              ) {
+                await decideLeaveRequest(
+                  rawId,
+                  apiDecision
+                );
+              } else {
+                throw new Error(
+                  "Jenis pengajuan tidak dikenali."
                 );
               }
 
@@ -1465,6 +1940,11 @@ export function PrototypeProvider({
                 error
               );
 
+              const message =
+                getErrorMessage(
+                  error
+                );
+
               setNotifications(
                 (items) =>
                   items.map(
@@ -1475,10 +1955,10 @@ export function PrototypeProvider({
                             ...item,
 
                             title:
-                              "Proses gagal",
+                              "Proses pengajuan gagal",
 
                             desc:
-                              "Pengajuan gagal diproses. Silakan coba lagi.",
+                              message,
 
                             status:
                               "error",
@@ -1492,7 +1972,7 @@ export function PrototypeProvider({
 
               flash(
                 setToast,
-                "Proses pengajuan gagal"
+                message
               );
 
               return false;
@@ -1510,17 +1990,22 @@ export function PrototypeProvider({
           markNotificationRead(
             id
           ) {
-            if (/^\d+$/.test(id)) {
+            if (
+              /^\d+$/.test(id)
+            ) {
               void markBackendNotificationRead(
                 id
-              ).catch((error) => {
-                console.log(
-                  "Mark notification failed:",
-                  error instanceof Error
-                    ? error.message
-                    : error
-                );
-              });
+              ).catch(
+                (error) => {
+                  console.log(
+                    "Mark notification failed:",
+                    error instanceof
+                      Error
+                      ? error.message
+                      : error
+                  );
+                }
+              );
             }
 
             setNotifications(

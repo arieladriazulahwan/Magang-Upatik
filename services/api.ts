@@ -6,16 +6,19 @@ import * as SecureStore from "expo-secure-store";
  * API CONFIGURATION
  * ============================================================
  *
- * Backend Laravel:
- * http://10.10.16.241:8000
+ * Untuk Android/iOS physical device:
+ * gunakan IP komputer yang menjalankan Laravel.
  *
- * API:
- * http://10.10.16.241:8000/api
+ * Contoh:
+ * http://192.168.43.50:8000/api
+ *
+ * Untuk Web:
+ * 127.0.0.1 menunjuk ke komputer yang menjalankan browser.
  */
 
 const DEFAULT_API_URL =
   Platform.OS === "android"
-    ? "192.168.111.133/api"
+    ? "http://192.168.1.189:8000/api"
     : "http://127.0.0.1:8000/api";
 
 export const API_URL =
@@ -59,12 +62,7 @@ export type ApiUser = {
   id: number;
   username: string;
   full_name: string;
-
-  /**
-   * Backend saat ini dapat mengembalikan null.
-   */
   employee: ApiEmployee | null;
-
   roles: ApiUserRole[];
 };
 
@@ -136,6 +134,27 @@ export type ApiAttendance = {
 
   created_at: string | null;
   updated_at?: string | null;
+};
+
+/**
+ * ============================================================
+ * LEAVE TYPE
+ * ============================================================
+ */
+
+export type ApiLeaveType = {
+  id: number;
+  code: string;
+  name: string;
+
+  category:
+    | "cuti"
+    | "izin"
+    | "sakit"
+    | "dinas_luar";
+
+  requires_attachment: boolean;
+  requires_doctor_letter: boolean;
 };
 
 /**
@@ -264,8 +283,6 @@ export type ApiNotification = {
   created_at: string | null;
 };
 
-
-
 /**
  * ============================================================
  * STORAGE
@@ -277,28 +294,48 @@ async function setStorageItem(
   value: string
 ) {
   if (Platform.OS === "web") {
-    window.localStorage.setItem(key, value);
+    window.localStorage.setItem(
+      key,
+      value
+    );
+
     return;
   }
 
-  await SecureStore.setItemAsync(key, value);
+  await SecureStore.setItemAsync(
+    key,
+    value
+  );
 }
 
-async function getStorageItem(key: string) {
+async function getStorageItem(
+  key: string
+) {
   if (Platform.OS === "web") {
-    return window.localStorage.getItem(key);
+    return window.localStorage.getItem(
+      key
+    );
   }
 
-  return SecureStore.getItemAsync(key);
+  return SecureStore.getItemAsync(
+    key
+  );
 }
 
-async function removeStorageItem(key: string) {
+async function removeStorageItem(
+  key: string
+) {
   if (Platform.OS === "web") {
-    window.localStorage.removeItem(key);
+    window.localStorage.removeItem(
+      key
+    );
+
     return;
   }
 
-  await SecureStore.deleteItemAsync(key);
+  await SecureStore.deleteItemAsync(
+    key
+  );
 }
 
 /**
@@ -310,7 +347,8 @@ async function removeStorageItem(key: string) {
 async function parseResponse(
   response: Response
 ) {
-  const text = await response.text();
+  const text =
+    await response.text();
 
   if (!text) {
     return null;
@@ -329,15 +367,69 @@ function errorMessage(
   data: unknown,
   status: number
 ) {
-  if (data && typeof data === "object") {
-    const body = data as JsonMap;
+  if (
+    data &&
+    typeof data === "object"
+  ) {
+    const body =
+      data as JsonMap;
 
-    if (typeof body.message === "string") {
+    if (
+      typeof body.message ===
+      "string"
+    ) {
       return body.message;
     }
 
-    if (typeof body.error === "string") {
+    if (
+      typeof body.error ===
+      "string"
+    ) {
       return body.error;
+    }
+
+    if (
+      body.errors &&
+      typeof body.errors ===
+        "object"
+    ) {
+      const errors =
+        body.errors as Record<
+          string,
+          unknown
+        >;
+
+      const messages: string[] =
+        [];
+
+      Object.values(
+        errors
+      ).forEach((value) => {
+        if (
+          Array.isArray(value)
+        ) {
+          value.forEach(
+            (item) => {
+              if (
+                typeof item ===
+                "string"
+              ) {
+                messages.push(
+                  item
+                );
+              }
+            }
+          );
+        }
+      });
+
+      if (
+        messages.length > 0
+      ) {
+        return messages.join(
+          "\n"
+        );
+      }
     }
   }
 
@@ -351,28 +443,40 @@ function errorMessage(
  */
 
 export async function getToken() {
-  return getStorageItem(TOKEN_KEY);
+  return getStorageItem(
+    TOKEN_KEY
+  );
 }
 
 export async function getStoredUser(): Promise<
   ApiUser | null
 > {
-  const value = await getStorageItem(USER_KEY);
+  const value =
+    await getStorageItem(
+      USER_KEY
+    );
 
   if (!value) {
     return null;
   }
 
   try {
-    return JSON.parse(value) as ApiUser;
+    return JSON.parse(
+      value
+    ) as ApiUser;
   } catch {
     return null;
   }
 }
 
 export async function clearSession() {
-  await removeStorageItem(TOKEN_KEY);
-  await removeStorageItem(USER_KEY);
+  await removeStorageItem(
+    TOKEN_KEY
+  );
+
+  await removeStorageItem(
+    USER_KEY
+  );
 }
 
 /**
@@ -386,20 +490,43 @@ export async function apiRequest<T>(
   options: RequestInit = {},
   authenticated = true
 ): Promise<T> {
-  const token = authenticated
-    ? await getToken()
-    : null;
+  const token =
+    authenticated
+      ? await getToken()
+      : null;
 
   const isFormData =
-    typeof FormData !== "undefined" &&
-    options.body instanceof FormData;
+    typeof FormData !==
+      "undefined" &&
+    options.body instanceof
+      FormData;
 
-  const headers: Record<string, string> = {
-    Accept: "application/json",
+  const headers: Record<
+    string,
+    string
+  > = {
+    Accept:
+      "application/json",
   };
 
+  /**
+   * PENTING:
+   *
+   * Jangan set:
+   *
+   * Content-Type:
+   * multipart/form-data
+   *
+   * secara manual.
+   *
+   * Browser / React Native akan
+   * membuat boundary multipart
+   * secara otomatis.
+   */
   if (!isFormData) {
-    headers["Content-Type"] =
+    headers[
+      "Content-Type"
+    ] =
       "application/json";
   }
 
@@ -417,19 +544,95 @@ export async function apiRequest<T>(
   if (options.headers) {
     Object.assign(
       headers,
-      options.headers as Record<string, string>
+      options.headers as Record<
+        string,
+        string
+      >
     );
   }
 
-  const response = await fetch(
-    `${API_URL}${endpoint}`,
-    {
-      ...options,
-      headers,
-    }
+  const url =
+    `${API_URL}${endpoint}`;
+
+  console.log(
+    "========== API REQUEST =========="
   );
 
-  const data = await parseResponse(response);
+  console.log(
+    "URL:",
+    url
+  );
+
+  console.log(
+    "METHOD:",
+    options.method ||
+      "GET"
+  );
+
+  console.log(
+    "AUTHENTICATED:",
+    authenticated
+  );
+
+  console.log(
+    "IS FORMDATA:",
+    isFormData
+  );
+
+  console.log(
+    "================================="
+  );
+
+  let response: Response;
+
+  try {
+    response =
+      await fetch(
+        url,
+        {
+          ...options,
+          headers,
+        }
+      );
+  } catch (error) {
+    console.error(
+      "========== FETCH ERROR =========="
+    );
+
+    console.error(
+      error
+    );
+
+    console.error(
+      "URL:",
+      url
+    );
+
+    console.error(
+      "METHOD:",
+      options.method ||
+        "GET"
+    );
+
+    console.error(
+      "================================="
+    );
+
+    throw new Error(
+      "Network request failed. Pastikan server Laravel aktif, alamat API benar, dan perangkat dapat mengakses komputer server."
+    );
+  }
+
+  console.log(
+    "API RESPONSE:",
+    response.status,
+    response.statusText
+  );
+
+  const data =
+    await parseResponse(
+      response
+    );
 
   if (!response.ok) {
     throw new Error(
@@ -457,7 +660,9 @@ export async function login(
       "/auth/login",
       {
         method: "POST",
-        body: JSON.stringify(payload),
+        body: JSON.stringify(
+          payload
+        ),
       },
       false
     );
@@ -475,7 +680,9 @@ export async function login(
 
   await setStorageItem(
     USER_KEY,
-    JSON.stringify(data.user)
+    JSON.stringify(
+      data.user
+    )
   );
 
   return data;
@@ -525,12 +732,16 @@ function buildQuery(
     string | number | boolean | undefined
   >
 ) {
-  const query = new URLSearchParams();
+  const query =
+    new URLSearchParams();
 
-  Object.entries(params || {}).forEach(
+  Object.entries(
+    params || {}
+  ).forEach(
     ([key, value]) => {
       if (
-        value !== undefined &&
+        value !==
+          undefined &&
         value !== null
       ) {
         query.set(
@@ -541,7 +752,8 @@ function buildQuery(
     }
   );
 
-  const text = query.toString();
+  const text =
+    query.toString();
 
   return text
     ? `?${text}`
@@ -552,9 +764,6 @@ function buildQuery(
  * ============================================================
  * ATTENDANCE
  * ============================================================
- *
- * Endpoint ini hanya dipanggil oleh frontend
- * apabila user memang memiliki role yang sesuai.
  */
 
 export async function getAttendance(
@@ -577,7 +786,9 @@ export async function getAttendance(
       last_page: number;
     };
   }>(
-    `/attendance${buildQuery(params)}`
+    `/attendance${buildQuery(
+      params
+    )}`
   );
 }
 
@@ -609,7 +820,8 @@ export async function checkIn(
     device_info?: string;
   }
 ) {
-  const body = new FormData();
+  const body =
+    new FormData();
 
   body.append(
     "type",
@@ -618,20 +830,26 @@ export async function checkIn(
 
   body.append(
     "latitude",
-    String(payload.latitude)
+    String(
+      payload.latitude
+    )
   );
 
   body.append(
     "longitude",
-    String(payload.longitude)
+    String(
+      payload.longitude
+    )
   );
 
   body.append(
     "photo",
-    payload.photo as never
+    payload.photo as any
   );
 
-  if (payload.device_info) {
+  if (
+    payload.device_info
+  ) {
     body.append(
       "device_info",
       payload.device_info
@@ -640,10 +858,13 @@ export async function checkIn(
 
   return apiRequest<{
     data: ApiAttendance;
-  }>("/attendance/check-in", {
-    method: "POST",
-    body,
-  });
+  }>(
+    "/attendance/check-in",
+    {
+      method: "POST",
+      body,
+    }
+  );
 }
 
 /**
@@ -668,24 +889,31 @@ export async function checkOut(
     device_info?: string;
   }
 ) {
-  const body = new FormData();
+  const body =
+    new FormData();
 
   body.append(
     "latitude",
-    String(payload.latitude)
+    String(
+      payload.latitude
+    )
   );
 
   body.append(
     "longitude",
-    String(payload.longitude)
+    String(
+      payload.longitude
+    )
   );
 
   body.append(
     "photo",
-    payload.photo as never
+    payload.photo as any
   );
 
-  if (payload.device_info) {
+  if (
+    payload.device_info
+  ) {
     body.append(
       "device_info",
       payload.device_info
@@ -694,10 +922,25 @@ export async function checkOut(
 
   return apiRequest<{
     data: ApiAttendance;
-  }>("/attendance/check-out", {
-    method: "POST",
-    body,
-  });
+  }>(
+    "/attendance/check-out",
+    {
+      method: "POST",
+      body,
+    }
+  );
+}
+
+/**
+ * ============================================================
+ * LEAVE TYPE
+ * ============================================================
+ */
+
+export async function getLeaveTypes() {
+  return apiRequest<{
+    data: ApiLeaveType[];
+  }>("/leave-types");
 }
 
 /**
@@ -722,32 +965,61 @@ export async function getLeaveRequests(
   );
 }
 
-export async function postLeaveRequest(
-  payload:
-    | FormData
-    | JsonMap
-) {
-  return apiRequest<{
-    data: ApiLeaveRequest;
-  }>("/leave-requests", {
-    method: "POST",
-    body:
-      payload instanceof FormData
-        ? payload
-        : JSON.stringify(payload),
-  });
-}
-
 /**
  * ============================================================
- * OVERTIME
+ * POST LEAVE REQUEST
  * ============================================================
  */
 
-export async function getOvertimeRequests() {
+export type LeaveRequestPayload =
+  | FormData
+  | {
+      leave_type_id: number;
+      start_date: string;
+      end_date: string;
+      reason: string;
+
+      start_time?: string;
+      end_time?: string;
+
+      address_during_leave?: string;
+
+      child_number?: number;
+
+      doctor_letter_type?:
+        | "dokter_biasa"
+        | "tim_penguji_kesehatan";
+
+      doctor_letter_number?: string;
+
+      doctor_facility_name?: string;
+
+      sub_category?:
+        | "menikah"
+        | "keluarga_sakit"
+        | "keluarga_meninggal"
+        | "bencana";
+    };
+
+export async function postLeaveRequest(
+  payload: LeaveRequestPayload
+) {
   return apiRequest<{
-    data: ApiOvertimeRequest[];
-  }>("/overtime-requests");
+    data: ApiLeaveRequest;
+  }>(
+    "/leave-requests",
+    {
+      method: "POST",
+
+      body:
+        payload instanceof
+        FormData
+          ? payload
+          : JSON.stringify(
+              payload
+            ),
+    }
+  );
 }
 
 /**
@@ -837,6 +1109,20 @@ export async function decideWfhRequest(
         note,
       }),
     }
+  );
+}
+
+/**
+ * ============================================================
+ * OVERTIME
+ * ============================================================
+ */
+
+export async function getOvertimeRequests() {
+  return apiRequest<{
+    data: ApiOvertimeRequest[];
+  }>(
+    "/overtime-requests"
   );
 }
 
