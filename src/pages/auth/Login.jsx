@@ -1,29 +1,33 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiRequest } from "../../services/api";
 
+const USE_MOCK_SSO = import.meta.env.VITE_ENABLE_MOCK_SSO === "true";
+
 const normalizeRole = (user, payload) => {
-  const roles = user?.roles || payload?.roles || payload?.data?.roles;
-  const roleValue = user?.role || payload?.role || payload?.user_role;
-  const firstRole = Array.isArray(roles) ? roles[0] : roles;
-  const roleName =
-    (typeof firstRole === "object" ? firstRole?.name : firstRole) ||
-    (typeof roleValue === "object" ? roleValue?.name : roleValue) ||
-    "admin";
+  // Prioritaskan role aplikasi yang sudah dipetakan backend. `roles` dari
+  // SIGA8 adalah role sumber (misalnya "Help Desk"), bukan hak akses aplikasi.
+  const candidates = [
+    user?.app_role, user?.local_role, user?.presensi_role,
+    payload?.app_role, payload?.local_role, payload?.presensi_role,
+    user?.role, payload?.role, payload?.user_role,
+    ...(Array.isArray(user?.roles) ? user.roles : [user?.roles]),
+    ...(Array.isArray(payload?.roles) ? payload.roles : [payload?.roles]),
+  ];
 
-  const normalized = String(roleName)
-    .trim()
-    .toLowerCase()
-    .replace(/[ -]+/g, "_");
+  const allowedRoles = new Set([
+    "super_admin", "admin_kepegawaian", "admin_unit", "pimpinan", "pegawai", "developer",
+  ]);
 
-  if (normalized === "superadmin" || normalized === "super_admin") {
-    return "super_admin";
+  for (const candidate of candidates) {
+    const roleName = typeof candidate === "object" ? candidate?.app_role || candidate?.local_role || candidate?.name : candidate;
+    const normalized = String(roleName || "").trim().toLowerCase().replace(/[ -]+/g, "_");
+    const mapped = normalized === "superadmin" ? "super_admin" : normalized === "admin" ? "admin_kepegawaian" : normalized;
+    if (allowedRoles.has(mapped)) return mapped;
   }
 
-  if (normalized.includes("developer")) return "developer";
-  if (normalized.startsWith("admin")) return "admin";
-
-  return normalized || "admin";
+  // Role yang tidak dikenal tidak boleh memperoleh akses admin di frontend.
+  return "pegawai";
 };
 
 const storeLoginSession = (response) => {
@@ -58,16 +62,20 @@ function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    document.title = "Masuk | KlikPresensi";
+  }, []);
+
   const handleSsoLogin = async () => {
     if (!username || !password) {
-      alert("Isi username dan password untuk simulasi login SSO SIGA8.");
+      alert("Isi username dan password untuk login SSO SIGA8.");
       return;
     }
 
     setLoading(true);
 
     try {
-      const response = await apiRequest("/mock/siga8/login", {
+      const response = await apiRequest(USE_MOCK_SSO ? "/mock/siga8/login" : "/auth/login", {
         method: "POST",
         body: JSON.stringify({
           username,

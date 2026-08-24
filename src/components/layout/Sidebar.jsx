@@ -144,12 +144,20 @@ function Sidebar() {
   const roleLabel =
     role === "super_admin"
       ? "Super Admin"
+      : role === "admin_kepegawaian"
+      ? "Admin Kepegawaian"
+      : role === "admin_unit"
+      ? "Admin Unit"
+      : role === "pimpinan"
+      ? "Pimpinan"
+      : role === "pegawai"
+      ? "Pegawai"
       : role === "developer"
       ? "Developer"
-      : "Admin";
+      : "Pengguna";
 
   const visibleRoutes = {
-    admin: [
+    admin_kepegawaian: [
       "/dashboard",
       "/monitoring",
       "/pegawai",
@@ -159,6 +167,26 @@ function Sidebar() {
       "/persetujuan",
       "/laporan",
     ],
+    admin_unit: [
+      "/dashboard",
+      "/monitoring",
+      "/pegawai",
+      "/unit",
+      "/shift",
+      "/verifikasi",
+      "/persetujuan",
+      "/laporan",
+    ],
+    pimpinan: [
+      "/dashboard",
+      "/monitoring",
+      "/pegawai",
+      "/unit",
+      "/verifikasi",
+      "/persetujuan",
+      "/laporan",
+    ],
+    pegawai: ["/dashboard"],
     super_admin: [
       "/dashboard",
       "/monitoring",
@@ -189,7 +217,7 @@ function Sidebar() {
     ],
   };
 
-  const allowedPaths = visibleRoutes[role] || visibleRoutes.admin;
+  const allowedPaths = visibleRoutes[role] || visibleRoutes.pegawai;
 
   const filteredGroups = navGroups.map((group) => ({
     ...group,

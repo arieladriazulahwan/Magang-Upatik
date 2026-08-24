@@ -1,8 +1,34 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import AdminLayout from "../../components/layout/AdminLayout";
 import { apiRequest } from "../../services/api";
 
+const APP_TIME_ZONE = "Asia/Makassar";
+
+const getToday = () => {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: APP_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const value = Object.fromEntries(parts.map(({ type, value: part }) => [type, part]));
+  return `${value.year}-${value.month}-${value.day}`;
+};
+
+const getAttendanceDate = (item) => {
+  const value = item.date || item.attendance_date || item.tanggal || item.check_in_at || item.clock_in || item.created_at;
+  if (!value) return "";
+  return String(value).slice(0, 10);
+};
+
 function Monitoring() {
+  const today = getToday();
+  const todayLabel = new Intl.DateTimeFormat("id-ID", {
+    timeZone: APP_TIME_ZONE,
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(new Date());
   const [data, setData] = useState([]);
   const [summary, setSummary] = useState({
     hadir: 0,
@@ -21,11 +47,14 @@ function Monitoring() {
   // AMBIL DATA DARI BACKEND
   // =========================
 
-  const fetchMonitoring = async () => {
+  const fetchMonitoring = useCallback(async () => {
     try {
       setLoading(true);
 
-      const response = await apiRequest("/attendance");
+      // Backend menerima filter tanggal agar ringkasan dan data yang dikirim
+      // hanya untuk hari ini. Penyaringan ulang di frontend mengantisipasi
+      // backend lama yang belum menerapkan query parameter tersebut.
+      const response = await apiRequest(`/attendance?date=${today}`);
 
       console.log(
         "Data monitoring dari backend:",
@@ -47,7 +76,8 @@ function Monitoring() {
        * }
        */
 
-      setData(response.data || []);
+      const attendance = Array.isArray(response?.data) ? response.data : Array.isArray(response) ? response : [];
+      setData(attendance.filter((item) => !getAttendanceDate(item) || getAttendanceDate(item) === today));
 
       setSummary({
         hadir: response.summary?.hadir || 0,
@@ -75,11 +105,11 @@ function Monitoring() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [today]);
 
   useEffect(() => {
     fetchMonitoring();
-  }, []);
+  }, [fetchMonitoring]);
 
   // =========================
   // FILTER DATA
@@ -171,7 +201,7 @@ function Monitoring() {
             </span>
 
             <strong>
-              18 Agustus 2026
+              {todayLabel}
             </strong>
 
           </div>

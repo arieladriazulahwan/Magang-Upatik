@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import AdminLayout from "../../components/layout/AdminLayout";
 import { apiRequest } from "../../services/api";
+import { canManageShifts } from "../../utils/access";
 
 const normalizeShifts = (payload) => {
   if (Array.isArray(payload)) return payload;
@@ -18,6 +19,7 @@ const formatRestTime = (value) => {
 };
 
 function Shift() {
+  const canCreateShift = canManageShifts();
   const [shifts, setShifts] = useState([]);
   const [search, setSearch] = useState("");
   const [unitFilter, setUnitFilter] = useState("Semua Unit");
@@ -105,12 +107,12 @@ function Shift() {
             <p>Kelola jadwal kerja dan pola dinas pegawai</p>
           </div>
 
-          <button
+          {canCreateShift && <button
             className="primary-button"
             onClick={() => setShowModal(true)}
           >
             + Tambah Shift
-          </button>
+          </button>}
         </div>
 
         <div className="shift-cards">
@@ -246,7 +248,7 @@ function Shift() {
                         </td>
 
                         <td>
-                          <button className="action-button">Edit</button>
+                          {canCreateShift && <button className="action-button">Edit</button>}
                           <button className="action-button">Detail</button>
                         </td>
                       </tr>

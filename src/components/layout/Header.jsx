@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { apiRequest } from "../../services/api";
 
@@ -79,6 +79,7 @@ function Header() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [search, setSearch] = useState("");
   const [notificationCount, setNotificationCount] = useState(0);
+  const [notifications, setNotifications] = useState([]);
   const user = getStoredUser();
   const role = String(localStorage.getItem("role") || "admin");
   const displayName = user.name || user.full_name || user.username || "Administrator";
@@ -87,37 +88,45 @@ function Header() {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
   const avatar = displayName.charAt(0).toUpperCase();
 
-  useEffect(() => {
-    const fetchNotificationCount = async () => {
-      const [attendanceResult, leaveResult] = await Promise.allSettled([
-        apiRequest("/attendance"),
-        apiRequest("/leave-requests"),
-      ]);
-      const getItems = (result) => {
-        if (result.status !== "fulfilled") return [];
-        const payload = result.value;
+  const fetchNotifications = useCallback(async () => {
+      try {
+        const response = await apiRequest("/notifications");
+        const payload = response?.data || response;
         if (Array.isArray(payload)) return payload;
         if (Array.isArray(payload?.data)) return payload.data;
         if (Array.isArray(payload?.items)) return payload.items;
         return [];
-      };
-      const isPending = (item) => ["menunggu", "diajukan", "diproses", "pending"].includes(
-        String(item.status || item.verification_status || item.approval_status || "").toLowerCase()
-      );
-      setNotificationCount(
-        getItems(attendanceResult).filter(isPending).length +
-        getItems(leaveResult).filter(isPending).length
-      );
-    };
-
-    fetchNotificationCount();
+      } catch {
+        return [];
+      }
   }, []);
+
+  const countUnread = (items) => items.filter((notification) =>
+        notification.is_read === false ||
+        (notification.is_read === undefined && !notification.read_at)
+      ).length;
+
+  useEffect(() => {
+    fetchNotifications().then((items) => {
+      setNotifications(items);
+      setNotificationCount(countUnread(items));
+    });
+  }, [fetchNotifications]);
 
   const page =
     pageTitles[location.pathname] ||
     pageTitles["/dashboard"];
 
+  useEffect(() => {
+    document.title = `${page.title} | KlikPresensi`;
+  }, [page.title]);
+
   const handleLogout = () => {
+    // Jangan menahan logout UI jika backend sedang lambat/tidak terjangkau.
+    void apiRequest("/auth/logout", { method: "POST" }).catch((error) => {
+      console.warn("Logout backend gagal:", error);
+    });
+
     localStorage.removeItem("isLoggedIn");
     localStorage.removeItem("role");
     localStorage.removeItem("user");
@@ -142,6 +151,26 @@ function Header() {
 
     navigate(target);
     setShowSearch(false);
+  };
+
+  const handleNotifications = async () => {
+    const nextOpenState = !showNotifications;
+    setShowNotifications(nextOpenState);
+    if (!nextOpenState) return;
+
+    const items = await fetchNotifications();
+    setNotifications(items);
+    const unreadCount = countUnread(items);
+    setNotificationCount(unreadCount);
+
+    if (unreadCount === 0) return;
+    try {
+      await apiRequest("/notifications/read-all", { method: "PATCH" });
+      setNotifications((current) => current.map((item) => ({ ...item, is_read: true, read_at: item.read_at || new Date().toISOString() })));
+      setNotificationCount(0);
+    } catch (error) {
+      console.error("Gagal menandai notifikasi sudah dibaca:", error);
+    }
   };
 
   return (
@@ -187,7 +216,7 @@ function Header() {
         {/* Notification */}
         <button
           className="header-button notification"
-          onClick={() => setShowNotifications((value) => !value)}
+          onClick={handleNotifications}
           title="Notifikasi"
           aria-label="Buka notifikasi"
         >
@@ -197,13 +226,18 @@ function Header() {
 
         {showNotifications && (
           <div className="notification-popover">
-            <strong>Notifikasi</strong>
-            <p>{notificationCount > 0 ? `${notificationCount} pengajuan menunggu perhatian.` : "Tidak ada notifikasi baru."}</p>
-            {notificationCount > 0 && (
-              <button onClick={() => { setShowNotifications(false); navigate("/persetujuan"); }}>
-                Lihat persetujuan
-              </button>
-            )}
+            <div className="notification-popover-heading"><strong>Notifikasi</strong><span>{notifications.length}</span></div>
+            <div className="notification-list">
+              {notifications.slice(0, 5).map((notification) => (
+                <article className="notification-item" key={notification.id || notification.uuid}>
+                  <strong>{notification.title || notification.subject || "Notifikasi sistem"}</strong>
+                  <p>{notification.message || notification.body || notification.description || "Ada pembaruan pada sistem presensi."}</p>
+                  <small>{notification.created_at || notification.createdAt || "Baru saja"}</small>
+                </article>
+              ))}
+              {notifications.length === 0 && <p>Tidak ada notifikasi baru.</p>}
+            </div>
+            <button onClick={() => setShowNotifications(false)}>Tutup</button>
           </div>
         )}
 
@@ -220,6 +254,7 @@ function Header() {
           </div>
 
           <button
+            type="button"
             className="profile-menu"
             onClick={handleLogout}
             title="Logout"

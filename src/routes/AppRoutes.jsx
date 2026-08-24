@@ -2,7 +2,6 @@ import { Routes, Route, Navigate } from "react-router-dom";
 
 import Login from "../pages/auth/Login";
 import Dashboard from "../pages/dashboard/Dashboard";
-import AdminLayout from "../components/layout/AdminLayout";
 import Pegawai from "../pages/pegawai/Pegawai";
 import TambahPegawai from "../pages/pegawai/TambahPegawai";
 import DetailPegawai from "../pages/pegawai/DetailPegawai";
@@ -16,18 +15,14 @@ import DetailPengajuan from "../pages/pengajuan/DetailPengajuan";
 import Verifikasi from "../pages/verifikasi/Verifikasi";
 import LaporanKehadiran from "../pages/laporan/LaporanKehadiran";
 import Lokasi from "../pages/lokasi/Lokasi";
+import Kalender from "../pages/kalender/Kalender";
+import Pengaturan from "../pages/pengaturan/Pengaturan";
+import PemetaanSIGA8 from "../pages/pengaturan/PemetaanSIGA8";
 import ProtectedRoute from "./ProtectedRoute";
 
-function SimplePage({ title }) {
-  return (
-    <AdminLayout>
-      <div>
-        <h2>{title}</h2>
-        <p>Halaman {title} sedang dikembangkan.</p>
-      </div>
-    </AdminLayout>
-  );
-}
+const MANAGEMENT_ROLES = ["super_admin", "admin_kepegawaian", "admin_unit", "developer"];
+const APPROVAL_ROLES = [...MANAGEMENT_ROLES, "pimpinan"];
+const SYSTEM_ROLES = ["super_admin", "developer"];
 
 function AppRoutes() {
   return (
@@ -53,7 +48,7 @@ function AppRoutes() {
       <Route
         path="/monitoring"
         element={
-          <ProtectedRoute allowedRoles={["admin", "super_admin", "developer"]}>
+          <ProtectedRoute allowedRoles={APPROVAL_ROLES}>
             <Monitoring />
           </ProtectedRoute>
         }
@@ -62,7 +57,7 @@ function AppRoutes() {
       <Route
         path="/pegawai"
         element={
-          <ProtectedRoute allowedRoles={["admin", "super_admin", "developer"]}>
+          <ProtectedRoute allowedRoles={APPROVAL_ROLES}>
             <Pegawai />
           </ProtectedRoute>
         }
@@ -71,7 +66,7 @@ function AppRoutes() {
       <Route
         path="/pegawai/tambah"
         element={
-          <ProtectedRoute allowedRoles={["admin", "super_admin", "developer"]}>
+          <ProtectedRoute allowedRoles={["super_admin", "admin_kepegawaian", "developer"]}>
             <TambahPegawai />
           </ProtectedRoute>
         }
@@ -80,7 +75,7 @@ function AppRoutes() {
       <Route
         path="/pegawai/:id"
         element={
-          <ProtectedRoute allowedRoles={["admin", "super_admin", "developer"]}>
+          <ProtectedRoute allowedRoles={APPROVAL_ROLES}>
             <DetailPegawai />
           </ProtectedRoute>
         }
@@ -89,7 +84,7 @@ function AppRoutes() {
       <Route
         path="/unit"
         element={
-          <ProtectedRoute allowedRoles={["admin", "super_admin", "developer"]}>
+          <ProtectedRoute allowedRoles={APPROVAL_ROLES}>
             <UnitKerja />
           </ProtectedRoute>
         }
@@ -98,7 +93,7 @@ function AppRoutes() {
       <Route
         path="/jadwal"
         element={
-          <ProtectedRoute allowedRoles={["admin", "super_admin", "developer"]}>
+          <ProtectedRoute allowedRoles={MANAGEMENT_ROLES}>
             <Jadwal />
           </ProtectedRoute>
         }
@@ -107,7 +102,7 @@ function AppRoutes() {
       <Route
         path="/shift"
         element={
-          <ProtectedRoute allowedRoles={["admin", "super_admin", "developer"]}>
+          <ProtectedRoute allowedRoles={MANAGEMENT_ROLES}>
             <Shift />
           </ProtectedRoute>
         }
@@ -116,7 +111,7 @@ function AppRoutes() {
       <Route
         path="/pengajuan"
         element={
-          <ProtectedRoute allowedRoles={["admin", "super_admin", "developer"]}>
+          <ProtectedRoute allowedRoles={APPROVAL_ROLES}>
             <Pengajuan />
           </ProtectedRoute>
         }
@@ -125,7 +120,7 @@ function AppRoutes() {
       <Route
         path="/pengajuan/detail"
         element={
-          <ProtectedRoute allowedRoles={["admin", "super_admin", "developer"]}>
+          <ProtectedRoute allowedRoles={APPROVAL_ROLES}>
             <DetailPengajuan />
           </ProtectedRoute>
         }
@@ -134,7 +129,7 @@ function AppRoutes() {
       <Route
         path="/verifikasi"
         element={
-          <ProtectedRoute allowedRoles={["admin", "super_admin", "developer"]}>
+          <ProtectedRoute allowedRoles={APPROVAL_ROLES}>
             <Verifikasi />
           </ProtectedRoute>
         }
@@ -143,7 +138,7 @@ function AppRoutes() {
       <Route
         path="/persetujuan"
         element={
-          <ProtectedRoute allowedRoles={["admin", "super_admin", "developer"]}>
+          <ProtectedRoute allowedRoles={APPROVAL_ROLES}>
             <Approval />
           </ProtectedRoute>
         }
@@ -152,7 +147,7 @@ function AppRoutes() {
       <Route
         path="/laporan"
         element={
-          <ProtectedRoute allowedRoles={["admin", "super_admin", "developer"]}>
+          <ProtectedRoute allowedRoles={APPROVAL_ROLES}>
             <LaporanKehadiran />
           </ProtectedRoute>
         }
@@ -161,8 +156,8 @@ function AppRoutes() {
       <Route
         path="/siga8"
         element={
-          <ProtectedRoute allowedRoles={["super_admin", "developer"]}>
-            <SimplePage title="Pemetaan SIGA8" />
+          <ProtectedRoute allowedRoles={SYSTEM_ROLES}>
+            <PemetaanSIGA8 />
           </ProtectedRoute>
         }
       />
@@ -170,7 +165,7 @@ function AppRoutes() {
       <Route
         path="/geofence"
         element={
-          <ProtectedRoute allowedRoles={["super_admin", "developer"]}>
+          <ProtectedRoute allowedRoles={SYSTEM_ROLES}>
             <Lokasi />
           </ProtectedRoute>
         }
@@ -179,8 +174,8 @@ function AppRoutes() {
       <Route
         path="/kalender"
         element={
-          <ProtectedRoute allowedRoles={["super_admin", "developer"]}>
-            <SimplePage title="Google Calendar" />
+          <ProtectedRoute allowedRoles={SYSTEM_ROLES}>
+            <Kalender />
           </ProtectedRoute>
         }
       />
@@ -188,8 +183,8 @@ function AppRoutes() {
       <Route
         path="/pengaturan"
         element={
-          <ProtectedRoute allowedRoles={["super_admin", "developer"]}>
-            <SimplePage title="Pengaturan" />
+          <ProtectedRoute allowedRoles={SYSTEM_ROLES}>
+            <Pengaturan />
           </ProtectedRoute>
         }
       />
@@ -204,6 +199,8 @@ function AppRoutes() {
           />
         }
       />
+
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
 
     </Routes>
   );

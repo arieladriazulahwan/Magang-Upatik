@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AdminLayout from "../../components/layout/AdminLayout";
 import { apiRequest } from "../../services/api";
+import { canManageEmployees } from "../../utils/access";
 
 function Pegawai() {
   const navigate = useNavigate();
+  const canCreateEmployee = canManageEmployees();
 
   const [employees, setEmployees] = useState([]);
   const [search, setSearch] = useState("");
@@ -148,14 +150,14 @@ function Pegawai() {
 
           </div>
 
-          <button
+          {canCreateEmployee && <button
             className="primary-button"
             onClick={() =>
               navigate("/pegawai/tambah")
             }
           >
             + Tambah Pegawai
-          </button>
+          </button>}
 
         </div>
 
