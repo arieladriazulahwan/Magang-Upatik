@@ -1,4 +1,7 @@
-import React, { useState } from "react";
+import React, {
+  useEffect,
+  useState,
+} from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -18,7 +21,10 @@ import LogoMark from "../../components/LogoMark";
 
 import { Colors } from "../../constants/colors";
 import { AppConfig } from "../../constants/config";
-import { login as loginApi } from "../../services/api";
+import {
+  getToken,
+  login as loginApi,
+} from "../../services/api";
 
 function UserIcon() {
   return (
@@ -127,6 +133,24 @@ export default function LoginScreen() {
   const [loading, setLoading] =
     useState(false);
 
+  useEffect(() => {
+    let active = true;
+
+    async function redirectIfLoggedIn() {
+      const token = await getToken();
+
+      if (active && token) {
+        router.replace("/(main)");
+      }
+    }
+
+    redirectIfLoggedIn();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const login = async () => {
     // Cegah tombol ditekan berkali-kali
     if (loading) {
@@ -154,9 +178,6 @@ export default function LoginScreen() {
     try {
       setLoading(true);
 
-      console.log("LOGIN DIMULAI");
-      console.log("Username:", username);
-
       const result = await loginApi({
         username: username.trim(),
         password: password,
@@ -165,11 +186,6 @@ export default function LoginScreen() {
             ? "Web"
             : "Android",
       });
-
-      console.log(
-        "LOGIN BERHASIL:",
-        result
-      );
 
       Alert.alert(
         "Login berhasil",

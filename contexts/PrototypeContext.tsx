@@ -15,6 +15,7 @@ import {
   checkOut,
   clearSession,
   decideLeaveRequest,
+  decideOvertimeRequest,
   decideWfhRequest,
   getAttendance,
   getLeaveRequests,
@@ -47,7 +48,8 @@ type AttendanceState =
 type RequestStatus =
   | "Disetujui"
   | "Menunggu"
-  | "Ditolak";
+  | "Ditolak"
+  | "Dibatalkan";
 
 type Decision =
   | "Disetujui"
@@ -293,6 +295,42 @@ function statusToRequestStatus(
     return "Ditolak";
   }
 
+  if (
+    status === "dibatalkan"
+  ) {
+    return "Dibatalkan";
+  }
+
+  return "Menunggu";
+}
+
+function statusToDisplay(
+  status?: string | null
+): RequestStatus {
+  const value =
+    status
+      ?.toLowerCase()
+      .trim() ?? "";
+
+  if (
+    value === "disetujui" ||
+    value === "selesai"
+  ) {
+    return "Disetujui";
+  }
+
+  if (
+    value === "ditolak"
+  ) {
+    return "Ditolak";
+  }
+
+  if (
+    value === "dibatalkan"
+  ) {
+    return "Dibatalkan";
+  }
+
   return "Menunggu";
 }
 
@@ -372,10 +410,6 @@ async function createAttachmentForUpload(
   if (
     Platform.OS === "web"
   ) {
-    console.log(
-      "ATTACHMENT WEB: mulai mengambil Blob"
-    );
-
     const response =
       await fetch(
         attachment.uri
@@ -389,17 +423,6 @@ async function createAttachmentForUpload(
 
     const blob =
       await response.blob();
-
-    console.log(
-      "ATTACHMENT WEB:",
-      {
-        name: fileName,
-        size: blob.size,
-        type:
-          blob.type ||
-          mimeType,
-      }
-    );
 
     return new Blob(
       [blob],
@@ -417,18 +440,11 @@ async function createAttachmentForUpload(
    * =================================================
    */
 
-  const nativeFile = {
+  return {
     uri: attachment.uri,
     name: fileName,
     type: mimeType,
   };
-
-  console.log(
-    "ATTACHMENT NATIVE:",
-    nativeFile
-  );
-
-  return nativeFile;
 }
 
 /* =====================================================
@@ -478,7 +494,7 @@ function mapLeaveRequest(
       : "Pengajuan",
 
     status:
-      statusToRequestStatus(
+      statusToDisplay(
         item.status
       ),
 
@@ -725,9 +741,56 @@ function mapOvertime(
       item.work_description,
 
     status:
+      statusToDisplay(
+        item.status
+      ),
+  };
+}
+
+function mapOvertimeRequest(
+  item: ApiOvertimeRequest
+): RequestItem {
+  return {
+    id: `overtime-${item.id}`,
+    title: "Lembur",
+    meta: item.date || "-",
+    days:
+      item.duration_minutes
+        ? formatDuration(
+            item.duration_minutes
+          )
+        : `${item.planned_start_time?.slice(0, 5) || "--:--"} - ${
+            item.planned_end_time?.slice(0, 5) || "--:--"
+          }`,
+    status:
       statusToRequestStatus(
         item.status
       ),
+    type: "Lembur",
+  };
+}
+
+function mapOvertimeApproval(
+  item: ApiOvertimeRequest
+): ApprovalItem {
+  return {
+    id: `overtime-${item.id}`,
+    name:
+      item.employee?.name ||
+      "Pegawai",
+    unit:
+      item.employee?.nip ||
+      "-",
+    type: "Lembur",
+    range:
+      item.date || "-",
+    reason:
+      item.work_description ||
+      "-",
+    info:
+      `${item.planned_start_time?.slice(0, 5) || "--:--"} - ${
+        item.planned_end_time?.slice(0, 5) || "--:--"
+      }`,
   };
 }
 
@@ -1066,6 +1129,27 @@ export function PrototypeProvider({
 
         /* REQUESTS */
 
+        let overtimeData:
+          | ApiOvertimeRequest[]
+          | undefined;
+
+        if (
+          overtimeResult.status ===
+          "fulfilled"
+        ) {
+          overtimeData =
+            overtimeResult.value.data;
+        } else {
+          console.log(
+            "OVERTIME LOAD ERROR:",
+            getErrorMessage(
+              overtimeResult.reason
+            )
+          );
+
+          overtimeData = [];
+        }
+
         const backendRequests = [
           ...leaveData.map(
             mapLeaveRequest
@@ -1073,6 +1157,10 @@ export function PrototypeProvider({
 
           ...wfhData.map(
             mapWfhRequest
+          ),
+
+          ...overtimeData.map(
+            mapOvertimeRequest
           ),
         ];
 
@@ -1102,6 +1190,16 @@ export function PrototypeProvider({
             .map(
               mapWfhApproval
             ),
+
+          ...overtimeData
+            .filter(
+              (item) =>
+                item.status ===
+                "diajukan"
+            )
+            .map(
+              mapOvertimeApproval
+            ),
         ]);
 
         /* NOTIFICATIONS */
@@ -1124,48 +1222,10 @@ export function PrototypeProvider({
           );
         }
 
-        /* OVERTIME */
-
-        if (
-          overtimeResult.status ===
-          "fulfilled"
-        ) {
-          setOvertimeRequests(
-            overtimeResult.value.data.map(
-              mapOvertime
-            )
-          );
-        } else {
-          console.log(
-            "OVERTIME LOAD ERROR:",
-            getErrorMessage(
-              overtimeResult.reason
-            )
-          );
-
-          setOvertimeRequests(
-            []
-          );
-        }
-
-        console.log(
-          "BACKEND SYNC SELESAI:",
-          {
-            attendance:
-              attendanceResult.status,
-
-            leave:
-              leaveResult.status,
-
-            wfh:
-              wfhResult.status,
-
-            notifications:
-              notificationResult.status,
-
-            overtime:
-              overtimeResult.status,
-          }
+        setOvertimeRequests(
+          overtimeData.map(
+            mapOvertime
+          )
         );
       } catch (error) {
         console.error(
@@ -1559,43 +1619,6 @@ export function PrototypeProvider({
                 if (
                   payload.attachment
                 ) {
-                  console.log(
-                    "========== ATTACHMENT UPLOAD =========="
-                  );
-
-                  console.log(
-                    "Platform:",
-                    Platform.OS
-                  );
-
-                  console.log(
-                    "URI:",
-                    payload
-                      .attachment
-                      .uri
-                  );
-
-                  console.log(
-                    "Name:",
-                    payload
-                      .attachment
-                      .name
-                  );
-
-                  console.log(
-                    "MIME:",
-                    payload
-                      .attachment
-                      .mimeType
-                  );
-
-                  console.log(
-                    "Size:",
-                    payload
-                      .attachment
-                      .size
-                  );
-
                   const file =
                     await createAttachmentForUpload(
                       payload.attachment
@@ -1605,56 +1628,7 @@ export function PrototypeProvider({
                     "attachment",
                     file as any
                   );
-
-                  console.log(
-                    "ATTACHMENT BERHASIL DITAMBAHKAN KE FORMDATA"
-                  );
-
-                  console.log(
-                    "========================================"
-                  );
-                } else {
-                  console.log(
-                    "ATTACHMENT: tidak ada file"
-                  );
                 }
-
-                /* =================================
-                   DEBUG REQUEST
-                ================================= */
-
-                console.log(
-                  "========== LEAVE REQUEST =========="
-                );
-
-                console.log(
-                  "leave_type_id:",
-                  selectedTypeId
-                );
-
-                console.log(
-                  "start_date:",
-                  payload.startDate
-                );
-
-                console.log(
-                  "end_date:",
-                  payload.endDate
-                );
-
-                console.log(
-                  "reason:",
-                  payload.reason
-                );
-
-                console.log(
-                  "attachment:",
-                  payload.attachment
-                );
-
-                console.log(
-                  "==================================="
-                );
 
                 /* =================================
                    SEND TO LARAVEL
@@ -1868,6 +1842,14 @@ export function PrototypeProvider({
                 "leave"
               ) {
                 await decideLeaveRequest(
+                  rawId,
+                  apiDecision
+                );
+              } else if (
+                kind ===
+                "overtime"
+              ) {
+                await decideOvertimeRequest(
                   rawId,
                   apiDecision
                 );

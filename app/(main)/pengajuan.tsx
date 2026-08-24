@@ -14,12 +14,14 @@ import { Colors } from "../../constants/colors";
 
 import {
   getLeaveRequests,
+  getOvertimeRequests,
   getWfhRequests,
   ApiLeaveRequest,
+  ApiOvertimeRequest,
   ApiWfhRequest,
 } from "../../services/api";
 
-const filters = ["Semua", "Izin", "Cuti", "Sakit", "WFH"];
+const filters = ["Semua", "Izin", "Cuti", "Sakit", "WFH", "Lembur"];
 
 type RequestItem = {
   id: string;
@@ -49,10 +51,11 @@ export default function PengajuanScreen() {
       setLoading(true);
       setError(null);
 
-      const [leaveResult, wfhResult] =
+      const [leaveResult, wfhResult, overtimeResult] =
         await Promise.allSettled([
           getLeaveRequests(),
           getWfhRequests(),
+          getOvertimeRequests(),
         ]);
 
       const result: RequestItem[] = [];
@@ -138,6 +141,44 @@ export default function PengajuanScreen() {
         console.log(
           "WFH LOAD ERROR:",
           wfhResult.reason
+        );
+      }
+
+      /**
+       * --------------------------------------------------------
+       * LEMBUR
+       * --------------------------------------------------------
+       */
+
+      if (overtimeResult.status === "fulfilled") {
+        const overtimeData =
+          overtimeResult.value?.data ?? [];
+
+        overtimeData.forEach(
+          (item: ApiOvertimeRequest) => {
+            result.push({
+              id: `overtime-${item.id}`,
+              type: "Lembur",
+              status: mapStatus(item.status),
+              title: "Lembur",
+
+              meta: formatDate(
+                item.date
+              ),
+
+              days: formatOvertimeRange(
+                item
+              ),
+
+              createdAt:
+                item.created_at ?? null,
+            });
+          }
+        );
+      } else {
+        console.log(
+          "OVERTIME LOAD ERROR:",
+          overtimeResult.reason
         );
       }
 
@@ -401,6 +442,7 @@ function mapStatus(
     case "approved":
     case "approve":
     case "disetujui":
+    case "selesai":
       return "Disetujui";
 
     case "rejected":
@@ -420,7 +462,7 @@ function mapStatus(
 
 function getStatusTone(
   status: string
-): "amber" | "green" | "blue" {
+): "amber" | "green" | "blue" | "red" | "gray" {
   if (status === "Menunggu") {
     return "amber";
   }
@@ -429,7 +471,39 @@ function getStatusTone(
     return "green";
   }
 
+  if (status === "Ditolak") {
+    return "red";
+  }
+
+  if (status === "Dibatalkan") {
+    return "gray";
+  }
+
   return "blue";
+}
+
+function formatOvertimeRange(
+  item: ApiOvertimeRequest
+) {
+  const start =
+    item.planned_start_time?.slice(0, 5) ||
+    "--:--";
+
+  const end =
+    item.planned_end_time?.slice(0, 5) ||
+    "--:--";
+
+  if (item.duration_minutes) {
+    const hours = Math.floor(
+      item.duration_minutes / 60
+    );
+    const minutes =
+      item.duration_minutes % 60;
+
+    return `${hours}j ${minutes}m`;
+  }
+
+  return `${start} - ${end}`;
 }
 
 function formatDate(

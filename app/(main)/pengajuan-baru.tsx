@@ -168,38 +168,6 @@ export default function PengajuanBaruScreen() {
           "application/octet-stream";
 
         /* =========================================
-           DEBUG
-        ========================================= */
-
-        console.log(
-          "========== FILE DIPILIH =========="
-        );
-
-        console.log(
-          "URI:",
-          file.uri
-        );
-
-        console.log(
-          "NAME:",
-          file.name
-        );
-
-        console.log(
-          "MIME:",
-          mimeType
-        );
-
-        console.log(
-          "SIZE:",
-          file.size
-        );
-
-        console.log(
-          "=================================="
-        );
-
-        /* =========================================
            SAVE FILE
         ========================================= */
 
@@ -217,11 +185,6 @@ export default function PengajuanBaruScreen() {
             file.size,
         });
       } catch (error) {
-        console.log(
-          "PICK FILE ERROR:",
-          error
-        );
-
         Alert.alert(
           "Gagal memilih file",
           "File tidak dapat dipilih."
@@ -288,43 +251,6 @@ export default function PengajuanBaruScreen() {
 
         return;
       }
-
-      /* =========================================
-         DEBUG
-      ========================================= */
-
-      console.log(
-        "========== SUBMIT PENGAJUAN =========="
-      );
-
-      console.log(
-        "TYPE:",
-        type
-      );
-
-      console.log(
-        "START DATE:",
-        startDate
-      );
-
-      console.log(
-        "END DATE:",
-        endDate
-      );
-
-      console.log(
-        "REASON:",
-        reason.trim()
-      );
-
-      console.log(
-        "ATTACHMENT:",
-        selectedFile
-      );
-
-      console.log(
-        "======================================="
-      );
 
       /* =========================================
          SUBMIT

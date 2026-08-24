@@ -4,18 +4,36 @@ import { router } from "expo-router";
 import LogoMark from "../../components/LogoMark";
 import { Colors } from "../../constants/colors";
 import { AppConfig } from "../../constants/config";
+import { getToken } from "../../services/api";
 
 export default function SplashScreen() {
   useEffect(() => {
-    const timer = setTimeout(() => {
-      router.replace("/login");
+    let active = true;
+
+    const timer = setTimeout(async () => {
+      const token = await getToken();
+
+      if (!active) {
+        return;
+      }
+
+      router.replace(token ? "/(main)" : "/login");
     }, 2600);
 
-    return () => clearTimeout(timer);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
   }, []);
 
   return (
-    <Pressable style={styles.container} onPress={() => router.replace("/login")}>
+    <Pressable
+      style={styles.container}
+      onPress={async () => {
+        const token = await getToken();
+        router.replace(token ? "/(main)" : "/login");
+      }}
+    >
       <View style={styles.grid} />
       <View style={styles.glowTop} />
       <View style={styles.glowBottom} />

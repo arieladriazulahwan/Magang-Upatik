@@ -138,27 +138,6 @@ export type ApiAttendance = {
 
 /**
  * ============================================================
- * LEAVE TYPE
- * ============================================================
- */
-
-export type ApiLeaveType = {
-  id: number;
-  code: string;
-  name: string;
-
-  category:
-    | "cuti"
-    | "izin"
-    | "sakit"
-    | "dinas_luar";
-
-  requires_attachment: boolean;
-  requires_doctor_letter: boolean;
-};
-
-/**
- * ============================================================
  * LEAVE REQUEST
  * ============================================================
  */
@@ -554,35 +533,6 @@ export async function apiRequest<T>(
   const url =
     `${API_URL}${endpoint}`;
 
-  console.log(
-    "========== API REQUEST =========="
-  );
-
-  console.log(
-    "URL:",
-    url
-  );
-
-  console.log(
-    "METHOD:",
-    options.method ||
-      "GET"
-  );
-
-  console.log(
-    "AUTHENTICATED:",
-    authenticated
-  );
-
-  console.log(
-    "IS FORMDATA:",
-    isFormData
-  );
-
-  console.log(
-    "================================="
-  );
-
   let response: Response;
 
   try {
@@ -622,12 +572,6 @@ export async function apiRequest<T>(
       "Network request failed. Pastikan server Laravel aktif, alamat API benar, dan perangkat dapat mengakses komputer server."
     );
   }
-
-  console.log(
-    "API RESPONSE:",
-    response.status,
-    response.statusText
-  );
 
   const data =
     await parseResponse(
@@ -933,18 +877,6 @@ export async function checkOut(
 
 /**
  * ============================================================
- * LEAVE TYPE
- * ============================================================
- */
-
-export async function getLeaveTypes() {
-  return apiRequest<{
-    data: ApiLeaveType[];
-  }>("/leave-types");
-}
-
-/**
- * ============================================================
  * LEAVE REQUEST
  * ============================================================
  */
@@ -1123,6 +1055,26 @@ export async function getOvertimeRequests() {
     data: ApiOvertimeRequest[];
   }>(
     "/overtime-requests"
+  );
+}
+
+export async function decideOvertimeRequest(
+  id: number | string,
+  decision:
+    | "approve"
+    | "reject",
+  note?: string
+) {
+  return apiRequest<{
+    data: ApiOvertimeRequest;
+  }>(
+    `/overtime-requests/${id}/${decision}`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        note,
+      }),
+    }
   );
 }
 
