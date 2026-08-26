@@ -23,6 +23,7 @@ import ProtectedRoute from "./ProtectedRoute";
 const MANAGEMENT_ROLES = ["super_admin", "admin_kepegawaian", "admin_unit", "developer"];
 const APPROVAL_ROLES = [...MANAGEMENT_ROLES, "pimpinan"];
 const SYSTEM_ROLES = ["super_admin", "developer"];
+const SIGA8_ROLES = ["super_admin"];
 
 function AppRoutes() {
   return (
@@ -156,7 +157,7 @@ function AppRoutes() {
       <Route
         path="/siga8"
         element={
-          <ProtectedRoute allowedRoles={SYSTEM_ROLES}>
+          <ProtectedRoute allowedRoles={SIGA8_ROLES}>
             <PemetaanSIGA8 />
           </ProtectedRoute>
         }

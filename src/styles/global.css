@@ -1806,6 +1806,46 @@ img {
   border-top: 1px solid #edf0f4;
 }
 
+.approval-detail-modal .modal-actions {
+  margin-top: 0;
+  padding: 14px 22px;
+}
+
+.approval-detail-modal .modal-actions button {
+  min-width: 92px;
+  min-height: 36px;
+  padding: 0 16px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.approval-detail-modal .modal-actions button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.reject-submit {
+  border-color: #f0caca !important;
+  background: #fff5f5;
+  color: #b42318;
+}
+
+.reject-submit:hover:not(:disabled) {
+  background: #fde8e8;
+}
+
+.approve-submit {
+  background: #0f7a4a;
+  color: #ffffff;
+}
+
+.approve-submit:hover:not(:disabled) {
+  background: #0b633c;
+}
+
 
 /* =========================================================
    MONITORING KEHADIRAN

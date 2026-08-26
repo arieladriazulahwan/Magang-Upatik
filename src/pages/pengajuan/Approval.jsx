@@ -97,7 +97,9 @@ function Approval() {
   const [typeFilter, setTypeFilter] = useState("Semua Jenis");
   const [selectedApproval, setSelectedApproval] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
 
   const fetchApprovals = async () => {
     try {
@@ -138,7 +140,20 @@ function Approval() {
   });
 
   const handleApprove = async (id) => {
+    setActionLoading(true);
+    setError("");
+    setMessage("");
     try {
+      const latestResponse = await apiRequest(`/leave-requests/${id}`);
+      const latestItems = normalizeArray(latestResponse);
+      const latestItem = latestItems[0] || latestResponse?.data || latestResponse;
+      const latestStatus = normalizeApprovalStatus(
+        latestItem?.status || latestItem?.approval_status || latestItem?.state
+      );
+      if (latestStatus !== "Menunggu") {
+        throw new Error(`Pengajuan ini sudah berstatus ${latestStatus.toLowerCase()}. Muat ulang daftar pengajuan.`);
+      }
+
       await apiRequest(`/leave-requests/${id}/approve`, {
         method: "POST",
       });
@@ -148,15 +163,32 @@ function Approval() {
           item.id === id ? { ...item, status: "Disetujui" } : item
         )
       );
+      setStatusFilter("Semua Status");
+      setMessage("Pengajuan berhasil disetujui.");
       setSelectedApproval(null);
     } catch (err) {
       console.error("Gagal menyetujui pengajuan:", err);
       setError(err.message || "Gagal menyetujui pengajuan.");
+    } finally {
+      setActionLoading(false);
     }
   };
 
   const handleReject = async (id) => {
+    setActionLoading(true);
+    setError("");
+    setMessage("");
     try {
+      const latestResponse = await apiRequest(`/leave-requests/${id}`);
+      const latestItems = normalizeArray(latestResponse);
+      const latestItem = latestItems[0] || latestResponse?.data || latestResponse;
+      const latestStatus = normalizeApprovalStatus(
+        latestItem?.status || latestItem?.approval_status || latestItem?.state
+      );
+      if (latestStatus !== "Menunggu") {
+        throw new Error(`Pengajuan ini sudah berstatus ${latestStatus.toLowerCase()}. Muat ulang daftar pengajuan.`);
+      }
+
       await apiRequest(`/leave-requests/${id}/reject`, {
         method: "POST",
       });
@@ -166,10 +198,14 @@ function Approval() {
           item.id === id ? { ...item, status: "Ditolak" } : item
         )
       );
+      setStatusFilter("Semua Status");
+      setMessage("Pengajuan berhasil ditolak.");
       setSelectedApproval(null);
     } catch (err) {
       console.error("Gagal menolak pengajuan:", err);
       setError(err.message || "Gagal menolak pengajuan.");
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -182,6 +218,9 @@ function Approval() {
             <p>Verifikasi dan persetujuan pengajuan pegawai</p>
           </div>
         </div>
+
+        {error && <div className="form-error">{error}</div>}
+        {message && <div className="settings-success">{message}</div>}
 
         <section className="data-panel">
           <div className="approval-toolbar">
@@ -288,8 +327,12 @@ function Approval() {
               </div>
               {selectedApproval.status === "Menunggu" && (
                 <div className="modal-actions">
-                  <button className="reject-submit" onClick={() => handleReject(selectedApproval.id)}>Tolak</button>
-                  <button className="approve-submit" onClick={() => handleApprove(selectedApproval.id)}>Setujui</button>
+                  <button className="reject-submit" onClick={() => handleReject(selectedApproval.id)} disabled={actionLoading}>
+                    {actionLoading ? "Memproses..." : "Tolak"}
+                  </button>
+                  <button className="approve-submit" onClick={() => handleApprove(selectedApproval.id)} disabled={actionLoading}>
+                    {actionLoading ? "Memproses..." : "Setujui"}
+                  </button>
                 </div>
               )}
             </div>
