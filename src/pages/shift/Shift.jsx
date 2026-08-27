@@ -11,6 +11,13 @@ const normalizeShifts = (payload) => {
   return [];
 };
 
+const normalizeUnits = (payload) => {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload?.items)) return payload.items;
+  return [];
+};
+
 const formatRestTime = (value) => {
   if (value === null || value === undefined || value === "") return "-";
   if (typeof value === "number") return `${value} jam`;
@@ -21,6 +28,7 @@ const formatRestTime = (value) => {
 function Shift() {
   const canCreateShift = canManageShifts();
   const [shifts, setShifts] = useState([]);
+  const [units, setUnits] = useState([]);
   const [search, setSearch] = useState("");
   const [unitFilter, setUnitFilter] = useState("Semua Unit");
   const [showModal, setShowModal] = useState(false);
@@ -45,6 +53,10 @@ function Shift() {
 
   useEffect(() => {
     fetchShifts();
+
+    apiRequest("/work-units")
+      .then((response) => setUnits(normalizeUnits(response)))
+      .catch((err) => console.error("Gagal mengambil unit kerja:", err));
   }, []);
 
   const filteredShifts = shifts.filter((item) => {
@@ -75,16 +87,23 @@ function Shift() {
       setLoading(true);
       setError("");
 
+      const workUnitId = form.get("work_unit_id");
+      if (!workUnitId) {
+        throw new Error("Unit kerja wajib dipilih.");
+      }
+
+      const startTime = form.get("masuk") || "07:00";
+      const endTime = form.get("pulang") || "15:00";
+
       await apiRequest("/shifts", {
         method: "POST",
         body: JSON.stringify({
-          code: String(form.get("code") || "").toUpperCase(),
           name: form.get("name") || "Shift Baru",
-          unit: form.get("unit") || null,
-          start_time: form.get("masuk") || "07:00",
-          end_time: form.get("pulang") || "15:00",
-          break_minutes: Number(form.get("istirahat") || 60),
-          work_days: form.get("workDays") || "Senin - Jumat",
+          work_unit_id: Number(workUnitId),
+          start_time: startTime,
+          end_time: endTime,
+          is_overnight: endTime < startTime,
+          tolerance_minutes: Number(form.get("tolerance_minutes") || 0),
           is_active: true,
         }),
       });
@@ -301,24 +320,19 @@ function Shift() {
             <form onSubmit={handleAddShift}>
               <div className="form-grid">
                 <div className="form-field">
-                  <label>Kode Shift</label>
-                  <input name="code" required placeholder="Contoh: PAGI" />
-                </div>
-
-                <div className="form-field">
                   <label>Nama Shift</label>
                   <input name="name" required placeholder="Nama shift" />
                 </div>
 
                 <div className="form-field">
                   <label>Unit Kerja</label>
-                  <select name="unit">
-                    <option>Semua Unit</option>
-                    <option>Fakultas Teknik</option>
-                    <option>Fakultas Ekonomi</option>
-                    <option>Fakultas Hukum</option>
-                    <option>UPT Teknologi Informasi</option>
-                    <option>Instalasi Rawat Inap</option>
+                  <select name="work_unit_id" required defaultValue="">
+                    <option value="" disabled>Pilih unit kerja</option>
+                    {units.map((unit) => (
+                      <option key={unit.id} value={unit.id}>
+                        {unit.name || unit.nama || unit.nama_unit || "Unit kerja"}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -333,23 +347,14 @@ function Shift() {
                 </div>
 
                 <div className="form-field">
-                  <label>Durasi Istirahat</label>
+                  <label>Toleransi Keterlambatan (menit)</label>
                   <input
-                    name="istirahat"
+                    name="tolerance_minutes"
                     type="number"
                     min="0"
-                    defaultValue="1"
+                    defaultValue="0"
                     required
                   />
-                </div>
-
-                <div className="form-field">
-                  <label>Hari Kerja</label>
-                  <select name="workDays">
-                    <option>Senin - Jumat</option>
-                    <option>Senin - Sabtu</option>
-                    <option>Senin - Minggu</option>
-                  </select>
                 </div>
               </div>
 

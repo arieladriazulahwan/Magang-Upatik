@@ -63,6 +63,8 @@ const normalizeVerificationData = (item, index) => {
 
 function Verifikasi() {
   const [selectedData, setSelectedData] = useState(null);
+  const [employees, setEmployees] = useState([]);
+  const [showAddModal, setShowAddModal] = useState(false);
   const [data, setData] = useState([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("Semua Status");
@@ -76,15 +78,47 @@ function Verifikasi() {
       setLoading(true);
       setError("");
 
-      const response = await apiRequest("/attendance");
+      const [attendanceResponse, employeesResponse] = await Promise.all([
+        apiRequest("/attendance"),
+        apiRequest("/employees"),
+      ]);
+      const response = attendanceResponse;
       const normalized = normalizeArray(response).map(normalizeVerificationData);
       setData(normalized);
+      setEmployees(normalizeArray(employeesResponse));
     } catch (err) {
       console.error("Gagal mengambil data verifikasi:", err);
       setError(err.message || "Gagal mengambil data verifikasi.");
       setData([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAddCorrection = async (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+
+    try {
+      setCorrecting(true);
+      setError("");
+      await apiRequest("/attendance/manual", {
+        method: "POST",
+        body: JSON.stringify({
+          employee_id: Number(form.get("employee_id")),
+          date: form.get("date"),
+          check_in: form.get("check_in") || null,
+          check_out: form.get("check_out") || null,
+          correction_reason: form.get("correction_reason"),
+          is_manual: true,
+        }),
+      });
+      setShowAddModal(false);
+      await fetchVerifications();
+    } catch (err) {
+      setError(err.message || "Gagal menambahkan koreksi presensi.");
+    } finally {
+      setCorrecting(false);
     }
   };
 
@@ -150,7 +184,9 @@ function Verifikasi() {
             <p>Verifikasi pengajuan koreksi presensi pegawai</p>
           </div>
 
-          <button className="primary-button">+ Tambah Koreksi</button>
+          <button className="primary-button" onClick={() => setShowAddModal(true)}>
+            + Tambah Koreksi
+          </button>
         </div>
 
         <div className="verification-summary">
@@ -374,13 +410,65 @@ function Verifikasi() {
                     <button type="button" className="secondary-button" onClick={() => setSelectedData(null)}>
                       Batal
                     </button>
-                    <button type="submit" className="approve-submit" disabled={correcting}>
+                    <button type="submit" className="approve-submit" disabled={correcting || selectedData.status !== "Menunggu"}>
                       {correcting ? "Menyimpan..." : "Simpan Koreksi"}
                     </button>
                   </div>
                 </form>
 
                 </div>
+            </div>
+          </div>
+        )}
+
+        {showAddModal && (
+          <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
+            <div className="employee-modal" onClick={(event) => event.stopPropagation()}>
+              <div className="modal-header">
+                <div>
+                  <h3>Tambah Koreksi Presensi</h3>
+                  <p>Catat kehadiran manual untuk pegawai</p>
+                </div>
+                <button className="modal-close" onClick={() => setShowAddModal(false)}>×</button>
+              </div>
+
+              <form onSubmit={handleAddCorrection}>
+                <div className="form-grid">
+                  <div className="form-field">
+                    <label>Pegawai</label>
+                    <select name="employee_id" required defaultValue="">
+                      <option value="" disabled>Pilih pegawai</option>
+                      {employees.map((employee) => (
+                        <option key={employee.id} value={employee.id}>
+                          {employee.name || employee.nama || employee.full_name || "Pegawai"}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-field">
+                    <label>Tanggal</label>
+                    <input name="date" type="date" required />
+                  </div>
+                  <div className="form-field">
+                    <label>Jam Masuk</label>
+                    <input name="check_in" type="time" />
+                  </div>
+                  <div className="form-field">
+                    <label>Jam Pulang</label>
+                    <input name="check_out" type="time" />
+                  </div>
+                  <div className="form-field full-width">
+                    <label>Alasan Koreksi</label>
+                    <textarea name="correction_reason" rows="3" required placeholder="Tuliskan alasan presensi manual atau koreksi..." />
+                  </div>
+                </div>
+                <div className="modal-actions">
+                  <button type="button" className="secondary-button" onClick={() => setShowAddModal(false)}>Batal</button>
+                  <button type="submit" className="approve-submit" disabled={correcting}>
+                    {correcting ? "Menyimpan..." : "Simpan Koreksi"}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}

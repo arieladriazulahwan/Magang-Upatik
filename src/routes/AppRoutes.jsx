@@ -19,190 +19,35 @@ import Kalender from "../pages/kalender/Kalender";
 import Pengaturan from "../pages/pengaturan/Pengaturan";
 import PemetaanSIGA8 from "../pages/pengaturan/PemetaanSIGA8";
 import ProtectedRoute from "./ProtectedRoute";
+import { getAllowedRoles } from "../utils/access";
 
-const MANAGEMENT_ROLES = ["super_admin", "admin_kepegawaian", "admin_unit", "developer"];
-const APPROVAL_ROLES = [...MANAGEMENT_ROLES, "pimpinan"];
-const SYSTEM_ROLES = ["super_admin", "developer"];
-const SIGA8_ROLES = ["super_admin"];
+const guarded = (path, element) => (
+  <ProtectedRoute allowedRoles={getAllowedRoles(path)}>{element}</ProtectedRoute>
+);
 
 function AppRoutes() {
   return (
     <Routes>
-
-      {/* LOGIN */}
-      <Route
-        path="/login"
-        element={<Login />}
-      />
-
-      {/* DASHBOARD */}
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute>
-            <Dashboard />
-          </ProtectedRoute>
-        }
-      />
-
-      {/* MENU */}
-      <Route
-        path="/monitoring"
-        element={
-          <ProtectedRoute allowedRoles={APPROVAL_ROLES}>
-            <Monitoring />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/pegawai"
-        element={
-          <ProtectedRoute allowedRoles={APPROVAL_ROLES}>
-            <Pegawai />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/pegawai/tambah"
-        element={
-          <ProtectedRoute allowedRoles={["super_admin", "admin_kepegawaian", "developer"]}>
-            <TambahPegawai />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/pegawai/:id"
-        element={
-          <ProtectedRoute allowedRoles={APPROVAL_ROLES}>
-            <DetailPegawai />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/unit"
-        element={
-          <ProtectedRoute allowedRoles={APPROVAL_ROLES}>
-            <UnitKerja />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/jadwal"
-        element={
-          <ProtectedRoute allowedRoles={MANAGEMENT_ROLES}>
-            <Jadwal />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/shift"
-        element={
-          <ProtectedRoute allowedRoles={MANAGEMENT_ROLES}>
-            <Shift />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/pengajuan"
-        element={
-          <ProtectedRoute allowedRoles={APPROVAL_ROLES}>
-            <Pengajuan />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/pengajuan/detail"
-        element={
-          <ProtectedRoute allowedRoles={APPROVAL_ROLES}>
-            <DetailPengajuan />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/verifikasi"
-        element={
-          <ProtectedRoute allowedRoles={APPROVAL_ROLES}>
-            <Verifikasi />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/persetujuan"
-        element={
-          <ProtectedRoute allowedRoles={APPROVAL_ROLES}>
-            <Approval />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/laporan"
-        element={
-          <ProtectedRoute allowedRoles={APPROVAL_ROLES}>
-            <LaporanKehadiran />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/siga8"
-        element={
-          <ProtectedRoute allowedRoles={SIGA8_ROLES}>
-            <PemetaanSIGA8 />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/geofence"
-        element={
-          <ProtectedRoute allowedRoles={SYSTEM_ROLES}>
-            <Lokasi />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/kalender"
-        element={
-          <ProtectedRoute allowedRoles={SYSTEM_ROLES}>
-            <Kalender />
-          </ProtectedRoute>
-        }
-      />
-
-      <Route
-        path="/pengaturan"
-        element={
-          <ProtectedRoute allowedRoles={SYSTEM_ROLES}>
-            <Pengaturan />
-          </ProtectedRoute>
-        }
-      />
-
-      {/* DEFAULT */}
-      <Route
-        path="/"
-        element={
-          <Navigate
-            to="/login"
-            replace
-          />
-        }
-      />
-
+      <Route path="/login" element={<Login />} />
+      <Route path="/dashboard" element={guarded("/dashboard", <Dashboard />)} />
+      <Route path="/monitoring" element={guarded("/monitoring", <Monitoring />)} />
+      <Route path="/pegawai" element={guarded("/pegawai", <Pegawai />)} />
+      <Route path="/pegawai/tambah" element={guarded("/pegawai/tambah", <TambahPegawai />)} />
+      <Route path="/pegawai/:id" element={guarded("/pegawai/:id", <DetailPegawai />)} />
+      <Route path="/unit" element={guarded("/unit", <UnitKerja />)} />
+      <Route path="/jadwal" element={guarded("/jadwal", <Jadwal />)} />
+      <Route path="/shift" element={guarded("/shift", <Shift />)} />
+      <Route path="/pengajuan" element={guarded("/pengajuan", <Pengajuan />)} />
+      <Route path="/pengajuan/detail" element={guarded("/pengajuan/detail", <DetailPengajuan />)} />
+      <Route path="/verifikasi" element={guarded("/verifikasi", <Verifikasi />)} />
+      <Route path="/persetujuan" element={guarded("/persetujuan", <Approval />)} />
+      <Route path="/laporan" element={guarded("/laporan", <LaporanKehadiran />)} />
+      <Route path="/siga8" element={guarded("/siga8", <PemetaanSIGA8 />)} />
+      <Route path="/geofence" element={guarded("/geofence", <Lokasi />)} />
+      <Route path="/kalender" element={guarded("/kalender", <Kalender />)} />
+      <Route path="/pengaturan" element={guarded("/pengaturan", <Pengaturan />)} />
+      <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
-
     </Routes>
   );
 }

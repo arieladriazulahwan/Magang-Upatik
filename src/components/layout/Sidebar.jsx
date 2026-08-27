@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { apiRequest } from "../../services/api";
+import { getAllowedPaths } from "../../utils/access";
 
 const navGroups = [
   {
@@ -156,68 +157,7 @@ function Sidebar() {
       ? "Developer"
       : "Pengguna";
 
-  const visibleRoutes = {
-    admin_kepegawaian: [
-      "/dashboard",
-      "/monitoring",
-      "/pegawai",
-      "/unit",
-      "/shift",
-      "/verifikasi",
-      "/persetujuan",
-      "/laporan",
-    ],
-    admin_unit: [
-      "/dashboard",
-      "/monitoring",
-      "/pegawai",
-      "/unit",
-      "/shift",
-      "/verifikasi",
-      "/persetujuan",
-      "/laporan",
-    ],
-    pimpinan: [
-      "/dashboard",
-      "/monitoring",
-      "/pegawai",
-      "/unit",
-      "/verifikasi",
-      "/persetujuan",
-      "/laporan",
-    ],
-    pegawai: ["/dashboard"],
-    super_admin: [
-      "/dashboard",
-      "/monitoring",
-      "/pegawai",
-      "/unit",
-      "/shift",
-      "/verifikasi",
-      "/persetujuan",
-      "/laporan",
-      "/siga8",
-      "/geofence",
-      "/kalender",
-      "/pengaturan",
-    ],
-    developer: [
-      "/dashboard",
-      "/monitoring",
-      "/pegawai",
-      "/unit",
-      "/shift",
-      "/verifikasi",
-      "/persetujuan",
-      "/laporan",
-      "/siga8",
-      "/geofence",
-      "/kalender",
-      "/pengaturan",
-    ],
-  };
-
-  const allowedPaths = visibleRoutes[role] || visibleRoutes.pegawai;
+  const allowedPaths = getAllowedPaths(role);
 
   const filteredGroups = navGroups.map((group) => ({
     ...group,
@@ -242,7 +182,7 @@ function Sidebar() {
       {/* Navigation */}
       <nav className="sidebar-nav">
 
-        {filteredGroups.map((group) => (
+        {filteredGroups.filter((group) => group.items.length > 0).map((group) => (
           <div
             className="nav-group"
             key={group.title}

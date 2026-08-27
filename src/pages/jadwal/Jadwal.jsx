@@ -1,650 +1,147 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import AdminLayout from "../../components/layout/AdminLayout";
+import { apiRequest } from "../../services/api";
+import { canManageShifts } from "../../utils/access";
 
-const initialSchedules = [
-  {
-    id: 1,
-    code: "REG",
-    name: "Jam Kerja Reguler",
-    unit: "Semua Unit",
-    masuk: "08:00",
-    pulang: "16:00",
-    tolerance: "15 menit",
-    workDays: "Senin - Jumat",
-    status: "Aktif",
-  },
-  {
-    id: 2,
-    code: "PAGI",
-    name: "Shift Pagi",
-    unit: "UPT Teknologi Informasi",
-    masuk: "07:00",
-    pulang: "15:00",
-    tolerance: "10 menit",
-    workDays: "Senin - Sabtu",
-    status: "Aktif",
-  },
-  {
-    id: 3,
-    code: "SIANG",
-    name: "Shift Siang",
-    unit: "UPT Teknologi Informasi",
-    masuk: "15:00",
-    pulang: "23:00",
-    tolerance: "10 menit",
-    workDays: "Senin - Sabtu",
-    status: "Aktif",
-  },
-  {
-    id: 4,
-    code: "KHUSUS",
-    name: "Jam Kerja Khusus",
-    unit: "Fakultas Teknik",
-    masuk: "08:30",
-    pulang: "16:30",
-    tolerance: "15 menit",
-    workDays: "Senin - Jumat",
-    status: "Aktif",
-  },
-];
+const normalizeArray = (payload) => {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload?.items)) return payload.items;
+  if (Array.isArray(payload?.results)) return payload.results;
+  return [];
+};
+
+const getEmployeeName = (employee) => employee.name || employee.nama || employee.full_name || "Pegawai";
+const getShiftName = (shift) => shift.name || shift.nama || shift.shift_name || "Shift";
 
 function Jadwal() {
-  const [schedules, setSchedules] =
-    useState(initialSchedules);
-
+  const canCreateSchedule = canManageShifts();
+  const [schedules, setSchedules] = useState([]);
+  const [employees, setEmployees] = useState([]);
+  const [shifts, setShifts] = useState([]);
   const [search, setSearch] = useState("");
-  const [unitFilter, setUnitFilter] =
-    useState("Semua Unit");
+  const [showModal, setShowModal] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
-  const [showModal, setShowModal] =
-    useState(false);
-
-  const filteredSchedules = schedules.filter(
-    (item) => {
-      const keyword =
-        search.toLowerCase();
-
-      const matchSearch =
-        item.name
-          .toLowerCase()
-          .includes(keyword) ||
-        item.code
-          .toLowerCase()
-          .includes(keyword);
-
-      const matchUnit =
-        unitFilter === "Semua Unit" ||
-        item.unit === unitFilter ||
-        item.unit === "Semua Unit";
-
-      return (
-        matchSearch &&
-        matchUnit
-      );
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      setError("");
+      const [scheduleResponse, employeeResponse, shiftResponse] = await Promise.all([
+        apiRequest("/shift-schedules"),
+        apiRequest("/employees"),
+        apiRequest("/shifts"),
+      ]);
+      setSchedules(normalizeArray(scheduleResponse));
+      setEmployees(normalizeArray(employeeResponse));
+      setShifts(normalizeArray(shiftResponse));
+    } catch (err) {
+      console.error("Gagal mengambil jadwal shift:", err);
+      setError(err.message || "Gagal mengambil data jadwal shift.");
+    } finally {
+      setLoading(false);
     }
-  );
+  };
 
-  const handleAddSchedule = (e) => {
-    e.preventDefault();
+  useEffect(() => {
+    fetchData();
+  }, []);
 
-    const form = new FormData(e.target);
+  const filteredSchedules = schedules.filter((schedule) => {
+    const employee = schedule.employee || schedule.pegawai || {};
+    const shift = schedule.shift || {};
+    const searchable = [
+      employee.name, employee.nama, employee.nip,
+      schedule.employee_name, schedule.employee_nip,
+      shift.name, shift.nama, schedule.shift_name,
+      schedule.date,
+    ].filter(Boolean).join(" ").toLowerCase();
+    return searchable.includes(search.toLowerCase());
+  });
 
-    const newSchedule = {
-      id: schedules.length + 1,
-      code: form
-        .get("code")
-        .toUpperCase(),
-      name: form.get("name"),
-      unit: form.get("unit"),
-      masuk: form.get("masuk"),
-      pulang: form.get("pulang"),
-      tolerance:
-        form.get("tolerance") +
-        " menit",
-      workDays: form.get("workDays"),
-      status: "Aktif",
-    };
-
-    setSchedules([
-      ...schedules,
-      newSchedule,
-    ]);
-
-    setShowModal(false);
+  const handleCreate = async (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    try {
+      setSaving(true);
+      setError("");
+      await apiRequest("/shift-schedules", {
+        method: "POST",
+        body: JSON.stringify({
+          employee_id: Number(form.get("employee_id")),
+          shift_id: Number(form.get("shift_id")),
+          date: form.get("date"),
+          description: form.get("description") || null,
+        }),
+      });
+      setShowModal(false);
+      await fetchData();
+    } catch (err) {
+      console.error("Gagal menyimpan jadwal shift:", err);
+      setError(err.message || "Gagal menyimpan jadwal shift.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
     <AdminLayout>
-
       <div className="schedule-page">
-
-        {/* HEADER */}
-
         <div className="page-heading">
-
-          <div>
-            <h2>Shift & Jadwal</h2>
-
-            <p>
-              Pengaturan jam kerja dan jadwal presensi pegawai
-            </p>
-          </div>
-
-          <button
-            className="primary-button"
-            onClick={() =>
-              setShowModal(true)
-            }
-          >
-            + Tambah Jadwal
-          </button>
-
+          <div><h2>Jadwal Shift</h2><p>Atur penempatan shift pegawai berdasarkan tanggal</p></div>
+          {canCreateSchedule && <button className="primary-button" onClick={() => setShowModal(true)}>+ Atur Jadwal</button>}
         </div>
 
-        {/* SHIFT CARDS */}
-
-        <div className="shift-cards">
-
-          <div className="shift-card">
-
-            <div className="shift-card-top">
-              <span className="shift-code">
-                REG
-              </span>
-
-              <span className="status-pill active">
-                Aktif
-              </span>
-            </div>
-
-            <h3>
-              Jam Kerja Reguler
-            </h3>
-
-            <div className="shift-time">
-              <strong>08:00</strong>
-              <span>—</span>
-              <strong>16:00</strong>
-            </div>
-
-            <p>
-              Senin - Jumat
-            </p>
-
+        <section className="data-panel schedule-assignment-panel">
+          <div className="data-toolbar schedule-assignment-toolbar">
+            <div><h3>Penjadwalan Pegawai</h3><p>Daftar shift yang sudah ditetapkan pada kalender kerja</p></div>
+            <div className="search-box"><span>⌕</span><input type="search" placeholder="Cari pegawai, shift, atau tanggal..." value={search} onChange={(event) => setSearch(event.target.value)} /></div>
           </div>
 
-          <div className="shift-card">
+          {loading && <div className="empty-state">Memuat jadwal shift...</div>}
+          {!loading && error && <div className="empty-state"><p>{error}</p><button className="secondary-button" onClick={fetchData}>Coba Lagi</button></div>}
 
-            <div className="shift-card-top">
-              <span className="shift-code">
-                PAGI
-              </span>
-
-              <span className="status-pill active">
-                Aktif
-              </span>
-            </div>
-
-            <h3>
-              Shift Pagi
-            </h3>
-
-            <div className="shift-time">
-              <strong>07:00</strong>
-              <span>—</span>
-              <strong>15:00</strong>
-            </div>
-
-            <p>
-              Senin - Sabtu
-            </p>
-
-          </div>
-
-          <div className="shift-card">
-
-            <div className="shift-card-top">
-              <span className="shift-code">
-                SIANG
-              </span>
-
-              <span className="status-pill active">
-                Aktif
-              </span>
-            </div>
-
-            <h3>
-              Shift Siang
-            </h3>
-
-            <div className="shift-time">
-              <strong>15:00</strong>
-              <span>—</span>
-              <strong>23:00</strong>
-            </div>
-
-            <p>
-              Senin - Sabtu
-            </p>
-
-          </div>
-
-        </div>
-
-        {/* DATA PANEL */}
-
-        <section className="data-panel">
-
-          <div className="schedule-panel-header">
-
-            <div>
-              <h3>
-                Daftar Jadwal Kerja
-              </h3>
-
-              <p>
-                Jadwal yang digunakan oleh unit kerja
-              </p>
-            </div>
-
-          </div>
-
-          <div className="data-toolbar">
-
-            <div className="search-box">
-
-              <span>⌕</span>
-
-              <input
-                type="text"
-                placeholder="Cari nama atau kode jadwal..."
-                value={search}
-                onChange={(e) =>
-                  setSearch(
-                    e.target.value
-                  )
-                }
-              />
-
-            </div>
-
-            <select
-              className="filter-select"
-              value={unitFilter}
-              onChange={(e) =>
-                setUnitFilter(
-                  e.target.value
-                )
-              }
-            >
-              <option>
-                Semua Unit
-              </option>
-
-              <option>
-                Fakultas Teknik
-              </option>
-
-              <option>
-                Fakultas Ekonomi
-              </option>
-
-              <option>
-                Fakultas Hukum
-              </option>
-
-              <option>
-                UPT Teknologi Informasi
-              </option>
-            </select>
-
-          </div>
-
-          {/* TABLE */}
-
-          <div className="employee-table-wrapper">
-
-            <table className="employee-table schedule-table">
-
-              <thead>
-
-                <tr>
-                  <th>Kode</th>
-                  <th>Nama Jadwal</th>
-                  <th>Unit Kerja</th>
-                  <th>Jam Masuk</th>
-                  <th>Jam Pulang</th>
-                  <th>Toleransi</th>
-                  <th>Hari Kerja</th>
-                  <th>Status</th>
-                  <th>Aksi</th>
-                </tr>
-
-              </thead>
-
+          {!loading && !error && <div className="employee-table-wrapper">
+            <table className="employee-table schedule-assignment-table">
+              <thead><tr><th>Tanggal</th><th>Pegawai</th><th>Shift</th><th>Jam Kerja</th><th>Keterangan</th></tr></thead>
               <tbody>
-
-                {filteredSchedules.map(
-                  (item) => (
-
-                    <tr key={item.id}>
-
-                      <td>
-
-                        <span className="unit-code">
-                          {item.code}
-                        </span>
-
-                      </td>
-
-                      <td>
-
-                        <strong className="schedule-name">
-                          {item.name}
-                        </strong>
-
-                      </td>
-
-                      <td>
-                        {item.unit}
-                      </td>
-
-                      <td>
-
-                        <span className="schedule-time">
-                          {item.masuk}
-                        </span>
-
-                      </td>
-
-                      <td>
-
-                        <span className="schedule-time">
-                          {item.pulang}
-                        </span>
-
-                      </td>
-
-                      <td>
-                        {item.tolerance}
-                      </td>
-
-                      <td>
-                        {item.workDays}
-                      </td>
-
-                      <td>
-
-                        <span className="status-pill active">
-                          {item.status}
-                        </span>
-
-                      </td>
-
-                      <td>
-
-                        <button className="action-button">
-                          Edit
-                        </button>
-
-                        <button className="action-button">
-                          Detail
-                        </button>
-
-                      </td>
-
-                    </tr>
-
-                  )
-                )}
-
+                {filteredSchedules.length > 0 ? filteredSchedules.map((schedule, index) => {
+                  const employee = schedule.employee || schedule.pegawai || {};
+                  const shift = schedule.shift || {};
+                  const employeeName = schedule.employee_name || getEmployeeName(employee);
+                  const shiftName = schedule.shift_name || getShiftName(shift);
+                  return <tr key={schedule.id || index}>
+                    <td><strong className="schedule-date">{schedule.date || schedule.tanggal || "-"}</strong></td>
+                    <td><div className="employee-name"><div className="employee-avatar">{employeeName.charAt(0).toUpperCase()}</div><div><strong>{employeeName}</strong><span>{employee.nip || schedule.employee_nip || "NIP belum tersedia"}</span></div></div></td>
+                    <td><span className="schedule-shift-badge">{shiftName}</span></td>
+                    <td>{shift.start_time || schedule.start_time || "-"} - {shift.end_time || schedule.end_time || "-"}</td>
+                    <td>{schedule.description || schedule.keterangan || "-"}</td>
+                  </tr>;
+                }) : <tr><td colSpan="5"><div className="empty-state">{search ? "Jadwal tidak ditemukan." : "Belum ada jadwal shift."}</div></td></tr>}
               </tbody>
-
             </table>
+          </div>}
 
-            {filteredSchedules.length === 0 && (
-              <div className="empty-state">
-                Jadwal tidak ditemukan.
-              </div>
-            )}
-
-          </div>
-
-          <div className="table-footer">
-
-            <span>
-              Menampilkan{" "}
-              {filteredSchedules.length}{" "}
-              jadwal
-            </span>
-
-            <div className="pagination">
-              <button>‹</button>
-              <button className="current">
-                1
-              </button>
-              <button>2</button>
-              <button>›</button>
-            </div>
-
-          </div>
-
+          {!loading && !error && <div className="table-footer"><span>Menampilkan {filteredSchedules.length} jadwal</span></div>}
         </section>
 
-      </div>
-
-      {/* MODAL TAMBAH JADWAL */}
-
-      {showModal && (
-
-        <div
-          className="modal-overlay"
-          onClick={() =>
-            setShowModal(false)
-          }
-        >
-
-          <div
-            className="employee-modal"
-            onClick={(e) =>
-              e.stopPropagation()
-            }
-          >
-
-            <div className="modal-header">
-
-              <div>
-
-                <h3>
-                  Tambah Jadwal Kerja
-                </h3>
-
-                <p>
-                  Buat jadwal kerja baru
-                </p>
-
-              </div>
-
-              <button
-                className="modal-close"
-                onClick={() =>
-                  setShowModal(false)
-                }
-              >
-                ×
-              </button>
-
-            </div>
-
-            <form
-              onSubmit={
-                handleAddSchedule
-              }
-            >
-
+        {showModal && <div className="modal-overlay" onClick={() => setShowModal(false)}>
+          <div className="employee-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header"><div><h3>Atur Jadwal Shift</h3><p>Tetapkan shift untuk pegawai pada tanggal tertentu</p></div><button className="modal-close" onClick={() => setShowModal(false)}>×</button></div>
+            <form onSubmit={handleCreate}>
               <div className="form-grid">
-
-                <div className="form-field">
-
-                  <label>
-                    Kode Jadwal
-                  </label>
-
-                  <input
-                    name="code"
-                    required
-                    placeholder="Contoh: REG"
-                  />
-
-                </div>
-
-                <div className="form-field">
-
-                  <label>
-                    Nama Jadwal
-                  </label>
-
-                  <input
-                    name="name"
-                    required
-                    placeholder="Nama jadwal"
-                  />
-
-                </div>
-
-                <div className="form-field">
-
-                  <label>
-                    Unit Kerja
-                  </label>
-
-                  <select name="unit">
-
-                    <option>
-                      Semua Unit
-                    </option>
-
-                    <option>
-                      Fakultas Teknik
-                    </option>
-
-                    <option>
-                      Fakultas Ekonomi
-                    </option>
-
-                    <option>
-                      Fakultas Hukum
-                    </option>
-
-                    <option>
-                      UPT Teknologi Informasi
-                    </option>
-
-                  </select>
-
-                </div>
-
-                <div className="form-field">
-
-                  <label>
-                    Toleransi Keterlambatan
-                  </label>
-
-                  <input
-                    name="tolerance"
-                    type="number"
-                    min="0"
-                    defaultValue="15"
-                    required
-                  />
-
-                </div>
-
-                <div className="form-field">
-
-                  <label>
-                    Jam Masuk
-                  </label>
-
-                  <input
-                    name="masuk"
-                    type="time"
-                    defaultValue="08:00"
-                    required
-                  />
-
-                </div>
-
-                <div className="form-field">
-
-                  <label>
-                    Jam Pulang
-                  </label>
-
-                  <input
-                    name="pulang"
-                    type="time"
-                    defaultValue="16:00"
-                    required
-                  />
-
-                </div>
-
-                <div className="form-field">
-
-                  <label>
-                    Hari Kerja
-                  </label>
-
-                  <select name="workDays">
-
-                    <option>
-                      Senin - Jumat
-                    </option>
-
-                    <option>
-                      Senin - Sabtu
-                    </option>
-
-                    <option>
-                      Senin - Minggu
-                    </option>
-
-                  </select>
-
-                </div>
-
+                <div className="form-field"><label>Pegawai</label><select name="employee_id" required defaultValue=""><option value="" disabled>Pilih pegawai</option>{employees.map((employee) => <option key={employee.id} value={employee.id}>{getEmployeeName(employee)}{employee.nip ? ` - ${employee.nip}` : ""}</option>)}</select></div>
+                <div className="form-field"><label>Shift</label><select name="shift_id" required defaultValue=""><option value="" disabled>Pilih shift</option>{shifts.map((shift) => <option key={shift.id} value={shift.id}>{getShiftName(shift)}{shift.start_time ? ` (${shift.start_time} - ${shift.end_time})` : ""}</option>)}</select></div>
+                <div className="form-field"><label>Tanggal</label><input name="date" type="date" required /></div>
+                <div className="form-field"><label>Keterangan</label><input name="description" placeholder="Opsional" /></div>
               </div>
-
-              <div className="modal-actions">
-
-                <button
-                  type="button"
-                  className="secondary-button"
-                  onClick={() =>
-                    setShowModal(false)
-                  }
-                >
-                  Batal
-                </button>
-
-                <button
-                  type="submit"
-                  className="primary-button"
-                >
-                  Simpan Jadwal
-                </button>
-
-              </div>
-
+              <div className="modal-actions"><button type="button" className="secondary-button" onClick={() => setShowModal(false)}>Batal</button><button type="submit" className="primary-button" disabled={saving}>{saving ? "Menyimpan..." : "Simpan Jadwal"}</button></div>
             </form>
-
           </div>
-
-        </div>
-
-      )}
-
+        </div>}
+      </div>
     </AdminLayout>
   );
 }

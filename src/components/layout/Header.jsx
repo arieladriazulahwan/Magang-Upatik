@@ -28,6 +28,21 @@ const pageTitles = {
     subtitle: "Manajemen · Penjadwalan shift RS Pendidikan",
   },
 
+  "/jadwal": {
+    title: "Jadwal Kerja",
+    subtitle: "Manajemen · Pengaturan jam kerja dan jadwal presensi",
+  },
+
+  "/pengajuan": {
+    title: "Pengajuan",
+    subtitle: "Pengajuan · Izin, cuti, lembur, WFH, dan dinas",
+  },
+
+  "/pengajuan/detail": {
+    title: "Detail Pengajuan",
+    subtitle: "Pengajuan · Rincian dan status pengajuan pegawai",
+  },
+
   "/verifikasi": {
     title: "Verifikasi & Koreksi",
     subtitle: "Pengajuan · Koreksi presensi & presensi manual",
@@ -115,7 +130,12 @@ function Header() {
 
   const page =
     pageTitles[location.pathname] ||
-    pageTitles["/dashboard"];
+    (location.pathname.startsWith("/pegawai/")
+      ? {
+          title: "Detail Pegawai",
+          subtitle: "Manajemen · Informasi lengkap dan riwayat pegawai",
+        }
+      : pageTitles["/dashboard"]);
 
   useEffect(() => {
     document.title = `${page.title} | KlikPresensi`;
