@@ -60,7 +60,7 @@ function formatTime(
   value: string | null | undefined
 ) {
   if (!value) {
-    return "—";
+    return "--";
   }
 
   const date = new Date(value);
@@ -88,8 +88,8 @@ function getDateInfo(
 ) {
   if (!value) {
     return {
-      date: "—",
-      day: "—",
+      date: "--",
+      day: "--",
     };
   }
 
@@ -100,7 +100,7 @@ function getDateInfo(
   if (Number.isNaN(date.getTime())) {
     return {
       date: value.slice(-2),
-      day: "—",
+      day: "--",
     };
   }
 
@@ -134,7 +134,7 @@ function formatDuration(
     minutes === null ||
     minutes === undefined
   ) {
-    return "—";
+    return "--";
   }
 
   const hours = Math.floor(
@@ -251,7 +251,7 @@ function toHistoryRow(
       dateInfo.day,
 
     time:
-      `${masuk}  →  ${keluar}`,
+      `${masuk} -> ${keluar}`,
 
     duration:
       formatDuration(

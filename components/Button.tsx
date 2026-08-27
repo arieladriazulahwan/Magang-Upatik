@@ -15,7 +15,7 @@ interface ButtonProps extends PressableProps {
   title: string;
   icon?: React.ReactNode;
   loading?: boolean;
-  variant?: "primary" | "ghost";
+  variant?: "primary" | "ghost" | "outline" | "danger";
   style?: StyleProp<ViewStyle>;
 }
 
@@ -36,7 +36,7 @@ export default function Button({
       disabled={isDisabled}
       style={({ pressed }) => [
         styles.base,
-        variant === "primary" ? styles.primary : styles.ghost,
+        styles[variant],
         pressed && !isDisabled ? styles.pressed : null,
         isDisabled ? styles.disabled : null,
         style,
@@ -48,7 +48,17 @@ export default function Button({
       ) : (
         <View style={styles.content}>
           {icon}
-          <Text style={[styles.label, variant === "ghost" ? styles.ghostLabel : null]}>
+          <Text
+            style={[
+              styles.label,
+              variant === "ghost"
+                ? styles.ghostLabel
+                : null,
+              variant === "outline"
+                ? styles.outlineLabel
+                : null,
+            ]}
+          >
             {title}
           </Text>
         </View>
@@ -78,6 +88,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.2)",
   },
+  outline: {
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.line,
+  },
+  danger: {
+    backgroundColor: Colors.danger,
+    shadowColor: Colors.danger,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.26,
+    shadowRadius: 18,
+    elevation: 5,
+  },
   pressed: {
     opacity: 0.82,
     transform: [{ scale: 0.99 }],
@@ -99,5 +122,8 @@ const styles = StyleSheet.create({
   ghostLabel: {
     color: "#E8F0FC",
     fontSize: 13.5,
+  },
+  outlineLabel: {
+    color: Colors.textInk,
   },
 });

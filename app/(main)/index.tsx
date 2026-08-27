@@ -9,7 +9,6 @@ import {
   ActivityIndicator,
   Pressable,
   RefreshControl,
-  SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -20,10 +19,12 @@ import {
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
+import MainScreen from "../../components/MainScreen";
 import {
   ApiAttendance,
   ApiUser,
   getAttendance,
+  getDashboardMe,
   getLeaveRequests,
   getNotifications,
   getOvertimeRequests,
@@ -110,7 +111,7 @@ function formatTime(
   value: string | null | undefined
 ) {
   if (!value) {
-    return "—";
+    return "--";
   }
 
   const date = new Date(value);
@@ -137,7 +138,7 @@ function formatDuration(
     minutes === null ||
     minutes === undefined
   ) {
-    return "—";
+    return "--";
   }
 
   const hours = Math.floor(minutes / 60);
@@ -277,8 +278,8 @@ function toActivity(
           {
             day: "2-digit",
           }
-        )
-      : "—",
+      )
+      : "--",
 
     day: item.date
       ? new Date(
@@ -289,9 +290,9 @@ function toActivity(
             {
               weekday: "short",
             }
-          )
-          .toUpperCase()
-      : "—",
+      )
+      .toUpperCase()
+      : "--",
 
     masuk: formatTime(
       item.check_in
@@ -326,7 +327,7 @@ function toActivity(
    MAIN SCREEN
 ============================================================ */
 
-export default function MainScreen() {
+export default function DashboardScreen() {
   /* ==========================================================
      STATE
   ========================================================== */
@@ -372,6 +373,12 @@ export default function MainScreen() {
     setApprovalCount,
   ] =
     useState(0);
+
+  const [
+    leaveRemaining,
+    setLeaveRemaining,
+  ] =
+    useState<string>("--");
 
   const [
     refreshing,
@@ -481,6 +488,7 @@ export default function MainScreen() {
             todayResult,
             historyResult,
             notificationResult,
+            dashboardResult,
             leaveResult,
             wfhResult,
             overtimeResult,
@@ -511,6 +519,8 @@ export default function MainScreen() {
               getNotifications({
                 per_page: 1,
               }),
+
+              getDashboardMe(),
 
               getLeaveRequests(),
 
@@ -573,6 +583,43 @@ export default function MainScreen() {
               .meta
               ?.unread_count ||
               0
+          );
+
+          /* -----------------------------------------------
+             LEAVE BALANCE
+          ------------------------------------------------ */
+
+          const leaveBalances =
+            dashboardResult.data
+              .leave_balances || [];
+
+          const annualBalance =
+            leaveBalances.find(
+              (item) => {
+                const name =
+                  item.leave_type?.name
+                    ?.toLowerCase() ||
+                  "";
+                const code =
+                  item.leave_type?.code
+                    ?.toLowerCase() ||
+                  "";
+
+                return (
+                  name.includes(
+                    "tahunan"
+                  ) ||
+                  code.includes(
+                    "tahunan"
+                  )
+                );
+              }
+            ) || leaveBalances[0];
+
+          setLeaveRemaining(
+            annualBalance
+              ? `${annualBalance.remaining}`
+              : "--"
           );
 
           /* -----------------------------------------------
@@ -926,11 +973,7 @@ export default function MainScreen() {
   ========================================================== */
 
   return (
-    <SafeAreaView
-      style={
-        styles.safeArea
-      }
-    >
+    <MainScreen scroll={false}>
       <StatusBar
         barStyle="dark-content"
         backgroundColor={
@@ -1388,7 +1431,7 @@ export default function MainScreen() {
                   styles.statValue
                 }
               >
-                —
+                {leaveRemaining}
               </Text>
 
               <Text
@@ -1735,7 +1778,7 @@ export default function MainScreen() {
                             styles.arrow
                           }
                         >
-                          {"  →  "}
+                          {" -> "}
                         </Text>
 
                         {
@@ -1750,8 +1793,7 @@ export default function MainScreen() {
                       >
                         {
                           activity.duration
-                        }{" "}
-                        ·{" "}
+                        }{" - "}
                         {
                           activity.mode
                         }
@@ -1787,132 +1829,10 @@ export default function MainScreen() {
             )}
           </View>
 
-          <View
-            style={
-              styles.bottomSpacing
-            }
-          />
+          <View style={styles.bottomSpacing} />
         </ScrollView>
-
-        {/* =================================================
-            BOTTOM NAVIGATION
-        ================================================= */}
-
-        <View
-          style={
-            styles.bottomNav
-          }
-        >
-          <BottomNavItem
-            icon="home"
-            label="Beranda"
-            active
-            onPress={() =>
-              router.replace(
-                "/(main)"
-              )
-            }
-          />
-
-          <BottomNavItem
-            icon="time-outline"
-            label="Riwayat"
-            onPress={() =>
-              router.push(
-                "/(main)/riwayat"
-              )
-            }
-          />
-
-          <BottomNavItem
-            icon="document-text-outline"
-            label="Pengajuan"
-            onPress={() =>
-              router.push(
-                "/(main)/pengajuan"
-              )
-            }
-          />
-
-          <BottomNavItem
-            icon="person-outline"
-            label="Profil"
-            onPress={() =>
-              router.push(
-                "/(main)/profil"
-              )
-            }
-          />
-        </View>
-
-        {/* =================================================
-            GESTURE AREA
-        ================================================= */}
-
-        <View
-          style={
-            styles.gestureArea
-          }
-        >
-          <View
-            style={
-              styles.gesturePill
-            }
-          />
-        </View>
       </View>
-    </SafeAreaView>
-  );
-}
-
-/* ============================================================
-   BOTTOM NAV ITEM
-============================================================ */
-
-type BottomNavItemProps = {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  active?: boolean;
-  onPress: () => void;
-};
-
-function BottomNavItem({
-  icon,
-  label,
-  active = false,
-  onPress,
-}: BottomNavItemProps) {
-  return (
-    <Pressable
-      style={
-        styles.bottomNavItem
-      }
-      onPress={onPress}
-    >
-      <Ionicons
-        name={icon}
-        size={23}
-        color={
-          active
-            ? COLORS.blue
-            : "#9aa5b6"
-        }
-      />
-
-      <Text
-        style={[
-          styles.bottomNavLabel,
-          {
-            color:
-              active
-                ? COLORS.blue
-                : "#9aa5b6",
-          },
-        ]}
-      >
-        {label}
-      </Text>
-    </Pressable>
+    </MainScreen>
   );
 }
 
@@ -1936,7 +1856,6 @@ const styles =
 
     scrollContent: {
       paddingTop: 4,
-      paddingBottom: 10,
     },
 
     /* ========================================================
@@ -2461,13 +2380,15 @@ const styles =
         "row",
       flexWrap:
         "wrap",
+      justifyContent:
+        "space-between",
       paddingHorizontal: 16,
       paddingTop: 8,
-      gap: 9,
+      rowGap: 9,
     },
 
     shortcutCard: {
-      width: "23.4%",
+      width: "23%",
       minHeight: 92,
       backgroundColor:
         COLORS.white,
@@ -2682,58 +2603,7 @@ const styles =
     },
 
     bottomSpacing: {
-      height: 20,
+      height: 8,
     },
 
-    /* ========================================================
-       BOTTOM NAV
-    ======================================================== */
-
-    bottomNav: {
-      height: 64,
-      backgroundColor:
-        COLORS.white,
-      borderTopWidth: 1,
-      borderTopColor:
-        "#e7ebf3",
-      paddingHorizontal: 14,
-      paddingTop: 9,
-      flexDirection:
-        "row",
-      alignItems:
-        "flex-start",
-      justifyContent:
-        "space-between",
-    },
-
-    bottomNavItem: {
-      flex: 1,
-      alignItems:
-        "center",
-      gap: 4,
-    },
-
-    bottomNavLabel: {
-      fontSize: 9.5,
-      fontWeight:
-        "700",
-    },
-
-    gestureArea: {
-      height: 26,
-      backgroundColor:
-        COLORS.white,
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
-    },
-
-    gesturePill: {
-      width: 120,
-      height: 5,
-      borderRadius: 3,
-      backgroundColor:
-        "#16223a",
-    },
   });

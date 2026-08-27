@@ -18,7 +18,7 @@ import * as SecureStore from "expo-secure-store";
 
 const DEFAULT_API_URL =
   Platform.OS === "android"
-    ? "http://192.168.1.189:8000/api"
+    ? "http://10.10.16.100:8000/api"
     : "http://127.0.0.1:8000/api";
 
 export const API_URL =
@@ -264,6 +264,43 @@ export type ApiNotification = {
 
 /**
  * ============================================================
+ * DASHBOARD
+ * ============================================================
+ */
+
+export type ApiLeaveBalance = {
+  leave_type: {
+    id: number;
+    name: string;
+    code: string;
+  } | null;
+  entitlement: number;
+  used: number;
+  remaining: number;
+};
+
+export type ApiDashboardMe = {
+  period: {
+    from: string;
+    to: string;
+  };
+  attendance_summary: {
+    hadir: number;
+    terlambat: number;
+    pulang_cepat: number;
+    alpha: number;
+    tidak_lengkap: number;
+  };
+  leave_balances: ApiLeaveBalance[];
+  pending_requests: {
+    wfh: number;
+    leave: number;
+    overtime: number;
+  };
+};
+
+/**
+ * ============================================================
  * STORAGE
  * ============================================================
  */
@@ -347,68 +384,35 @@ function errorMessage(
   status: number
 ) {
   if (
-    data &&
-    typeof data === "object"
+    !data ||
+    typeof data !== "object"
   ) {
-    const body =
-      data as JsonMap;
+    return `Request gagal (${status})`;
+  }
 
-    if (
-      typeof body.message ===
-      "string"
-    ) {
-      return body.message;
-    }
+  const body = data as JsonMap;
 
-    if (
-      typeof body.error ===
-      "string"
-    ) {
-      return body.error;
-    }
+  if (typeof body.message === "string") {
+    return body.message;
+  }
 
-    if (
-      body.errors &&
-      typeof body.errors ===
-        "object"
-    ) {
-      const errors =
-        body.errors as Record<
-          string,
-          unknown
-        >;
+  if (typeof body.error === "string") {
+    return body.error;
+  }
 
-      const messages: string[] =
-        [];
+  if (body.errors && typeof body.errors === "object") {
+    const messages = Object.values(
+      body.errors as Record<string, unknown>
+    ).flatMap((value) =>
+      Array.isArray(value)
+        ? value.filter(
+            (item): item is string => typeof item === "string"
+          )
+        : []
+    );
 
-      Object.values(
-        errors
-      ).forEach((value) => {
-        if (
-          Array.isArray(value)
-        ) {
-          value.forEach(
-            (item) => {
-              if (
-                typeof item ===
-                "string"
-              ) {
-                messages.push(
-                  item
-                );
-              }
-            }
-          );
-        }
-      });
-
-      if (
-        messages.length > 0
-      ) {
-        return messages.join(
-          "\n"
-        );
-      }
+    if (messages.length > 0) {
+      return messages.join("\n");
     }
   }
 
@@ -742,6 +746,47 @@ export async function getAttendance(
  * ============================================================
  */
 
+type PhotoPayload =
+  | Blob
+  | {
+      uri: string;
+      name: string;
+      type: string;
+    };
+
+/**
+ * Bangun FormData untuk check-in / check-out. Keduanya memakai payload
+ * identik (latitude, longitude, photo, device_info), hanya beda endpoint
+ * dan field `type` (khusus check-in).
+ */
+function buildAttendanceForm(
+  payload: {
+    latitude: number;
+    longitude: number;
+
+    photo: PhotoPayload;
+
+    device_info?: string;
+  },
+  includeType?: string
+) {
+  const body = new FormData();
+
+  if (includeType !== undefined) {
+    body.append("type", includeType);
+  }
+
+  body.append("latitude", String(payload.latitude));
+  body.append("longitude", String(payload.longitude));
+  body.append("photo", payload.photo as Blob);
+
+  if (payload.device_info) {
+    body.append("device_info", payload.device_info);
+  }
+
+  return body;
+}
+
 export async function checkIn(
   payload: {
     type:
@@ -753,52 +798,12 @@ export async function checkIn(
     latitude: number;
     longitude: number;
 
-    photo:
-      | Blob
-      | {
-          uri: string;
-          name: string;
-          type: string;
-        };
+    photo: PhotoPayload;
 
     device_info?: string;
   }
 ) {
-  const body =
-    new FormData();
-
-  body.append(
-    "type",
-    payload.type
-  );
-
-  body.append(
-    "latitude",
-    String(
-      payload.latitude
-    )
-  );
-
-  body.append(
-    "longitude",
-    String(
-      payload.longitude
-    )
-  );
-
-  body.append(
-    "photo",
-    payload.photo as any
-  );
-
-  if (
-    payload.device_info
-  ) {
-    body.append(
-      "device_info",
-      payload.device_info
-    );
-  }
+  const body = buildAttendanceForm(payload, payload.type);
 
   return apiRequest<{
     data: ApiAttendance;
@@ -822,47 +827,12 @@ export async function checkOut(
     latitude: number;
     longitude: number;
 
-    photo:
-      | Blob
-      | {
-          uri: string;
-          name: string;
-          type: string;
-        };
+    photo: PhotoPayload;
 
     device_info?: string;
   }
 ) {
-  const body =
-    new FormData();
-
-  body.append(
-    "latitude",
-    String(
-      payload.latitude
-    )
-  );
-
-  body.append(
-    "longitude",
-    String(
-      payload.longitude
-    )
-  );
-
-  body.append(
-    "photo",
-    payload.photo as any
-  );
-
-  if (
-    payload.device_info
-  ) {
-    body.append(
-      "device_info",
-      payload.device_info
-    );
-  }
+  const body = buildAttendanceForm(payload);
 
   return apiRequest<{
     data: ApiAttendance;
@@ -1129,4 +1099,16 @@ export async function markAllNotificationsRead() {
       method: "PATCH",
     }
   );
+}
+
+/**
+ * ============================================================
+ * DASHBOARD
+ * ============================================================
+ */
+
+export async function getDashboardMe() {
+  return apiRequest<{
+    data: ApiDashboardMe;
+  }>("/dashboard/me");
 }

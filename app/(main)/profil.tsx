@@ -1,4 +1,6 @@
-import React from "react";
+import React, {
+  useState,
+} from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
 import Avatar from "../../components/Avatar";
@@ -7,11 +9,19 @@ import Button from "../../components/Button";
 import MainScreen from "../../components/MainScreen";
 import { Colors } from "../../constants/colors";
 import { AppConfig } from "../../constants/config";
-import { logout } from "../../services/auth";
+import {
+  clearSession,
+  logout,
+} from "../../services/api";
 import { usePrototype } from "../../contexts/PrototypeContext";
 
 export default function ProfilScreen() {
   const { profile } = usePrototype();
+  const [
+    loggingOut,
+    setLoggingOut,
+  ] = useState(false);
+
   const employee = profile?.employee;
   const fullName = profile?.full_name || profile?.username || "Pegawai";
   const initials = fullName
@@ -24,8 +34,25 @@ export default function ProfilScreen() {
   const role = profile?.roles?.map((item) => item.name).join(", ") || "Pegawai";
 
   const handleLogout = async () => {
-    await logout();
-    router.replace("/login");
+    if (loggingOut) {
+      return;
+    }
+
+    setLoggingOut(true);
+
+    try {
+      await logout();
+    } catch (error) {
+      console.error(
+        "LOGOUT ERROR:",
+        error
+      );
+
+      await clearSession();
+    } finally {
+      setLoggingOut(false);
+      router.replace("/login");
+    }
   };
 
   return (
@@ -52,7 +79,16 @@ export default function ProfilScreen() {
         <MenuRow label="Notifikasi" value="Aktif" />
       </View>
 
-      <Button title="Keluar" variant="ghost" onPress={handleLogout} />
+      <Button
+        title={
+          loggingOut
+            ? "Keluar..."
+            : "Keluar"
+        }
+        variant="danger"
+        loading={loggingOut}
+        onPress={handleLogout}
+      />
 
       <Text style={styles.footer}>
         {AppConfig.name} - {AppConfig.university}

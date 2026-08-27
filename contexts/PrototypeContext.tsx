@@ -283,25 +283,9 @@ function formatDateRange(
 function statusToRequestStatus(
   status?: string | null
 ): RequestStatus {
-  if (
-    status === "disetujui"
-  ) {
-    return "Disetujui";
-  }
-
-  if (
-    status === "ditolak"
-  ) {
-    return "Ditolak";
-  }
-
-  if (
-    status === "dibatalkan"
-  ) {
-    return "Dibatalkan";
-  }
-
-  return "Menunggu";
+  return statusToDisplay(
+    status
+  );
 }
 
 function statusToDisplay(
@@ -332,6 +316,23 @@ function statusToDisplay(
   }
 
   return "Menunggu";
+}
+
+function isPendingApprovalStatus(
+  status?: string | null
+) {
+  const value =
+    status
+      ?.toLowerCase()
+      .trim() ?? "";
+
+  return (
+    value === "diajukan" ||
+    value === "diproses" ||
+    value === "pending" ||
+    value === "menunggu" ||
+    value === "waiting"
+  );
 }
 
 const LEAVE_TYPE_IDS = {
@@ -973,7 +974,7 @@ export function PrototypeProvider({
             return;
           }
 
-          console.log(
+          console.error(
             "PROFILE LOAD ERROR:",
             message
           );
@@ -1069,7 +1070,7 @@ export function PrototypeProvider({
             );
           }
         } else {
-          console.log(
+          console.error(
             "ATTENDANCE LOAD ERROR:",
             getErrorMessage(
               attendanceResult.reason
@@ -1094,7 +1095,7 @@ export function PrototypeProvider({
           leaveData =
             leaveResult.value.data;
         } else {
-          console.log(
+          console.error(
             "LEAVE LOAD ERROR:",
             getErrorMessage(
               leaveResult.reason
@@ -1117,7 +1118,7 @@ export function PrototypeProvider({
           wfhData =
             wfhResult.value.data;
         } else {
-          console.log(
+          console.error(
             "WFH LOAD ERROR:",
             getErrorMessage(
               wfhResult.reason
@@ -1140,7 +1141,7 @@ export function PrototypeProvider({
           overtimeData =
             overtimeResult.value.data;
         } else {
-          console.log(
+          console.error(
             "OVERTIME LOAD ERROR:",
             getErrorMessage(
               overtimeResult.reason
@@ -1174,8 +1175,9 @@ export function PrototypeProvider({
           ...leaveData
             .filter(
               (item) =>
-                item.status ===
-                "diajukan"
+                isPendingApprovalStatus(
+                  item.status
+                )
             )
             .map(
               mapLeaveApproval
@@ -1184,8 +1186,9 @@ export function PrototypeProvider({
           ...wfhData
             .filter(
               (item) =>
-                item.status ===
-                "diajukan"
+                isPendingApprovalStatus(
+                  item.status
+                )
             )
             .map(
               mapWfhApproval
@@ -1194,8 +1197,9 @@ export function PrototypeProvider({
           ...overtimeData
             .filter(
               (item) =>
-                item.status ===
-                "diajukan"
+                isPendingApprovalStatus(
+                  item.status
+                )
             )
             .map(
               mapOvertimeApproval
@@ -1214,7 +1218,7 @@ export function PrototypeProvider({
             )
           );
         } else {
-          console.log(
+          console.error(
             "NOTIFICATION LOAD ERROR:",
             getErrorMessage(
               notificationResult.reason
@@ -1979,7 +1983,7 @@ export function PrototypeProvider({
                 id
               ).catch(
                 (error) => {
-                  console.log(
+                  console.error(
                     "Mark notification failed:",
                     error instanceof
                       Error

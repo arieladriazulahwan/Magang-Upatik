@@ -359,8 +359,6 @@ export default function PresensiScreen() {
           accuracy: Location.Accuracy.High,
         });
 
-      console.log("CURRENT LOCATION:", current);
-
       if (
         !current ||
         !current.coords ||
@@ -425,11 +423,6 @@ export default function PresensiScreen() {
         setProcessing(false);
         return;
       }
-
-      console.log(
-        "LOCATION FOR ATTENDANCE:",
-        currentLocation
-      );
 
       /*
       * =====================================================
@@ -559,11 +552,6 @@ export default function PresensiScreen() {
                 deviceInfo,
             });
         }
-
-        console.log(
-          "ATTENDANCE RESPONSE:",
-          response
-        );
 
         /*
          * Backend mengembalikan:

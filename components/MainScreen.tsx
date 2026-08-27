@@ -1,5 +1,22 @@
-import React from "react";
-import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
+import React, {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import {
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { router, usePathname } from "expo-router";
 import Svg, { Circle, Path } from "react-native-svg";
 import { Colors } from "../constants/colors";
@@ -50,24 +67,125 @@ function TabIcon({ name, color }: { name: string; color: string }) {
 export default function MainScreen({ children, scroll = true }: MainScreenProps) {
   const pathname = usePathname();
   const { toast } = usePrototype();
-  const content = scroll ? (
-    <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+  const insets = useSafeAreaInsets();
+  const [
+    keyboardVisible,
+    setKeyboardVisible,
+  ] = useState(false);
+
+  useEffect(() => {
+    const showEvent =
+      Platform.OS === "ios"
+        ? "keyboardWillShow"
+        : "keyboardDidShow";
+    const hideEvent =
+      Platform.OS === "ios"
+        ? "keyboardWillHide"
+        : "keyboardDidHide";
+
+    const showSub =
+      Keyboard.addListener(
+        showEvent,
+        () => setKeyboardVisible(true)
+      );
+    const hideSub =
+      Keyboard.addListener(
+        hideEvent,
+        () => setKeyboardVisible(false)
+      );
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  const navHeight =
+    64 + insets.bottom;
+
+  const contentBottomPadding =
+    keyboardVisible
+      ? 28
+      : navHeight + 22;
+
+  const content = useMemo(() => scroll ? (
+    <ScrollView
+      contentContainerStyle={[
+        styles.scrollContent,
+        {
+          paddingBottom:
+            contentBottomPadding,
+        },
+      ]}
+      keyboardDismissMode="on-drag"
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+    >
       {children}
     </ScrollView>
   ) : (
-    <View style={styles.staticContent}>{children}</View>
-  );
+    <View
+      style={[
+        styles.staticContent,
+        {
+          paddingBottom:
+            contentBottomPadding,
+        },
+      ]}
+    >
+      {children}
+    </View>
+  ), [
+    children,
+    contentBottomPadding,
+    scroll,
+  ]);
 
   return (
-    <SafeAreaView style={styles.root}>
-      {content}
+    <SafeAreaView
+      edges={["top", "left", "right"]}
+      style={styles.root}
+    >
+      <KeyboardAvoidingView
+        style={styles.keyboardRoot}
+        behavior={
+          Platform.OS === "ios"
+            ? "padding"
+            : "height"
+        }
+      >
+        {content}
+      </KeyboardAvoidingView>
       {toast ? (
-        <View style={styles.toast}>
+        <View
+          style={[
+            styles.toast,
+            {
+              bottom:
+                keyboardVisible
+                  ? 18
+                  : navHeight + 14,
+            },
+          ]}
+        >
           <View style={styles.toastDot} />
           <Text style={styles.toastText}>{toast}</Text>
         </View>
       ) : null}
-      <View style={styles.nav}>
+      {!keyboardVisible ? (
+      <View
+        style={[
+          styles.nav,
+          {
+            height: navHeight,
+            paddingBottom:
+              Math.max(
+                insets.bottom,
+                10
+              ),
+          },
+        ]}
+      >
         {tabs.map((tab) => {
           const active = tab.match.some((item) => pathname === item || pathname.endsWith(item));
           const color = active ? Colors.primaryDark : "#9AA5B6";
@@ -79,6 +197,7 @@ export default function MainScreen({ children, scroll = true }: MainScreenProps)
           );
         })}
       </View>
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -88,27 +207,26 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.surfaceMuted,
   },
+  keyboardRoot: {
+    flex: 1,
+  },
   scrollContent: {
     padding: 18,
     paddingTop: 18,
-    paddingBottom: 96,
     gap: 14,
   },
   staticContent: {
     flex: 1,
-    paddingBottom: 76,
   },
   nav: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    height: 74,
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 8,
     paddingTop: 8,
-    paddingBottom: 10,
     backgroundColor: Colors.white,
     borderTopWidth: 1,
     borderTopColor: Colors.line,

@@ -13,6 +13,9 @@ import {
   View,
 } from "react-native";
 import { router } from "expo-router";
+import {
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import Svg, { Circle, Path } from "react-native-svg";
 
 import Button from "../../components/Button";
@@ -121,6 +124,9 @@ function CheckIcon() {
 }
 
 export default function LoginScreen() {
+  const insets =
+    useSafeAreaInsets();
+
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
@@ -245,20 +251,36 @@ export default function LoginScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.root}
-      behavior={Platform.select({
-        ios: "padding",
-        default: undefined,
-      })}
+      behavior={
+        Platform.OS === "ios"
+          ? "padding"
+          : "height"
+      }
     >
       <View style={styles.grid} />
       <View style={styles.glowTop} />
       <View style={styles.glowBottom} />
 
       <ScrollView
+        contentInsetAdjustmentBehavior="always"
+        keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={
-          styles.scrollContent
-        }
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.scrollContent,
+          {
+            paddingTop:
+              Math.max(
+                36,
+                insets.top + 26
+              ),
+            paddingBottom:
+              Math.max(
+                36,
+                insets.bottom + 36
+              ),
+          },
+        ]}
       >
         {/* BRAND */}
 
@@ -455,7 +477,6 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    overflow: "hidden",
     backgroundColor: Colors.background,
   },
 
@@ -491,8 +512,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 26,
-    paddingTop: 54,
-    paddingBottom: 28,
   },
 
   brandRow: {

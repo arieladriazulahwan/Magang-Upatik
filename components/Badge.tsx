@@ -20,7 +20,17 @@ export default function Badge({ label, tone = "blue" }: BadgeProps) {
 
   return (
     <View style={[styles.badge, { backgroundColor: colors.bg }]}>
-      <Text style={[styles.label, { color: colors.color }]}>{label}</Text>
+      <Text
+        style={[
+          styles.label,
+          {
+            color: colors.color,
+          },
+        ]}
+        numberOfLines={1}
+      >
+        {label}
+      </Text>
     </View>
   );
 }
@@ -28,6 +38,7 @@ export default function Badge({ label, tone = "blue" }: BadgeProps) {
 const styles = StyleSheet.create({
   badge: {
     alignSelf: "flex-start",
+    maxWidth: "100%",
     borderRadius: 7,
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -35,5 +46,6 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 10.5,
     fontWeight: "800",
+    flexShrink: 1,
   },
 });

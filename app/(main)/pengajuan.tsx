@@ -7,6 +7,7 @@ import {
   View,
 } from "react-native";
 import { router, useFocusEffect } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 
 import Badge from "../../components/Badge";
 import MainScreen from "../../components/MainScreen";
@@ -97,7 +98,7 @@ export default function PengajuanScreen() {
           }
         );
       } else {
-        console.log(
+        console.error(
           "LEAVE LOAD ERROR:",
           leaveResult.reason
         );
@@ -138,7 +139,7 @@ export default function PengajuanScreen() {
           }
         );
       } else {
-        console.log(
+        console.error(
           "WFH LOAD ERROR:",
           wfhResult.reason
         );
@@ -176,7 +177,7 @@ export default function PengajuanScreen() {
           }
         );
       } else {
-        console.log(
+        console.error(
           "OVERTIME LOAD ERROR:",
           overtimeResult.reason
         );
@@ -257,7 +258,7 @@ export default function PengajuanScreen() {
           </Text>
 
           <Text style={styles.subtitle}>
-            Izin, cuti, WFH, dan dinas luar
+            Izin, cuti, WFH, dan lembur
           </Text>
         </View>
 
@@ -269,6 +270,11 @@ export default function PengajuanScreen() {
             )
           }
         >
+          <Ionicons
+            name="add"
+            size={17}
+            color={Colors.white}
+          />
           <Text style={styles.addText}>
             Baru
           </Text>
@@ -435,6 +441,8 @@ function mapStatus(
 
   switch (value) {
     case "pending":
+    case "diajukan":
+    case "diproses":
     case "menunggu":
     case "waiting":
       return "Menunggu";
@@ -587,9 +595,13 @@ const styles = StyleSheet.create({
 
   addButton: {
     height: 38,
+    flexDirection: "row",
+    alignItems: "center",
     justifyContent: "center",
+    gap: 4,
     borderRadius: 11,
-    paddingHorizontal: 16,
+    paddingLeft: 12,
+    paddingRight: 15,
     backgroundColor: Colors.background,
   },
 
@@ -644,7 +656,9 @@ const styles = StyleSheet.create({
 
   cardTop: {
     flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
+    gap: 8,
   },
 
   cardTitle: {
