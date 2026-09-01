@@ -1000,7 +1000,8 @@ img {
 }
 
 .period-select,
-.filter-select {
+.filter-select,
+.filter-input {
   padding: 6px 8px;
 
   border: 1px solid #dce2e9;

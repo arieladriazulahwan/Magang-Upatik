@@ -40,6 +40,7 @@ function Monitoring() {
   const [search, setSearch] = useState("");
   const [unit, setUnit] = useState("Semua Unit");
   const [status, setStatus] = useState("Semua Status");
+  const [selectedDate, setSelectedDate] = useState(today);
 
   const [loading, setLoading] = useState(true);
 
@@ -52,9 +53,9 @@ function Monitoring() {
       setLoading(true);
 
       // Backend menerima filter tanggal agar ringkasan dan data yang dikirim
-      // hanya untuk hari ini. Penyaringan ulang di frontend mengantisipasi
+      // hanya untuk tanggal yang dipilih. Penyaringan ulang di frontend mengantisipasi
       // backend lama yang belum menerapkan query parameter tersebut.
-      const response = await apiRequest(`/attendance?date=${today}`);
+      const response = await apiRequest(`/attendance?date=${selectedDate}`);
 
       console.log(
         "Data monitoring dari backend:",
@@ -77,7 +78,7 @@ function Monitoring() {
        */
 
       const attendance = Array.isArray(response?.data) ? response.data : Array.isArray(response) ? response : [];
-      setData(attendance.filter((item) => !getAttendanceDate(item) || getAttendanceDate(item) === today));
+      setData(attendance.filter((item) => !getAttendanceDate(item) || getAttendanceDate(item) === selectedDate));
 
       setSummary({
         hadir: response.summary?.hadir || 0,
@@ -105,7 +106,7 @@ function Monitoring() {
     } finally {
       setLoading(false);
     }
-  }, [today]);
+  }, [selectedDate]);
 
   useEffect(() => {
     fetchMonitoring();
@@ -330,6 +331,15 @@ function Monitoring() {
             {/* FILTER */}
 
             <div className="monitoring-filters">
+
+              <input
+                type="date"
+                className="filter-input"
+                value={selectedDate}
+                onChange={(e) =>
+                  setSelectedDate(e.target.value)
+                }
+              />
 
               <select
                 className="filter-select"

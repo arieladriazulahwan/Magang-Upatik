@@ -11,7 +11,7 @@ export const ROLE_ACCESS = {
   ],
   admin_kepegawaian: [
     "/dashboard", "/monitoring", "/pegawai", "/unit", "/jadwal", "/shift",
-    "/pegawai/tambah", "/pegawai/:id", "/pengajuan", "/pengajuan/detail", "/verifikasi", "/persetujuan", "/laporan",
+    "/pegawai/tambah", "/pengajuan", "/pengajuan/detail", "/verifikasi", "/persetujuan", "/laporan",
   ],
   admin_unit: [
     "/dashboard", "/monitoring", "/pegawai", "/unit", "/jadwal", "/shift",
@@ -41,3 +41,24 @@ export const canManageEmployees = () =>
 
 export const canManageShifts = () =>
   hasAnyRole(["super_admin", "admin_kepegawaian", "admin_unit", "developer"]);
+
+export const canManageUnits = () =>
+  hasAnyRole(["super_admin", "developer"]);
+
+export const canManageLocations = () =>
+  hasAnyRole(["super_admin", "admin_kepegawaian", "admin_unit", "developer"]);
+
+export const isAdminUnitOrLeader = () =>
+  hasAnyRole(["admin_unit", "pimpinan"]);
+
+export const canEditEmployee = () =>
+  hasAnyRole(["super_admin", "admin_unit", "developer"]);
+
+export const canDeleteEmployee = () =>
+  hasAnyRole(["super_admin", "developer"]);
+
+export const canAddEmployee = () =>
+  hasAnyRole(["super_admin", "admin_kepegawaian", "developer"]);
+
+export const getUserUnit = () => 
+  localStorage.getItem("userUnit") || localStorage.getItem("unit") || "";

@@ -17,6 +17,8 @@ import LaporanKehadiran from "../pages/laporan/LaporanKehadiran";
 import Lokasi from "../pages/lokasi/Lokasi";
 import Kalender from "../pages/kalender/Kalender";
 import Pengaturan from "../pages/pengaturan/Pengaturan";
+import Role from "../pages/pengaturan/Role";
+import Permission from "../pages/pengaturan/Permission";
 import PemetaanSIGA8 from "../pages/pengaturan/PemetaanSIGA8";
 import ProtectedRoute from "./ProtectedRoute";
 import { getAllowedRoles } from "../utils/access";
@@ -46,6 +48,8 @@ function AppRoutes() {
       <Route path="/geofence" element={guarded("/geofence", <Lokasi />)} />
       <Route path="/kalender" element={guarded("/kalender", <Kalender />)} />
       <Route path="/pengaturan" element={guarded("/pengaturan", <Pengaturan />)} />
+      <Route path="/pengaturan/role" element={guarded("/pengaturan", <Role />)} />
+      <Route path="/pengaturan/permission" element={guarded("/pengaturan", <Permission />)} />
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>

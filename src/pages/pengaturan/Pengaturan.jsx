@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import AdminLayout from "../../components/layout/AdminLayout";
 import { apiRequest } from "../../services/api";
 
@@ -40,6 +41,8 @@ const settingGroups = [
 const parseValue = (value, type) => type === "boolean" ? String(value).toLowerCase() === "true" : String(value ?? "");
 
 function Pengaturan() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [values, setValues] = useState({});
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState("");
@@ -92,6 +95,18 @@ function Pengaturan() {
           <div><h2>Pengaturan</h2><p>Parameter presensi, keamanan, geofence, dan integrasi</p></div>
         </div>
 
+        <div className="settings-tabs">
+          <button className={`tab-btn ${location.pathname === "/pengaturan" ? "active" : ""}`} onClick={() => navigate("/pengaturan")}>
+            ⚙️ Pengaturan Umum
+          </button>
+          <button className={`tab-btn ${location.pathname === "/pengaturan/role" ? "active" : ""}`} onClick={() => navigate("/pengaturan/role")}>
+            👤 Manajemen Role
+          </button>
+          <button className={`tab-btn ${location.pathname === "/pengaturan/permission" ? "active" : ""}`} onClick={() => navigate("/pengaturan/permission")}>
+            📋 Kebijakan Kerja
+          </button>
+        </div>
+
         {loading && <div className="empty-state">Memuat pengaturan...</div>}
         {error && <div className="form-error">{error}</div>}
         {message && <div className="settings-success">{message}</div>}
@@ -135,6 +150,38 @@ function Pengaturan() {
 
         <div className="settings-note">Perubahan pengaturan berdampak pada seluruh proses presensi. Kredensial SIGA8 dan Google Calendar tetap dikelola di environment backend.</div>
       </div>
+
+      <style>{`
+        .settings-tabs {
+          display: flex;
+          gap: 8px;
+          margin: 20px 0;
+          border-bottom: 1px solid #edf0f4;
+          overflow-x: auto;
+        }
+
+        .tab-btn {
+          padding: 12px 16px;
+          background: none;
+          border: none;
+          border-bottom: 3px solid transparent;
+          color: #627084;
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.3s;
+          white-space: nowrap;
+        }
+
+        .tab-btn:hover {
+          color: #2c3e50;
+        }
+
+        .tab-btn.active {
+          color: #2980b9;
+          border-bottom-color: #2980b9;
+        }
+      `}</style>
     </AdminLayout>
   );
 }

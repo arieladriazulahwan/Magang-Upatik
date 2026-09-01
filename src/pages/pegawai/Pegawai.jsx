@@ -2,11 +2,12 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AdminLayout from "../../components/layout/AdminLayout";
 import { apiRequest } from "../../services/api";
-import { canManageEmployees } from "../../utils/access";
+import { canAddEmployee, canEditEmployee } from "../../utils/access";
 
 function Pegawai() {
   const navigate = useNavigate();
-  const canCreateEmployee = canManageEmployees();
+  const canCreateEmployee = canAddEmployee();
+  const canEdit = canEditEmployee();
 
   const [employees, setEmployees] = useState([]);
   const [search, setSearch] = useState("");
@@ -492,28 +493,34 @@ function Pegawai() {
 
                         <td>
 
-                          <button
-                            className="action-button"
-                            onClick={() =>
-                              navigate(
-                                `/pegawai/${employee.id}`
-                              )
-                            }
-                          >
-                            Detail
-                          </button>
+                          {canEdit ? (
+                            <>
+                              <button
+                                className="action-button"
+                                onClick={() =>
+                                  navigate(
+                                    `/pegawai/${employee.id}`
+                                  )
+                                }
+                              >
+                                Detail
+                              </button>
 
-                          <button
-                            className="action-button"
-                            onClick={() =>
-                              console.log(
-                                "Menu pegawai:",
-                                employee
-                              )
-                            }
-                          >
-                            ⋮
-                          </button>
+                              <button
+                                className="action-button"
+                                onClick={() =>
+                                  console.log(
+                                    "Menu pegawai:",
+                                    employee
+                                  )
+                                }
+                              >
+                                ⋮
+                              </button>
+                            </>
+                          ) : (
+                            <span style={{ fontSize: "12px", color: "#999" }}>Tidak ada aksi</span>
+                          )}
 
                         </td>
 

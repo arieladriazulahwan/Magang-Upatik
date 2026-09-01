@@ -2,16 +2,20 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AdminLayout from "../../components/layout/AdminLayout";
 import { apiRequest } from "../../services/api";
+import { canManageUnits } from "../../utils/access";
 
 const getUnitName = (unit) => unit.name || unit.nama || unit.nama_unit || unit.unit_name || "Unit kerja";
 const getUnitCode = (unit) => unit.code || unit.kode || unit.kode_unit || "Kode belum tersedia";
 
 function UnitKerja() {
   const navigate = useNavigate();
+  const canAddUnit = canManageUnits();
   const [units, setUnits] = useState([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [showModal, setShowModal] = useState(false);
+  const [formError, setFormError] = useState("");
 
   const fetchUnits = async () => {
     try {
@@ -42,6 +46,39 @@ function UnitKerja() {
     return `${getUnitName(unit)} ${getUnitCode(unit)}`.toLowerCase().includes(keyword);
   });
 
+  const handleAddUnit = async (e) => {
+    e.preventDefault();
+    const form = new FormData(e.target);
+    
+    try {
+      setLoading(true);
+      setFormError("");
+
+      const unitName = form.get("nama");
+      if (!unitName || unitName.trim() === "") {
+        throw new Error("Nama unit kerja wajib diisi.");
+      }
+
+      await apiRequest("/work-units", {
+        method: "POST",
+        body: JSON.stringify({
+          nama: unitName,
+          kode: form.get("kode") || "",
+          deskripsi: form.get("deskripsi") || "",
+          is_active: true,
+        }),
+      });
+
+      setShowModal(false);
+      setFormError("");
+      await fetchUnits();
+    } catch (err) {
+      console.error("Gagal menambahkan unit kerja:", err);
+      setFormError(err.message || "Gagal menambahkan unit kerja.");
+      setLoading(false);
+    }
+  };
+
   return (
     <AdminLayout>
       <div className="unit-page">
@@ -50,9 +87,14 @@ function UnitKerja() {
             <h2>Unit Kerja</h2>
             <p>Kelola struktur unit dan akses operasional Universitas Tadulako</p>
           </div>
-          <button className="secondary-button" onClick={fetchUnits} disabled={loading}>
-            ⟳ Refresh
-          </button>
+          <div className="heading-actions">
+            {canAddUnit && <button className="primary-button" onClick={() => setShowModal(true)}>
+              + Tambah Unit
+            </button>}
+            <button className="secondary-button" onClick={fetchUnits} disabled={loading}>
+              ⟳ Refresh
+            </button>
+          </div>
         </div>
 
         <div className="unit-summary-grid">
@@ -124,6 +166,50 @@ function UnitKerja() {
           {!loading && !error && <div className="table-footer"><span>Menampilkan {filteredUnits.length} dari {units.length} unit kerja</span></div>}
         </section>
       </div>
+
+      {showModal && (
+        <div className="modal-overlay" onClick={() => setShowModal(false)}>
+          <div className="employee-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h3>Tambah Unit Kerja</h3>
+                <p>Buat unit kerja baru di organisasi</p>
+              </div>
+              <button className="modal-close" onClick={() => setShowModal(false)}>×</button>
+            </div>
+
+            {formError && <div className="form-error">{formError}</div>}
+
+            <form onSubmit={handleAddUnit}>
+              <div className="form-grid">
+                <div className="form-field">
+                  <label>Nama Unit Kerja*</label>
+                  <input name="nama" required placeholder="Contoh: Fakultas Teknik" />
+                </div>
+
+                <div className="form-field">
+                  <label>Kode Unit</label>
+                  <input name="kode" placeholder="Contoh: FT" />
+                </div>
+
+                <div className="form-field" style={{ gridColumn: "1 / -1" }}>
+                  <label>Deskripsi</label>
+                  <textarea name="deskripsi" placeholder="Deskripsi unit kerja..." rows="3" />
+                </div>
+              </div>
+
+              <div className="modal-actions">
+                <button type="button" className="secondary-button" onClick={() => setShowModal(false)}>
+                  Batal
+                </button>
+                <button type="submit" className="primary-button" disabled={loading}>
+                  {loading ? "Menyimpan..." : "Simpan Unit"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </AdminLayout>
   );
 }

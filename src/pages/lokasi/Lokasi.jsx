@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import AdminLayout from "../../components/layout/AdminLayout";
 import { apiRequest } from "../../services/api";
+import { canManageLocations } from "../../utils/access";
 
 const normalizeArray = (payload) => {
 	if (Array.isArray(payload)) return payload;
@@ -10,9 +11,12 @@ const normalizeArray = (payload) => {
 };
 
 function Lokasi() {
+	const canAddLocation = canManageLocations();
 	const [locations, setLocations] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState("");
+	const [showModal, setShowModal] = useState(false);
+	const [formError, setFormError] = useState("");
 
 	const fetchLocations = async () => {
 		try {
@@ -30,12 +34,59 @@ function Lokasi() {
 
 	useEffect(() => { fetchLocations(); }, []);
 
+	const handleAddLocation = async (e) => {
+		e.preventDefault();
+		const form = new FormData(e.target);
+
+		try {
+			setLoading(true);
+			setFormError("");
+
+			const locationName = form.get("nama");
+			if (!locationName || locationName.trim() === "") {
+				throw new Error("Nama lokasi wajib diisi.");
+			}
+
+			const latitude = form.get("latitude");
+			const longitude = form.get("longitude");
+			const radius = form.get("radius_meters");
+
+			if (!latitude || !longitude) {
+				throw new Error("Koordinat lokasi wajib diisi.");
+			}
+
+			await apiRequest("/work-locations", {
+				method: "POST",
+				body: JSON.stringify({
+					nama: locationName,
+					nama_lokasi: locationName,
+					nama_tempat: locationName,
+					alamat: form.get("alamat") || "",
+					address: form.get("alamat") || "",
+					latitude: parseFloat(latitude),
+					longitude: parseFloat(longitude),
+					radius_meters: parseInt(radius) || 100,
+					radius: parseInt(radius) || 100,
+					is_active: true,
+				}),
+			});
+
+			setShowModal(false);
+			setFormError("");
+			await fetchLocations();
+		} catch (err) {
+			console.error("Gagal menambahkan lokasi:", err);
+			setFormError(err.message || "Gagal menambahkan lokasi.");
+			setLoading(false);
+		}
+	};
+
 	return (
 		<AdminLayout>
 			<div className="location-page">
 				<div className="page-heading">
 					<div><h2>Lokasi & Geofence</h2><p>Kelola titik presensi dan radius geofence per unit kerja</p></div>
-					<button className="primary-button" disabled>+ Tambah Lokasi</button>
+					{canAddLocation && <button className="primary-button" onClick={() => setShowModal(true)}>+ Tambah Lokasi</button>}
 				</div>
 
 				<div className="location-layout">
@@ -67,6 +118,60 @@ function Lokasi() {
 						{!loading && !error && locations.length === 0 && <div className="empty-state">Belum ada lokasi terdaftar.</div>}
 					</section>
 				</div>
+
+				{showModal && (
+					<div className="modal-overlay" onClick={() => setShowModal(false)}>
+						<div className="employee-modal" onClick={(e) => e.stopPropagation()}>
+							<div className="modal-header">
+								<div>
+									<h3>Tambah Titik Presensi</h3>
+									<p>Buat titik lokasi absen baru dengan geofence</p>
+								</div>
+								<button className="modal-close" onClick={() => setShowModal(false)}>×</button>
+							</div>
+
+							{formError && <div className="form-error">{formError}</div>}
+
+							<form onSubmit={handleAddLocation}>
+								<div className="form-grid">
+									<div className="form-field">
+										<label>Nama Lokasi*</label>
+										<input name="nama" required placeholder="Contoh: Gedung Rektorat" />
+									</div>
+
+									<div className="form-field">
+										<label>Alamat</label>
+										<input name="alamat" placeholder="Alamat lokasi" />
+									</div>
+
+									<div className="form-field">
+										<label>Latitude*</label>
+										<input name="latitude" type="number" step="0.000001" required placeholder="-1.234567" />
+									</div>
+
+									<div className="form-field">
+										<label>Longitude*</label>
+										<input name="longitude" type="number" step="0.000001" required placeholder="119.234567" />
+									</div>
+
+									<div className="form-field">
+										<label>Radius Geofence (meter)</label>
+										<input name="radius_meters" type="number" min="10" defaultValue="100" placeholder="100" />
+									</div>
+								</div>
+
+								<div className="modal-actions">
+									<button type="button" className="secondary-button" onClick={() => setShowModal(false)}>
+										Batal
+									</button>
+									<button type="submit" className="primary-button" disabled={loading}>
+										{loading ? "Menyimpan..." : "Simpan Lokasi"}
+									</button>
+								</div>
+							</form>
+						</div>
+					</div>
+				)}
 			</div>
 		</AdminLayout>
 	);
