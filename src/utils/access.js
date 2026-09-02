@@ -51,6 +51,9 @@ export const canManageLocations = () =>
 export const isAdminUnitOrLeader = () =>
   hasAnyRole(["admin_unit", "pimpinan"]);
 
+export const isRestrictedToUnit = () =>
+  hasAnyRole(["admin_unit", "pimpinan"]);
+
 export const canEditEmployee = () =>
   hasAnyRole(["super_admin", "admin_unit", "developer"]);
 
@@ -59,6 +62,9 @@ export const canDeleteEmployee = () =>
 
 export const canAddEmployee = () =>
   hasAnyRole(["super_admin", "admin_kepegawaian", "developer"]);
+
+export const canApproveRequests = () =>
+  hasAnyRole(["super_admin", "pimpinan", "developer"]);
 
 export const getUserUnit = () => 
   localStorage.getItem("userUnit") || localStorage.getItem("unit") || "";

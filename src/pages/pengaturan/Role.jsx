@@ -2,24 +2,136 @@ import { useEffect, useState } from "react";
 import AdminLayout from "../../components/layout/AdminLayout";
 import { apiRequest } from "../../services/api";
 
-const AVAILABLE_PERMISSIONS = [
-  { id: "dashboard", label: "Dashboard", category: "Core" },
-  { id: "monitoring", label: "Monitoring Presensi", category: "Monitoring" },
-  { id: "pegawai", label: "Kelola Pegawai", category: "Pegawai" },
-  { id: "pegawai_tambah", label: "Tambah Pegawai", category: "Pegawai" },
-  { id: "pegawai_edit", label: "Edit Pegawai", category: "Pegawai" },
-  { id: "unit", label: "Kelola Unit Kerja", category: "Organisasi" },
-  { id: "shift", label: "Kelola Shift Kerja", category: "Jadwal" },
-  { id: "jadwal", label: "Jadwal Kerja", category: "Jadwal" },
-  { id: "lokasi", label: "Lokasi & Geofence", category: "Lokasi" },
-  { id: "verifikasi", label: "Verifikasi Presensi", category: "Presensi" },
-  { id: "pengajuan", label: "Kelola Pengajuan", category: "Pengajuan" },
-  { id: "persetujuan", label: "Persetujuan", category: "Approval" },
-  { id: "laporan", label: "Laporan & Rekap", category: "Laporan" },
-  { id: "kalender", label: "Kalender Akademik", category: "Jadwal" },
-  { id: "pengaturan", label: "Pengaturan Sistem", category: "Admin" },
-  { id: "siga8", label: "Pemetaan SIGA8", category: "Integrasi" },
-];
+const AVAILABLE_PERMISSIONS = {
+  dashboard: {
+    label: "Dashboard",
+    category: "Core",
+    subPermissions: [],
+  },
+  monitoring: {
+    label: "Monitoring Presensi",
+    category: "Monitoring",
+    subPermissions: [],
+  },
+  pegawai: {
+    label: "Kelola Pegawai",
+    category: "Pegawai",
+    subPermissions: [
+      { id: "pegawai.view", label: "Lihat Data" },
+      { id: "pegawai.create", label: "Tambah Pegawai" },
+      { id: "pegawai.edit", label: "Edit Pegawai" },
+      { id: "pegawai.delete", label: "Hapus Pegawai" },
+    ],
+  },
+  unit: {
+    label: "Kelola Unit Kerja",
+    category: "Organisasi",
+    subPermissions: [
+      { id: "unit.view", label: "Lihat Data" },
+      { id: "unit.create", label: "Tambah Unit" },
+      { id: "unit.edit", label: "Edit Unit" },
+      { id: "unit.delete", label: "Hapus Unit" },
+    ],
+  },
+  jadwal: {
+    label: "Jadwal Kerja",
+    category: "Jadwal",
+    subPermissions: [
+      { id: "jadwal.view", label: "Lihat Jadwal" },
+      { id: "jadwal.edit", label: "Edit Jadwal" },
+    ],
+  },
+  shift: {
+    label: "Kelola Shift Kerja",
+    category: "Jadwal",
+    subPermissions: [
+      { id: "shift.view", label: "Lihat Shift" },
+      { id: "shift.create", label: "Tambah Shift" },
+      { id: "shift.edit", label: "Edit Shift" },
+      { id: "shift.delete", label: "Hapus Shift" },
+    ],
+  },
+  lokasi: {
+    label: "Lokasi & Geofence",
+    category: "Lokasi",
+    subPermissions: [
+      { id: "lokasi.view", label: "Lihat Lokasi" },
+      { id: "lokasi.create", label: "Tambah Lokasi" },
+      { id: "lokasi.edit", label: "Edit Lokasi" },
+      { id: "lokasi.delete", label: "Hapus Lokasi" },
+    ],
+  },
+  verifikasi: {
+    label: "Verifikasi Presensi",
+    category: "Presensi",
+    subPermissions: [
+      { id: "verifikasi.view", label: "Lihat Data" },
+      { id: "verifikasi.approve", label: "Verifikasi/Koreksi" },
+    ],
+  },
+  pengajuan: {
+    label: "Kelola Pengajuan",
+    category: "Pengajuan",
+    subPermissions: [
+      { id: "pengajuan.view", label: "Lihat Pengajuan" },
+      { id: "pengajuan.create", label: "Buat Pengajuan" },
+      { id: "pengajuan.edit", label: "Edit Pengajuan" },
+      { id: "pengajuan.delete", label: "Hapus Pengajuan" },
+    ],
+  },
+  persetujuan: {
+    label: "Persetujuan",
+    category: "Approval",
+    subPermissions: [
+      { id: "persetujuan.view", label: "Lihat Pengajuan" },
+      { id: "persetujuan.approve", label: "Setujui Pengajuan" },
+      { id: "persetujuan.reject", label: "Tolak Pengajuan" },
+    ],
+  },
+  laporan: {
+    label: "Laporan & Rekap",
+    category: "Laporan",
+    subPermissions: [
+      { id: "laporan.view", label: "Lihat Laporan" },
+      { id: "laporan.export", label: "Export (PDF/CSV)" },
+    ],
+  },
+  kalender: {
+    label: "Kalender Akademik",
+    category: "Jadwal",
+    subPermissions: [
+      { id: "kalender.view", label: "Lihat Kalender" },
+      { id: "kalender.edit", label: "Edit Kalender" },
+    ],
+  },
+  kinerja: {
+    label: "Penilaian Kinerja",
+    category: "Kinerja",
+    subPermissions: [
+      { id: "kinerja.view", label: "Lihat Penilaian" },
+      { id: "kinerja.create", label: "Buat Penilaian" },
+      { id: "kinerja.edit", label: "Edit Penilaian" },
+      { id: "kinerja.delete", label: "Hapus Penilaian" },
+    ],
+  },
+  pengaturan: {
+    label: "Pengaturan Sistem",
+    category: "Admin",
+    subPermissions: [
+      { id: "pengaturan.view", label: "Lihat Pengaturan" },
+      { id: "pengaturan.edit", label: "Edit Pengaturan" },
+      { id: "pengaturan.role", label: "Manajemen Role & Permission" },
+    ],
+  },
+  siga8: {
+    label: "Pemetaan SIGA8",
+    category: "Integrasi",
+    subPermissions: [
+      { id: "siga8.view", label: "Lihat Pemetaan" },
+      { id: "siga8.edit", label: "Edit Pemetaan" },
+    ],
+  },
+};
 
 const DEFAULT_ROLES = [
   { id: "super_admin", name: "Super Admin", is_system: true, description: "Akses penuh ke semua fitur" },
@@ -68,13 +180,66 @@ function Role() {
     });
   };
 
-  const handlePermissionToggle = (permissionId) => {
+  const handlePermissionToggle = (permissionKey, subPermId = null) => {
     setFormData((prev) => {
-      const permissions = prev.permissions.includes(permissionId)
-        ? prev.permissions.filter((p) => p !== permissionId)
-        : [...prev.permissions, permissionId];
+      const permissions = [...prev.permissions];
+      
+      if (subPermId) {
+        // Toggle sub-permission
+        const index = permissions.indexOf(subPermId);
+        if (index > -1) {
+          permissions.splice(index, 1);
+        } else {
+          permissions.push(subPermId);
+        }
+      } else {
+        // Toggle parent permission - enable/disable all sub-permissions
+        const permConfig = AVAILABLE_PERMISSIONS[permissionKey];
+        if (permConfig && permConfig.subPermissions && permConfig.subPermissions.length > 0) {
+          const subPerms = permConfig.subPermissions.map((sp) => sp.id);
+          const allIncluded = subPerms.every((sp) => permissions.includes(sp));
+          
+          if (allIncluded) {
+            // Uncheck all
+            const filtered = permissions.filter((p) => !subPerms.includes(p));
+            return { ...prev, permissions: filtered };
+          } else {
+            // Check all
+            const combined = new Set([...permissions, ...subPerms]);
+            return { ...prev, permissions: Array.from(combined) };
+          }
+        } else {
+          // No sub-permissions, toggle main permission
+          const index = permissions.indexOf(permissionKey);
+          if (index > -1) {
+            permissions.splice(index, 1);
+          } else {
+            permissions.push(permissionKey);
+          }
+        }
+      }
+      
       return { ...prev, permissions };
     });
+  };
+
+  const isParentPermissionChecked = (permissionKey) => {
+    const permConfig = AVAILABLE_PERMISSIONS[permissionKey];
+    if (permConfig && permConfig.subPermissions && permConfig.subPermissions.length > 0) {
+      const subPerms = permConfig.subPermissions.map((sp) => sp.id);
+      return subPerms.every((sp) => formData.permissions.includes(sp));
+    }
+    return formData.permissions.includes(permissionKey);
+  };
+
+  const isParentPermissionIndeterminate = (permissionKey) => {
+    const permConfig = AVAILABLE_PERMISSIONS[permissionKey];
+    if (permConfig && permConfig.subPermissions && permConfig.subPermissions.length > 0) {
+      const subPerms = permConfig.subPermissions.map((sp) => sp.id);
+      const checkedCount = subPerms.filter((sp) => formData.permissions.includes(sp)).length;
+      return checkedCount > 0 && checkedCount < subPerms.length;
+    }
+    return false;
   };
 
   const handleSaveRole = async (e) => {
@@ -161,9 +326,10 @@ function Role() {
     }
   };
 
-  const groupedPermissions = AVAILABLE_PERMISSIONS.reduce((acc, perm) => {
-    if (!acc[perm.category]) acc[perm.category] = [];
-    acc[perm.category].push(perm);
+  const groupedPermissions = Object.entries(AVAILABLE_PERMISSIONS).reduce((acc, [key, config]) => {
+    const category = config.category;
+    if (!acc[category]) acc[category] = [];
+    acc[category].push({ key, ...config });
     return acc;
   }, {});
 
@@ -231,8 +397,18 @@ function Role() {
                   {selectedRole.permissions && selectedRole.permissions.length > 0 ? (
                     <div className="permission-tags">
                       {selectedRole.permissions.map((perm) => {
-                        const permLabel = AVAILABLE_PERMISSIONS.find((p) => p.id === perm)?.label || perm;
-                        return <span key={perm} className="permission-tag">{permLabel}</span>;
+                        // Check if it's a sub-permission
+                        const parts = perm.split(".");
+                        if (parts.length === 2) {
+                          const parentKey = parts[0];
+                          const parentConfig = AVAILABLE_PERMISSIONS[parentKey];
+                          const subConfig = parentConfig?.subPermissions?.find((sp) => sp.id === perm);
+                          return <span key={perm} className="permission-tag sub-permission-tag">{subConfig?.label || perm}</span>;
+                        }
+                        
+                        // It's a parent permission
+                        const permConfig = AVAILABLE_PERMISSIONS[perm];
+                        return <span key={perm} className="permission-tag parent-permission-tag">{permConfig?.label || perm}</span>;
                       })}
                     </div>
                   ) : (
@@ -277,10 +453,34 @@ function Role() {
                           <h4>{category}</h4>
                           <div className="permission-checkboxes">
                             {perms.map((perm) => (
-                              <label key={perm.id} className="checkbox-label">
-                                <input type="checkbox" checked={formData.permissions.includes(perm.id)} onChange={() => handlePermissionToggle(perm.id)} />
-                                <span>{perm.label}</span>
-                              </label>
+                              <div key={perm.key} className="permission-item">
+                                <label className="checkbox-label parent-permission">
+                                  <input
+                                    type="checkbox"
+                                    checked={isParentPermissionChecked(perm.key)}
+                                    onChange={() => handlePermissionToggle(perm.key)}
+                                    style={{
+                                      accentColor: isParentPermissionIndeterminate(perm.key) ? "#666" : undefined,
+                                    }}
+                                  />
+                                  <span style={{ fontWeight: "600" }}>{perm.label}</span>
+                                </label>
+                                
+                                {perm.subPermissions && perm.subPermissions.length > 0 && (
+                                  <div className="sub-permissions">
+                                    {perm.subPermissions.map((subPerm) => (
+                                      <label key={subPerm.id} className="checkbox-label">
+                                        <input
+                                          type="checkbox"
+                                          checked={formData.permissions.includes(subPerm.id)}
+                                          onChange={() => handlePermissionToggle(perm.key, subPerm.id)}
+                                        />
+                                        <span>{subPerm.label}</span>
+                                      </label>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
                             ))}
                           </div>
                         </div>

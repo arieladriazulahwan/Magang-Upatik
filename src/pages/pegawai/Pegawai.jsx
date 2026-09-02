@@ -2,12 +2,14 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AdminLayout from "../../components/layout/AdminLayout";
 import { apiRequest } from "../../services/api";
-import { canAddEmployee, canEditEmployee } from "../../utils/access";
+import { canAddEmployee, canEditEmployee, isRestrictedToUnit, getUserUnit } from "../../utils/access";
 
 function Pegawai() {
   const navigate = useNavigate();
   const canCreateEmployee = canAddEmployee();
   const canEdit = canEditEmployee();
+  const userIsRestricted = isRestrictedToUnit();
+  const userUnit = getUserUnit();
 
   const [employees, setEmployees] = useState([]);
   const [search, setSearch] = useState("");
@@ -92,7 +94,12 @@ function Pegawai() {
       type === "Semua" ||
       employeeType === type;
 
-    return matchesSearch && matchesType;
+    // Filter berdasarkan unit jika user adalah admin_unit atau pimpinan
+    const matchesUnit = 
+      !userIsRestricted || 
+      unit.toLowerCase() === userUnit.toLowerCase();
+
+    return matchesSearch && matchesType && matchesUnit;
   });
 
 

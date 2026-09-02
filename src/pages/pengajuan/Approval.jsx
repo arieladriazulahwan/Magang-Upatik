@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import AdminLayout from "../../components/layout/AdminLayout";
 import { apiRequest } from "../../services/api";
+import { isRestrictedToUnit, getUserUnit } from "../../utils/access";
 
 const normalizeArray = (payload) => {
   if (Array.isArray(payload)) return payload;
@@ -100,6 +101,8 @@ function Approval() {
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const userIsRestricted = isRestrictedToUnit();
+  const userUnit = getUserUnit();
 
   const fetchApprovals = async () => {
     try {
@@ -136,7 +139,12 @@ function Approval() {
       typeFilter === "Semua Jenis" ||
       item.type.toLowerCase() === typeFilter.toLowerCase();
 
-    return matchSearch && matchStatus && matchType;
+    // Filter berdasarkan unit jika user adalah pimpinan
+    const matchUnit = 
+      !userIsRestricted || 
+      item.unit.toLowerCase() === userUnit.toLowerCase();
+
+    return matchSearch && matchStatus && matchType && matchUnit;
   });
 
   const handleApprove = async (id) => {
@@ -225,16 +233,21 @@ function Approval() {
         <section className="data-panel">
           <div className="approval-toolbar">
             <div className="approval-chips">
-              {["Semua Jenis", "Cuti", "Izin", "Sakit", "WFH", "Lembur", "Dinas"].map((type) => (
-                <button
-                  key={type}
-                  className={typeFilter === type ? "approval-chip active" : "approval-chip"}
-                  onClick={() => setTypeFilter(type)}
-                >
-                  {type}
-                  <span>{type === "Semua Jenis" ? data.length : data.filter((item) => item.type === type).length}</span>
-                </button>
-              ))}
+              {["Semua Jenis", "Cuti", "Izin", "Sakit", "WFH", "Lembur", "Dinas"].map((type) => {
+                const dataToCount = userIsRestricted 
+                  ? data.filter(item => item.unit.toLowerCase() === userUnit.toLowerCase())
+                  : data;
+                return (
+                  <button
+                    key={type}
+                    className={typeFilter === type ? "approval-chip active" : "approval-chip"}
+                    onClick={() => setTypeFilter(type)}
+                  >
+                    {type}
+                    <span>{type === "Semua Jenis" ? dataToCount.length : dataToCount.filter((item) => item.type === type).length}</span>
+                  </button>
+                );
+              })}
             </div>
 
             <select
