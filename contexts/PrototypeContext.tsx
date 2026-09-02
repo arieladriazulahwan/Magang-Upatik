@@ -169,6 +169,9 @@ interface PrototypeContextValue {
       endDate: string;
       reason: string;
       attachment?: RequestAttachment | null;
+      doctorLetterType?: "dokter_biasa" | "tim_penguji_kesehatan";
+      doctorLetterNumber?: string;
+      doctorFacilityName?: string;
     }
   ) => Promise<boolean>;
 
@@ -1615,6 +1618,33 @@ export function PrototypeProvider({
                   payload.reason ||
                     payload.title
                 );
+
+                if (
+                  payload.doctorLetterType
+                ) {
+                  formData.append(
+                    "doctor_letter_type",
+                    payload.doctorLetterType
+                  );
+                }
+
+                if (
+                  payload.doctorLetterNumber
+                ) {
+                  formData.append(
+                    "doctor_letter_number",
+                    payload.doctorLetterNumber
+                  );
+                }
+
+                if (
+                  payload.doctorFacilityName
+                ) {
+                  formData.append(
+                    "doctor_facility_name",
+                    payload.doctorFacilityName
+                  );
+                }
 
                 /* =================================
                    ATTACHMENT

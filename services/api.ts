@@ -18,7 +18,7 @@ import * as SecureStore from "expo-secure-store";
 
 const DEFAULT_API_URL =
   Platform.OS === "android"
-    ? "http://10.10.16.100:8000/api"
+    ? "http://10.10.16.53:8000/api"
     : "http://127.0.0.1:8000/api";
 
 export const API_URL =

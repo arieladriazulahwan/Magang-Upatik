@@ -281,6 +281,18 @@ export default function PengajuanBaruScreen() {
     useState("");
 
   const [
+    doctorLetterNumber,
+    setDoctorLetterNumber,
+  ] =
+    useState("");
+
+  const [
+    doctorFacilityName,
+    setDoctorFacilityName,
+  ] =
+    useState("");
+
+  const [
     selectedFile,
     setSelectedFile,
   ] =
@@ -521,6 +533,30 @@ export default function PengajuanBaruScreen() {
         return;
       }
 
+      if (
+        type === "Sakit" &&
+        !doctorLetterNumber.trim()
+      ) {
+        Alert.alert(
+          "Nomor surat diperlukan",
+          "Cuti sakit wajib mengisi nomor surat dokter."
+        );
+
+        return;
+      }
+
+      if (
+        type === "Sakit" &&
+        !selectedFile
+      ) {
+        Alert.alert(
+          "Dokumen diperlukan",
+          "Cuti sakit wajib melampirkan surat dokter."
+        );
+
+        return;
+      }
+
       /* =========================================
          SUBMIT
       ========================================= */
@@ -553,6 +589,21 @@ export default function PengajuanBaruScreen() {
 
           attachment:
             selectedFile,
+
+          doctorLetterType:
+            type === "Sakit"
+              ? "dokter_biasa"
+              : undefined,
+
+          doctorLetterNumber:
+            type === "Sakit"
+              ? doctorLetterNumber.trim()
+              : undefined,
+
+          doctorFacilityName:
+            type === "Sakit"
+              ? doctorFacilityName.trim()
+              : undefined,
         });
 
       /* =========================================
@@ -747,6 +798,42 @@ export default function PengajuanBaruScreen() {
           loadingRequest
         }
       />
+
+      {type === "Sakit" ? (
+        <View
+          style={
+            styles.sickFields
+          }
+        >
+          <Field
+            label="Nomor surat dokter"
+            value={
+              doctorLetterNumber
+            }
+            onChangeText={
+              setDoctorLetterNumber
+            }
+            placeholder="Contoh: 445/RS/2026"
+            disabled={
+              loadingRequest
+            }
+          />
+
+          <Field
+            label="Fasilitas kesehatan"
+            value={
+              doctorFacilityName
+            }
+            onChangeText={
+              setDoctorFacilityName
+            }
+            placeholder="Nama rumah sakit / klinik"
+            disabled={
+              loadingRequest
+            }
+          />
+        </View>
+      ) : null}
 
       {/* ==================================================
           DOKUMEN
@@ -1354,6 +1441,10 @@ const styles =
       backgroundColor:
         "#F5F6F8",
       opacity: 0.75,
+    },
+
+    sickFields: {
+      gap: 12,
     },
 
     typeGrid: {
