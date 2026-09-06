@@ -33,10 +33,21 @@ import { Ionicons } from "@expo/vector-icons";
 
 import {
   ApiAttendance,
+  ApiWorkLocation,
   checkIn,
   checkOut,
   getAttendance,
+  getProfile,
+  getWorkUnit,
 } from "../../services/api";
+import {
+  getWitaDateKey,
+  formatWitaLongDate,
+  formatWitaTime,
+} from "../../constants/time";
+import {
+  usePrototype,
+} from "../../contexts/PrototypeContext";
 
 /* ============================================================
    COLORS
@@ -81,42 +92,26 @@ type AttendanceKind =
   | "masuk"
   | "pulang";
 
+type LocationStatus =
+  | {
+      kind: "idle";
+      text: string;
+    }
+  | {
+      kind: "inside" | "outside" | "unknown";
+      text: string;
+      locationName?: string;
+      distanceMeters?: number;
+    };
+
 /* ============================================================
    HELPERS
 ============================================================ */
 
-function formatTime(
-  value: string | null | undefined
-) {
-  if (!value) {
-    return "--:--";
-  }
-
-  const date = new Date(value);
-
-  if (!Number.isNaN(date.getTime())) {
-    return date.toLocaleTimeString("id-ID", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
-  }
-
-  return value.slice(0, 5);
-}
-
 function formatDate(
   value: Date
 ) {
-  return value.toLocaleDateString(
-    "id-ID",
-    {
-      weekday: "long",
-      day: "2-digit",
-      month: "long",
-      year: "numeric",
-    }
-  );
+  return formatWitaLongDate(value);
 }
 
 function getErrorMessage(
@@ -129,11 +124,166 @@ function getErrorMessage(
   return "Terjadi kesalahan saat melakukan presensi.";
 }
 
+function toNumber(
+  value: number | string
+) {
+  return typeof value === "number"
+    ? value
+    : Number(value);
+}
+
+function distanceMeters(
+  from: {
+    latitude: number;
+    longitude: number;
+  },
+  to: {
+    latitude: number;
+    longitude: number;
+  }
+) {
+  const earthRadius =
+    6371000;
+  const lat1 =
+    (from.latitude * Math.PI) /
+    180;
+  const lat2 =
+    (to.latitude * Math.PI) /
+    180;
+  const deltaLat =
+    ((to.latitude - from.latitude) *
+      Math.PI) /
+    180;
+  const deltaLng =
+    ((to.longitude - from.longitude) *
+      Math.PI) /
+    180;
+
+  const a =
+    Math.sin(deltaLat / 2) *
+      Math.sin(deltaLat / 2) +
+    Math.cos(lat1) *
+      Math.cos(lat2) *
+      Math.sin(deltaLng / 2) *
+      Math.sin(deltaLng / 2);
+
+  return (
+    earthRadius *
+    2 *
+    Math.atan2(
+      Math.sqrt(a),
+      Math.sqrt(1 - a)
+    )
+  );
+}
+
+function formatDistance(
+  value: number
+) {
+  if (value >= 1000) {
+    return `${(value / 1000).toFixed(2)} km`;
+  }
+
+  return `${Math.round(value)} m`;
+}
+
+function buildLocationStatus(
+  currentLocation: {
+    latitude: number;
+    longitude: number;
+  },
+  locations: ApiWorkLocation[]
+): LocationStatus {
+  const activeLocations =
+    locations.filter(
+      (item) =>
+        item.is_active !== false
+    );
+
+  if (
+    activeLocations.length === 0
+  ) {
+    return {
+      kind: "unknown",
+      text: "Lokasi presensi unit belum tersedia.",
+    };
+  }
+
+  const nearest =
+    activeLocations
+      .map((item) => {
+        const latitude =
+          toNumber(item.latitude);
+        const longitude =
+          toNumber(item.longitude);
+
+        return {
+          item,
+          distance:
+            distanceMeters(
+              currentLocation,
+              {
+                latitude,
+                longitude,
+              }
+            ),
+        };
+      })
+      .filter(
+        (entry) =>
+          Number.isFinite(
+            entry.distance
+          )
+      )
+      .sort(
+        (a, b) =>
+          a.distance - b.distance
+      )[0];
+
+  if (!nearest) {
+    return {
+      kind: "unknown",
+      text: "Lokasi presensi belum dapat dihitung.",
+    };
+  }
+
+  const radius =
+    nearest.item.radius_meters;
+  const roundedDistance =
+    Math.round(nearest.distance);
+
+  if (
+    nearest.distance <= radius
+  ) {
+    return {
+      kind: "inside",
+      locationName:
+        nearest.item.name,
+      distanceMeters:
+        roundedDistance,
+      text: `Di area ${nearest.item.name}`,
+    };
+  }
+
+  return {
+    kind: "outside",
+    locationName:
+      nearest.item.name,
+    distanceMeters:
+      roundedDistance,
+    text: `${formatDistance(roundedDistance)} dari ${nearest.item.name}`,
+  };
+}
+
 /* ============================================================
    SCREEN
 ============================================================ */
 
 export default function PresensiScreen() {
+  const {
+    pushNotification,
+  } = usePrototype();
+
   /* ==========================================================
      CAMERA
   ========================================================== */
@@ -145,6 +295,9 @@ export default function PresensiScreen() {
 
   const cameraRef =
     useRef<CameraView | null>(null);
+
+  const locationAutoChecked =
+    useRef(false);
 
   const [
     cameraReady,
@@ -188,6 +341,21 @@ export default function PresensiScreen() {
     locationLoading,
     setLocationLoading,
   ] = useState(false);
+
+  const [
+    workLocations,
+    setWorkLocations,
+  ] =
+    useState<ApiWorkLocation[]>([]);
+
+  const [
+    locationStatus,
+    setLocationStatus,
+  ] =
+    useState<LocationStatus>({
+      kind: "idle",
+      text: "Mendeteksi jarak dari lokasi presensi unit kerja.",
+    });
 
   /* ==========================================================
      PROCESS
@@ -233,12 +401,18 @@ export default function PresensiScreen() {
         setAttendanceLoading(true);
 
         const today =
-          new Date()
-            .toISOString()
-            .slice(0, 10);
+          getWitaDateKey();
+
+        const profile =
+          await getProfile();
+        const employeeId =
+          profile.user.employee?.id;
 
         const response =
           await getAttendance({
+            employee_id:
+              employeeId,
+
             date_from: today,
             date_to: today,
             per_page: 10,
@@ -250,10 +424,14 @@ export default function PresensiScreen() {
         const current =
           items.find(
             (item: ApiAttendance) =>
-              item.check_in ||
-              item.check_out
+              item.date === today &&
+              (item.check_in ||
+                item.check_out)
           ) ||
-          items[0] ||
+          items.find(
+            (item: ApiAttendance) =>
+              item.date === today
+          ) ||
           null;
 
         setTodayAttendance(current);
@@ -305,6 +483,80 @@ export default function PresensiScreen() {
   useEffect(() => {
     loadTodayAttendance();
   }, [loadTodayAttendance]);
+
+  useEffect(() => {
+    if (!location) {
+      return;
+    }
+
+    setLocationStatus(
+      buildLocationStatus(
+        {
+          latitude:
+            location.coords.latitude,
+          longitude:
+            location.coords.longitude,
+        },
+        workLocations
+      )
+    );
+  }, [location, workLocations]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadWorkLocations() {
+      try {
+        const profile =
+          await getProfile();
+        const workUnitId =
+          profile.user.employee
+            ?.work_unit?.id;
+
+        if (!workUnitId) {
+          if (active) {
+            setLocationStatus({
+              kind: "unknown",
+              text: "Unit kerja belum tertaut ke akun ini.",
+            });
+          }
+
+          return;
+        }
+
+        const response =
+          await getWorkUnit(
+            workUnitId
+          );
+        const locations =
+          response.data.locations || [];
+
+        if (active) {
+          setWorkLocations(
+            locations
+          );
+        }
+      } catch (error) {
+        console.error(
+          "WORK LOCATION LOAD ERROR:",
+          error
+        );
+
+        if (active) {
+          setLocationStatus({
+            kind: "unknown",
+            text: "Lokasi presensi unit belum dapat dimuat.",
+          });
+        }
+      }
+    }
+
+    loadWorkLocations();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   /* ==========================================================
      CAMERA PERMISSION
@@ -375,10 +627,19 @@ export default function PresensiScreen() {
 
       setLocation(current);
 
-      return {
+      const currentLocation = {
         latitude: current.coords.latitude,
         longitude: current.coords.longitude,
       };
+
+      setLocationStatus(
+        buildLocationStatus(
+          currentLocation,
+          workLocations
+        )
+      );
+
+      return currentLocation;
     } catch (error) {
       console.error(
         "LOCATION ERROR:",
@@ -395,6 +656,20 @@ export default function PresensiScreen() {
       setLocationLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (
+      locationAutoChecked.current ||
+      workLocations.length === 0
+    ) {
+      return;
+    }
+
+    locationAutoChecked.current =
+      true;
+
+    getCurrentLocation();
+  }, [workLocations]);
 
 /* ==========================================================
    TAKE PHOTO
@@ -471,6 +746,13 @@ export default function PresensiScreen() {
 
       setProcessing(false);
       setStep("camera");
+
+      pushNotification({
+        title: "Presensi gagal",
+        desc: getErrorMessage(error),
+        status: "error",
+        category: "attendance",
+      });
 
       Alert.alert(
         "Presensi gagal",
@@ -603,15 +885,8 @@ export default function PresensiScreen() {
 
         const finalTime =
           serverTime
-            ? formatTime(serverTime)
-            : new Date().toLocaleTimeString(
-                "id-ID",
-                {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  hour12: false,
-                }
-              );
+            ? formatWitaTime(serverTime, "--:--")
+            : formatWitaTime(new Date(), "--:--");
 
         setResultTime(
           finalTime
@@ -624,6 +899,19 @@ export default function PresensiScreen() {
             : "Presensi pulang berhasil dicatat."
         );
 
+        pushNotification({
+          title:
+            attendanceKind === "masuk"
+              ? "Presensi masuk berhasil"
+              : "Presensi pulang berhasil",
+          desc:
+            attendanceKind === "masuk"
+              ? `Presensi masuk tercatat pada ${finalTime}`
+              : `Presensi pulang tercatat pada ${finalTime}`,
+          status: "success",
+          category: "attendance",
+        });
+
         /*
          * Selesai
          */
@@ -635,12 +923,33 @@ export default function PresensiScreen() {
           error
         );
 
+        const message =
+          getErrorMessage(error);
+
+        if (
+          message
+            .toLowerCase()
+            .includes(
+              "tidak ditemukan presensi masuk"
+            )
+        ) {
+          setTodayAttendance(null);
+          setAttendanceKind("masuk");
+        }
+
         setProcessing(false);
         setStep("camera");
 
+        pushNotification({
+          title: "Presensi gagal",
+          desc: message,
+          status: "error",
+          category: "attendance",
+        });
+
         Alert.alert(
           "Presensi gagal",
-          getErrorMessage(error)
+          message
         );
       }
     };
@@ -1188,8 +1497,16 @@ export default function PresensiScreen() {
                     style={
                       styles.verifiedText
                     }
+                    numberOfLines={1}
                   >
-                    Terverifikasi
+                    {resultAttendance
+                      ?.work_location
+                      ?.name ||
+                      (locationStatus.kind !==
+                      "idle"
+                        ? locationStatus.locationName
+                        : undefined) ||
+                      "Terverifikasi"}
                   </Text>
                 </View>
               </View>
@@ -1461,7 +1778,7 @@ export default function PresensiScreen() {
                   }
                 >
                   Pukul{" "}
-                  {formatTime(
+                  {formatWitaTime(
                     todayAttendance?.check_in
                   )}
                 </Text>
@@ -1511,25 +1828,56 @@ export default function PresensiScreen() {
           </Pressable>
 
           <View
-            style={
-              styles.locationHint
-            }
+            style={[
+              styles.locationHint,
+              locationStatus.kind ===
+              "inside"
+                ? styles.locationHintInside
+                : null,
+              locationStatus.kind ===
+              "outside"
+                ? styles.locationHintOutside
+                : null,
+            ]}
           >
             <Ionicons
-              name="location-outline"
+              name={
+                locationStatus.kind ===
+                "inside"
+                  ? "checkmark-circle"
+                  : locationStatus.kind ===
+                    "outside"
+                  ? "alert-circle"
+                  : "location-outline"
+              }
               size={16}
               color={
-                COLORS.textSecondary
+                locationStatus.kind ===
+                "inside"
+                  ? COLORS.green
+                  : locationStatus.kind ===
+                    "outside"
+                  ? COLORS.red
+                  : COLORS.textSecondary
               }
             />
 
             <Text
-              style={
-                styles.locationHintText
-              }
+              style={[
+                styles.locationHintText,
+                locationStatus.kind ===
+                "inside"
+                  ? styles.locationHintTextInside
+                  : null,
+                locationStatus.kind ===
+                "outside"
+                  ? styles.locationHintTextOutside
+                  : null,
+              ]}
             >
-              Lokasi akan diverifikasi
-              otomatis oleh sistem.
+              {locationLoading
+                ? "Mendeteksi lokasi..."
+                : locationStatus.text}
             </Text>
           </View>
         </View>
@@ -2083,12 +2431,40 @@ const styles =
       alignItems: "center",
       justifyContent: "center",
       gap: 5,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      borderRadius: 12,
+      backgroundColor:
+        "rgba(238,241,246,0.78)",
+    },
+
+    locationHintInside: {
+      backgroundColor:
+        COLORS.greenLight,
+    },
+
+    locationHintOutside: {
+      backgroundColor:
+        COLORS.redLight,
     },
 
     locationHintText: {
       color:
         COLORS.textSecondary,
       fontSize: 10.5,
+      flex: 1,
+      textAlign: "center",
+      fontWeight: "700",
+    },
+
+    locationHintTextInside: {
+      color:
+        COLORS.green,
+    },
+
+    locationHintTextOutside: {
+      color:
+        COLORS.red,
     },
 
     /* ========================================================
@@ -2303,6 +2679,7 @@ const styles =
     },
 
     verifiedBadge: {
+      maxWidth: 170,
       flexDirection: "row",
       alignItems: "center",
       gap: 5,
@@ -2314,6 +2691,7 @@ const styles =
     },
 
     verifiedText: {
+      flexShrink: 1,
       color: COLORS.green,
       fontSize: 10.5,
       fontWeight: "800",

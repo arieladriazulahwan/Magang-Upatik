@@ -18,9 +18,9 @@ export const Colors = {
   warning: "#FBBF24",
   danger: "#DC2626",
 
-  line: "#E9EDF4",
+  line: "#E4E9F2",
   surface: "#FFFFFF",
-  surfaceMuted: "#F6F8FB",
+  surfaceMuted: "#EEF1F6",
 
   white: "#FFFFFF",
   black: "#000000",

@@ -3,8 +3,9 @@ import React, {
 } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
 import Avatar from "../../components/Avatar";
-import Badge from "../../components/Badge";
 import Button from "../../components/Button";
 import MainScreen from "../../components/MainScreen";
 import { Colors } from "../../constants/colors";
@@ -57,26 +58,82 @@ export default function ProfilScreen() {
 
   return (
     <MainScreen>
-      <View style={styles.profileCard}>
-        <Avatar initials={initials || "KP"} size={72} />
-        <Text style={styles.name}>{fullName}</Text>
-        <Text style={styles.role}>{role}</Text>
-        <Badge label={employee?.employee_type || "Pegawai"} tone="blue" />
-      </View>
+      <LinearGradient
+        colors={[
+          Colors.background,
+          Colors.backgroundMid,
+        ]}
+        start={{
+          x: 0,
+          y: 0,
+        }}
+        end={{
+          x: 1,
+          y: 1,
+        }}
+        style={styles.profileHero}
+      >
+        <View style={styles.profileGlow} />
+
+        <View style={styles.profileHeroTop}>
+          <Avatar initials={initials || "KP"} size={62} />
+
+          <View style={styles.profileHeroText}>
+            <Text style={styles.heroName} numberOfLines={2}>
+              {fullName}
+            </Text>
+            <Text style={styles.heroRole} numberOfLines={1}>
+              {role}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.heroChips}>
+          <View style={styles.heroChip}>
+            <Text style={styles.heroChipText}>
+              {employee?.employment_status || "Pegawai"}
+            </Text>
+          </View>
+          <View style={[styles.heroChip, styles.heroChipGreen]}>
+            <Text style={[styles.heroChipText, styles.heroChipTextGreen]}>
+              Pegawai
+            </Text>
+          </View>
+          <View style={styles.heroChipBlue}>
+            <Text style={styles.heroChipBlueText}>
+              {employee?.employee_type || "Aktif"}
+            </Text>
+          </View>
+        </View>
+      </LinearGradient>
 
       <View style={styles.panel}>
         <InfoRow label="NIP" value={employee?.nip || "-"} mono />
         <InfoRow label="Unit kerja" value={employee?.work_unit?.name || "-"} />
+        <InfoRow label="Kategori" value={employee?.employee_type || "-"} />
         <InfoRow label="Status" value={employee?.employment_status || "-"} />
-        <InfoRow label="Pangkat/Golongan" value="-" />
-        <InfoRow label="Minimal kerja" value="-" />
+      </View>
+
+      <View style={styles.faceCard}>
+        <View style={styles.faceIcon}>
+          <Ionicons
+            name="person-circle-outline"
+            size={23}
+            color="#16A34A"
+          />
+        </View>
+        <View style={styles.faceContent}>
+          <Text style={styles.faceTitle}>Data wajah terdaftar</Text>
+          <Text style={styles.faceSubtitle}>Terverifikasi untuk presensi</Text>
+        </View>
+        <Text style={styles.faceAction}>Perbarui</Text>
       </View>
 
       <View style={styles.panel}>
-        <MenuRow label="Email" value={profile?.employee?.name ? profile.username : "-"} />
-        <MenuRow label="No. HP" value="-" />
-        <MenuRow label="Bahasa" value="Indonesia" />
-        <MenuRow label="Notifikasi" value="Aktif" />
+        <MenuRow icon="mail-outline" label="Email" value={profile?.employee?.name ? profile.username : "-"} />
+        <MenuRow icon="notifications-outline" label="Notifikasi" value="Aktif" />
+        <MenuRow icon="language-outline" label="Bahasa" value="Indonesia" />
+        <MenuRow icon="settings-outline" label="Pengaturan perangkat" value="" />
       </View>
 
       <Button
@@ -108,24 +165,103 @@ function InfoRow({ label, value, mono }: { label: string; value: string; mono?: 
   );
 }
 
-function MenuRow({ label, value }: { label: string; value: string }) {
+function MenuRow({ icon, label, value }: { icon: keyof typeof Ionicons.glyphMap; label: string; value: string }) {
   return (
     <Pressable style={styles.menuRow}>
+      <Ionicons
+        name={icon}
+        size={19}
+        color={Colors.textBody}
+      />
       <Text style={styles.menuLabel}>{label}</Text>
-      <Text style={styles.menuValue}>{value}</Text>
+      {value ? (
+        <Text style={styles.menuValue}>{value}</Text>
+      ) : (
+        <Ionicons
+          name="chevron-forward"
+          size={17}
+          color="#C2C9D6"
+        />
+      )}
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  profileCard: {
+  profileHero: {
+    overflow: "hidden",
+    gap: 14,
+    marginHorizontal: -16,
+    marginTop: -4,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 22,
+  },
+  profileGlow: {
+    position: "absolute",
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: "rgba(59,130,246,0.28)",
+    top: -90,
+    right: -50,
+  },
+  profileHeroTop: {
+    position: "relative",
+    flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    padding: 20,
-    borderRadius: 18,
-    backgroundColor: Colors.white,
-    borderWidth: 1,
-    borderColor: Colors.line,
+    gap: 14,
+  },
+  profileHeroText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  heroName: {
+    color: Colors.white,
+    fontSize: 16.5,
+    fontWeight: "800",
+    lineHeight: 21,
+  },
+  heroRole: {
+    color: Colors.textSecondary,
+    fontSize: 12,
+    fontWeight: "600",
+    marginTop: 3,
+  },
+  heroChips: {
+    position: "relative",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 7,
+  },
+  heroChip: {
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+    borderRadius: 9,
+    backgroundColor: "rgba(255,255,255,0.13)",
+  },
+  heroChipGreen: {
+    backgroundColor: "rgba(52,211,153,0.16)",
+  },
+  heroChipBlue: {
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+    borderRadius: 9,
+    backgroundColor: "rgba(96,165,250,0.18)",
+  },
+  heroChipText: {
+    color: "#CFE0F5",
+    fontSize: 10.5,
+    fontWeight: "800",
+    textTransform: "uppercase",
+  },
+  heroChipTextGreen: {
+    color: "#6EE7B7",
+  },
+  heroChipBlueText: {
+    color: "#93C5FD",
+    fontSize: 10.5,
+    fontWeight: "800",
   },
   name: {
     color: Colors.textInk,
@@ -145,6 +281,44 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     borderWidth: 1,
     borderColor: Colors.line,
+  },
+  faceCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 13,
+    padding: 14,
+    borderRadius: 16,
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.line,
+  },
+  faceIcon: {
+    width: 42,
+    height: 42,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    backgroundColor: "#E7F6ED",
+  },
+  faceContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+  faceTitle: {
+    color: Colors.textInk,
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  faceSubtitle: {
+    color: "#7A8699",
+    fontSize: 11,
+    fontWeight: "600",
+    marginTop: 2,
+  },
+  faceAction: {
+    color: Colors.primaryDark,
+    fontSize: 11,
+    fontWeight: "800",
   },
   infoRow: {
     flexDirection: "row",
@@ -171,13 +345,15 @@ const styles = StyleSheet.create({
   },
   menuRow: {
     flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
-    gap: 12,
+    gap: 13,
     padding: 14,
     borderBottomWidth: 1,
     borderBottomColor: "#F2F4F8",
   },
   menuLabel: {
+    flex: 1,
     color: Colors.textInk,
     fontSize: 13,
     fontWeight: "700",

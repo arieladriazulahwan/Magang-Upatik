@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -12,17 +12,36 @@ import { Ionicons } from "@expo/vector-icons";
 import Badge from "../../components/Badge";
 import MainScreen from "../../components/MainScreen";
 import { Colors } from "../../constants/colors";
+import {
+  formatWitaShortDate,
+  isWitaDateKeyInCurrentYear,
+  isWitaDateKeyInCurrentMonth,
+  isWitaDateKeyInCurrentWeek,
+  isWitaDateKeyToday,
+} from "../../constants/time";
+import {
+  SkeletonCard,
+} from "../../components/Skeleton";
 
 import {
   getLeaveRequests,
   getOvertimeRequests,
+  getProfile,
   getWfhRequests,
   ApiLeaveRequest,
   ApiOvertimeRequest,
   ApiWfhRequest,
 } from "../../services/api";
 
-const filters = ["Semua", "Izin", "Cuti", "Sakit", "WFH", "Lembur"];
+const filters = [
+  "Semua",
+  "Cuti",
+  "Sakit",
+  "Izin",
+  "WFA",
+  "Lembur",
+  "Perjadi",
+];
 
 type RequestItem = {
   id: string;
@@ -31,11 +50,69 @@ type RequestItem = {
   title: string;
   meta: string;
   days: string;
+  rawDate: string | null;
   createdAt: string | null;
 };
 
+type PeriodFilter =
+  | "all"
+  | "today"
+  | "week"
+  | "month"
+  | "year";
+
+const periodFilters: {
+  label: string;
+  value: PeriodFilter;
+}[] = [
+  {
+    label: "Semua",
+    value: "all",
+  },
+  {
+    label: "Hari ini",
+    value: "today",
+  },
+  {
+    label: "Minggu ini",
+    value: "week",
+  },
+  {
+    label: "Bulan ini",
+    value: "month",
+  },
+  {
+    label: "Tahun ini",
+    value: "year",
+  },
+];
+
+function isInPeriod(
+  rawDate: string | null,
+  period: PeriodFilter
+) {
+  switch (period) {
+    case "all":
+      return true;
+
+    case "today":
+      return isWitaDateKeyToday(rawDate);
+
+    case "week":
+      return isWitaDateKeyInCurrentWeek(rawDate);
+
+    case "year":
+      return isWitaDateKeyInCurrentYear(rawDate);
+
+    default:
+      return isWitaDateKeyInCurrentMonth(rawDate);
+  }
+}
+
 export default function PengajuanScreen() {
   const [activeFilter, setActiveFilter] = useState("Semua");
+  const [periodFilter, setPeriodFilter] =
+    useState<PeriodFilter>("month");
 
   const [requests, setRequests] = useState<RequestItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,11 +129,25 @@ export default function PengajuanScreen() {
       setLoading(true);
       setError(null);
 
+      const profile =
+        await getProfile();
+      const employeeId =
+        profile.user.employee?.id;
+
       const [leaveResult, wfhResult, overtimeResult] =
         await Promise.allSettled([
-          getLeaveRequests(),
-          getWfhRequests(),
-          getOvertimeRequests(),
+          getLeaveRequests({
+            employee_id:
+              employeeId,
+          }),
+          getWfhRequests({
+            employee_id:
+              employeeId,
+          }),
+          getOvertimeRequests({
+            employee_id:
+              employeeId,
+          }),
         ]);
 
       const result: RequestItem[] = [];
@@ -92,6 +183,9 @@ export default function PengajuanScreen() {
                   ? `${item.total_days} hari`
                   : "-",
 
+              rawDate:
+                item.start_date,
+
               createdAt:
                 item.created_at ?? null,
             });
@@ -106,7 +200,7 @@ export default function PengajuanScreen() {
 
       /**
        * --------------------------------------------------------
-       * WFH
+       * WFA / WFH
        * --------------------------------------------------------
        */
 
@@ -118,9 +212,9 @@ export default function PengajuanScreen() {
           (item: ApiWfhRequest) => {
             result.push({
               id: `wfh-${item.id}`,
-              type: "WFH",
+              type: "WFA",
               status: mapStatus(item.status),
-              title: "Work From Home",
+              title: "Work From Anywhere",
 
               meta: formatDateRange(
                 item.start_date,
@@ -132,6 +226,9 @@ export default function PengajuanScreen() {
                 item.total_days !== undefined
                   ? `${item.total_days} hari`
                   : "-",
+
+              rawDate:
+                item.start_date,
 
               createdAt:
                 item.created_at ?? null,
@@ -170,6 +267,9 @@ export default function PengajuanScreen() {
               days: formatOvertimeRange(
                 item
               ),
+
+              rawDate:
+                item.date,
 
               createdAt:
                 item.created_at ?? null,
@@ -232,15 +332,16 @@ export default function PengajuanScreen() {
    */
 
   const filteredRequests = useMemo(() => {
-    if (activeFilter === "Semua") {
-      return requests;
-    }
-
     return requests.filter(
       (item) =>
-        item.type === activeFilter
+        (activeFilter === "Semua" ||
+          item.type === activeFilter) &&
+        isInPeriod(
+          item.rawDate,
+          periodFilter
+        )
     );
-  }, [activeFilter, requests]);
+  }, [activeFilter, periodFilter, requests]);
 
   /**
    * ============================================================
@@ -258,7 +359,7 @@ export default function PengajuanScreen() {
           </Text>
 
           <Text style={styles.subtitle}>
-            Izin, cuti, WFH, dan lembur
+            Cuti, sakit, izin, WFA, lembur, dan perjadi
           </Text>
         </View>
 
@@ -310,17 +411,53 @@ export default function PengajuanScreen() {
         ))}
       </View>
 
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={
+          styles.periodTabs
+        }
+      >
+        {periodFilters.map((item) => {
+          const active =
+            item.value === periodFilter;
+
+          return (
+            <Pressable
+              key={item.value}
+              style={[
+                styles.periodTab,
+                active
+                  ? styles.periodTabActive
+                  : null,
+              ]}
+              onPress={() =>
+                setPeriodFilter(
+                  item.value
+                )
+              }
+            >
+              <Text
+                style={[
+                  styles.periodTabText,
+                  active
+                    ? styles.periodTabTextActive
+                    : null,
+                ]}
+              >
+                {item.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+
       {/* LOADING */}
       {loading ? (
-        <View style={styles.stateBox}>
-          <ActivityIndicator
-            size="small"
-            color={Colors.background}
-          />
-
-          <Text style={styles.stateText}>
-            Memuat data pengajuan...
-          </Text>
+        <View style={styles.skeletonList}>
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
         </View>
       ) : null}
 
@@ -361,7 +498,7 @@ export default function PengajuanScreen() {
                     tone={
                       item.type === "Cuti"
                         ? "purple"
-                        : item.type === "WFH"
+                        : item.type === "WFA"
                         ? "green"
                         : "blue"
                     }
@@ -398,6 +535,15 @@ export default function PengajuanScreen() {
           ) : null}
         </View>
       ) : null}
+
+      {!loading &&
+      !error &&
+      filteredRequests.length >
+        0 ? (
+        <Text style={styles.footerText}>
+          Menampilkan {filteredRequests.length} data pengajuan
+        </Text>
+      ) : null}
     </MainScreen>
   );
 }
@@ -428,6 +574,13 @@ function mapLeaveType(
     return "Izin";
   }
 
+  if (
+    name.includes("dinas") ||
+    name.includes("perjalanan")
+  ) {
+    return "Perjadi";
+  }
+
   return "Cuti";
 }
 
@@ -442,10 +595,13 @@ function mapStatus(
   switch (value) {
     case "pending":
     case "diajukan":
-    case "diproses":
     case "menunggu":
     case "waiting":
       return "Menunggu";
+
+    case "diproses":
+    case "proses":
+      return "Diproses";
 
     case "approved":
     case "approve":
@@ -473,6 +629,10 @@ function getStatusTone(
 ): "amber" | "green" | "blue" | "red" | "gray" {
   if (status === "Menunggu") {
     return "amber";
+  }
+
+  if (status === "Diproses") {
+    return "blue";
   }
 
   if (status === "Disetujui") {
@@ -530,14 +690,7 @@ function formatDate(
     return date;
   }
 
-  return value.toLocaleDateString(
-    "id-ID",
-    {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    }
-  );
+  return formatWitaShortDate(value);
 }
 
 function formatDateRange(
@@ -641,6 +794,43 @@ const styles = StyleSheet.create({
     color: Colors.white,
   },
 
+  periodTabs: {
+    flexDirection: "row",
+    gap: 8,
+    paddingRight: 8,
+  },
+
+  periodTab: {
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 84,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: 9,
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.line,
+  },
+
+  periodTabActive: {
+    backgroundColor: Colors.background,
+    borderColor: Colors.background,
+  },
+
+  periodTabText: {
+    color: Colors.textBody,
+    fontSize: 12,
+    fontWeight: "800",
+  },
+
+  periodTabTextActive: {
+    color: Colors.white,
+  },
+
+  skeletonList: {
+    gap: 10,
+  },
+
   list: {
     gap: 10,
   },
@@ -740,6 +930,13 @@ const styles = StyleSheet.create({
     color: "#94A0B3",
     fontSize: 13,
     fontWeight: "700",
+    textAlign: "center",
+  },
+
+  footerText: {
+    color: "#8A94A6",
+    fontSize: 10.5,
+    fontWeight: "600",
     textAlign: "center",
   },
 });

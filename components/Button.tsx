@@ -44,7 +44,13 @@ export default function Button({
       {...props}
     >
       {loading ? (
-        <ActivityIndicator color={Colors.white} />
+        <ActivityIndicator
+          color={
+            variant === "danger"
+              ? "#B91C1C"
+              : Colors.white
+          }
+        />
       ) : (
         <View style={styles.content}>
           {icon}
@@ -56,6 +62,9 @@ export default function Button({
                 : null,
               variant === "outline"
                 ? styles.outlineLabel
+                : null,
+              variant === "danger"
+                ? styles.dangerLabel
                 : null,
             ]}
           >
@@ -94,12 +103,9 @@ const styles = StyleSheet.create({
     borderColor: Colors.line,
   },
   danger: {
-    backgroundColor: Colors.danger,
-    shadowColor: Colors.danger,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.26,
-    shadowRadius: 18,
-    elevation: 5,
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: "#F0C9C4",
   },
   pressed: {
     opacity: 0.82,
@@ -125,5 +131,8 @@ const styles = StyleSheet.create({
   },
   outlineLabel: {
     color: Colors.textInk,
+  },
+  dangerLabel: {
+    color: "#B91C1C",
   },
 });

@@ -10,7 +10,7 @@ interface AvatarProps {
 
 export default function Avatar({ initials, size = 44, color = Colors.primaryDark }: AvatarProps) {
   return (
-    <View style={[styles.avatar, { width: size, height: size, borderRadius: size / 2, backgroundColor: color }]}>
+    <View style={[styles.avatar, { width: size, height: size, borderRadius: size <= 48 ? 13 : size / 2, backgroundColor: color }]}>
       <Text style={[styles.text, { fontSize: size * 0.34 }]}>{initials}</Text>
     </View>
   );

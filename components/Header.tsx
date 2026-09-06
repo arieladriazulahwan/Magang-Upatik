@@ -18,15 +18,12 @@ export default function Header({ title, subtitle }: HeaderProps) {
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    backgroundColor: Colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.line,
+    paddingVertical: 2,
+    backgroundColor: "transparent",
   },
   title: {
     color: Colors.textInk,
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: "800",
   },
   subtitle: {

@@ -18,7 +18,7 @@ import * as SecureStore from "expo-secure-store";
 
 const DEFAULT_API_URL =
   Platform.OS === "android"
-    ? "http://10.10.16.53:8000/api"
+    ? "http://192.168.1.189:8000/api"
     : "http://127.0.0.1:8000/api";
 
 export const API_URL =
@@ -56,6 +56,25 @@ export type ApiEmployee = {
     name: string;
     code: string;
   } | null;
+};
+
+export type ApiWorkLocation = {
+  id: number;
+  work_unit_id?: number;
+  name: string;
+  address?: string | null;
+  latitude: number | string;
+  longitude: number | string;
+  radius_meters: number;
+  is_active?: boolean;
+};
+
+export type ApiWorkUnit = {
+  id: number;
+  name: string;
+  code: string;
+  locations?: ApiWorkLocation[];
+  attendance_mode_effective?: string;
 };
 
 export type ApiUser = {
@@ -166,6 +185,18 @@ export type ApiLeaveRequest = {
   reason: string | null;
 
   status: string;
+
+  approval_steps?: {
+    sequence: number;
+    approver_role: string;
+    status: string;
+    approver?: {
+      id: number;
+      name: string;
+    } | null;
+    note: string | null;
+    recorded_at: string | null;
+  }[] | null;
 
   created_at: string | null;
 };
@@ -425,6 +456,29 @@ function errorMessage(
  * ============================================================
  */
 
+const sessionListeners =
+  new Set<() => void>();
+
+function emitSessionChange() {
+  sessionListeners.forEach(
+    (listener) => listener()
+  );
+}
+
+export function subscribeSessionChange(
+  listener: () => void
+) {
+  sessionListeners.add(
+    listener
+  );
+
+  return () => {
+    sessionListeners.delete(
+      listener
+    );
+  };
+}
+
 export async function getToken() {
   return getStorageItem(
     TOKEN_KEY
@@ -460,6 +514,8 @@ export async function clearSession() {
   await removeStorageItem(
     USER_KEY
   );
+
+  emitSessionChange();
 }
 
 /**
@@ -583,6 +639,13 @@ export async function apiRequest<T>(
     );
 
   if (!response.ok) {
+    if (
+      response.status === 401 &&
+      authenticated
+    ) {
+      await clearSession();
+    }
+
     throw new Error(
       errorMessage(
         data,
@@ -633,6 +696,8 @@ export async function login(
     )
   );
 
+  emitSessionChange();
+
   return data;
 }
 
@@ -666,6 +731,14 @@ export async function getProfile() {
   return apiRequest<{
     user: ApiUser;
   }>("/auth/me");
+}
+
+export async function getWorkUnit(
+  id: number | string
+) {
+  return apiRequest<{
+    data: ApiWorkUnit;
+  }>(`/work-units/${id}`);
 }
 
 /**
@@ -1020,12 +1093,39 @@ export async function decideWfhRequest(
  * ============================================================
  */
 
-export async function getOvertimeRequests() {
+export async function getOvertimeRequests(
+  params?: {
+    employee_id?: number;
+    status?: string;
+    date_from?: string;
+    date_to?: string;
+  }
+) {
   return apiRequest<{
     data: ApiOvertimeRequest[];
   }>(
-    "/overtime-requests"
+    `/overtime-requests${buildQuery(
+      params
+    )}`
   );
+}
+
+export async function postOvertimeRequest(
+  payload: {
+    date: string;
+    planned_start_time: string;
+    planned_end_time: string;
+    work_description: string;
+  }
+) {
+  return apiRequest<{
+    data: ApiOvertimeRequest;
+  }>("/overtime-requests", {
+    method: "POST",
+    body: JSON.stringify(
+      payload
+    ),
+  });
 }
 
 export async function decideOvertimeRequest(
@@ -1075,6 +1175,24 @@ export async function getNotifications(
       params
     )}`
   );
+}
+
+export async function postNotification(
+  payload: {
+    title: string;
+    message?: string | null;
+    type?: string | null;
+    target_url?: string | null;
+  }
+) {
+  return apiRequest<{
+    data: ApiNotification;
+  }>("/notifications", {
+    method: "POST",
+    body: JSON.stringify(
+      payload
+    ),
+  });
 }
 
 export async function markNotificationRead(

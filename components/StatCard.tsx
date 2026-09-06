@@ -20,10 +20,11 @@ const styles = StyleSheet.create({
   card: {
     flex: 1,
     backgroundColor: Colors.surface,
-    borderRadius: 14,
+    borderRadius: 15,
     padding: 14,
     borderWidth: 1,
     borderColor: Colors.line,
+    minHeight: 108,
   },
   value: {
     color: Colors.textInk,

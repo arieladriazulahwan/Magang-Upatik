@@ -14,6 +14,7 @@ import {
 
 import {
   router,
+  useLocalSearchParams,
 } from "expo-router";
 
 import {
@@ -26,6 +27,9 @@ import Button from "../../components/Button";
 import MainScreen from "../../components/MainScreen";
 import { Colors } from "../../constants/colors";
 import {
+  formatWitaShortDate,
+} from "../../constants/time";
+import {
   usePrototype,
 } from "../../contexts/PrototypeContext";
 
@@ -33,15 +37,66 @@ import {
    REQUEST TYPE
 ===================================================== */
 
-const requestTypes = [
-  "Cuti",
-  "Izin",
-  "Sakit",
-  "WFH",
-] as const;
-
 type RequestType =
-  (typeof requestTypes)[number];
+  | "Cuti"
+  | "Sakit"
+  | "Izin"
+  | "WFA"
+  | "Lembur"
+  | "Perjadi";
+
+const requestTypes: {
+  label: string;
+  value?: RequestType;
+  route?: string;
+}[] = [
+  {
+    label: "Cuti",
+    value: "Cuti",
+  },
+  {
+    label: "Sakit",
+    value: "Sakit",
+  },
+  {
+    label: "Izin",
+    value: "Izin",
+  },
+  {
+    label: "WFA",
+    value: "WFA",
+  },
+  {
+    label: "Lembur",
+    value: "Lembur",
+  },
+  {
+    label: "Perjadi",
+    value: "Perjadi",
+  },
+];
+
+function getInitialRequestType(
+  value: unknown
+): RequestType {
+  const typeParam =
+    Array.isArray(value)
+      ? value[0]
+      : value;
+
+  if (
+    typeParam === "Cuti" ||
+    typeParam === "Sakit" ||
+    typeParam === "Izin" ||
+    typeParam === "WFA" ||
+    typeParam === "Lembur" ||
+    typeParam === "Perjadi"
+  ) {
+    return typeParam;
+  }
+
+  return "Cuti";
+}
 
 /* =====================================================
    SELECTED FILE
@@ -128,14 +183,7 @@ function formatDisplayDate(
       value
     );
 
-  return date.toLocaleDateString(
-    "id-ID",
-    {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    }
-  );
+  return formatWitaShortDate(date);
 }
 
 function buildCalendarDays(
@@ -237,6 +285,11 @@ function daysBetween(
 ===================================================== */
 
 export default function PengajuanBaruScreen() {
+  const params =
+    useLocalSearchParams<{
+      type?: string;
+    }>();
+
   const {
     submitRequest,
     loadingRequest,
@@ -248,7 +301,9 @@ export default function PengajuanBaruScreen() {
     setType,
   ] =
     useState<RequestType>(
-      "Cuti"
+      getInitialRequestType(
+        params.type
+      )
     );
 
   const [
@@ -281,6 +336,18 @@ export default function PengajuanBaruScreen() {
     useState("");
 
   const [
+    plannedStartTime,
+    setPlannedStartTime,
+  ] =
+    useState("17:00");
+
+  const [
+    plannedEndTime,
+    setPlannedEndTime,
+  ] =
+    useState("19:00");
+
+  const [
     doctorLetterNumber,
     setDoctorLetterNumber,
   ] =
@@ -307,6 +374,23 @@ export default function PengajuanBaruScreen() {
     useState<DateTarget | null>(
       null
     );
+
+  const documentLabel =
+    type === "Sakit"
+      ? "Surat dokter"
+      : type === "Perjadi"
+      ? "Surat tugas"
+      : "Dokumen pendukung";
+
+  const uploadText =
+    type === "Sakit"
+      ? "Unggah surat dokter"
+      : type === "Perjadi"
+      ? "Unggah surat tugas"
+      : "Unggah surat / dokumen pendukung";
+
+  const isOvertime =
+    type === "Lembur";
 
   const [
     calendarMonth,
@@ -523,11 +607,29 @@ export default function PengajuanBaruScreen() {
 
       if (
         !startDate.trim() ||
-        !endDate.trim()
+        (!isOvertime &&
+          !endDate.trim())
       ) {
         Alert.alert(
           "Tanggal diperlukan",
           "Silakan isi tanggal mulai dan tanggal selesai."
+        );
+
+        return;
+      }
+
+      if (
+        isOvertime &&
+        (!/^\d{2}:\d{2}$/.test(
+          plannedStartTime
+        ) ||
+          !/^\d{2}:\d{2}$/.test(
+            plannedEndTime
+          ))
+      ) {
+        Alert.alert(
+          "Jam lembur tidak valid",
+          "Gunakan format jam HH:mm, contoh 17:00."
         );
 
         return;
@@ -557,6 +659,18 @@ export default function PengajuanBaruScreen() {
         return;
       }
 
+      if (
+        type === "Perjadi" &&
+        !selectedFile
+      ) {
+        Alert.alert(
+          "Dokumen diperlukan",
+          "Perjalanan dinas wajib melampirkan surat tugas."
+        );
+
+        return;
+      }
+
       /* =========================================
          SUBMIT
       ========================================= */
@@ -565,24 +679,33 @@ export default function PengajuanBaruScreen() {
         await submitRequest({
           title:
             type === "Cuti"
-              ? "Cuti Tahunan"
-              : type === "WFH"
-              ? "Work From Home"
+              ? "Cuti"
+              : type === "WFA"
+              ? "Work From Anywhere"
               : type === "Sakit"
               ? "Cuti Sakit"
-              : "Izin Keperluan",
+              : type === "Lembur"
+              ? "Lembur"
+              : type === "Perjadi"
+              ? "Perjalanan Dinas"
+              : "Izin",
 
           days:
             `${daysBetween(
               startDate,
-              endDate
+              isOvertime
+                ? startDate
+                : endDate
             )} hari`,
 
           type,
 
           startDate,
 
-          endDate,
+          endDate:
+            isOvertime
+              ? startDate
+              : endDate,
 
           reason:
             reason.trim(),
@@ -603,6 +726,16 @@ export default function PengajuanBaruScreen() {
           doctorFacilityName:
             type === "Sakit"
               ? doctorFacilityName.trim()
+              : undefined,
+
+          plannedStartTime:
+            isOvertime
+              ? plannedStartTime.trim()
+              : undefined,
+
+          plannedEndTime:
+            isOvertime
+              ? plannedEndTime.trim()
               : undefined,
         });
 
@@ -674,7 +807,7 @@ export default function PengajuanBaruScreen() {
               styles.subtitle
             }
           >
-            Lengkapi detail permohonan
+            Cuti, sakit, izin, WFA, lembur, dan perjalanan dinas
           </Text>
         </View>
       </View>
@@ -702,46 +835,70 @@ export default function PengajuanBaruScreen() {
           }
         >
           {requestTypes.map(
-            (item) => (
-              <Pressable
-                key={item}
-                style={[
-                  styles.typeOption,
+            (item) => {
+              const active =
+                item.value === type;
 
-                  type === item
-                    ? styles.typeOptionActive
-                    : null,
-
-                  loadingRequest
-                    ? styles.typeOptionDisabled
-                    : null,
-                ]}
-                onPress={() => {
-                  if (
-                    !loadingRequest
-                  ) {
-                    setType(
-                      item
-                    );
-                  }
-                }}
-                disabled={
-                  loadingRequest
-                }
-              >
-                <Text
+              return (
+                <Pressable
+                  key={item.label}
                   style={[
-                    styles.typeText,
+                    styles.typeOption,
 
-                    type === item
-                      ? styles.typeTextActive
+                    active
+                      ? styles.typeOptionActive
+                      : null,
+
+                    loadingRequest
+                      ? styles.typeOptionDisabled
                       : null,
                   ]}
+                  onPress={() => {
+                    if (
+                      loadingRequest
+                    ) {
+                      return;
+                    }
+
+                    if (
+                      item.route
+                    ) {
+                      router.push(
+                        item.route as never
+                      );
+                      return;
+                    }
+
+                    if (
+                      item.value
+                    ) {
+                      setType(
+                        item.value
+                      );
+                    }
+                  }}
+                  disabled={
+                    loadingRequest
+                  }
                 >
-                  {item}
-                </Text>
-              </Pressable>
-            )
+                  <Text
+                    style={[
+                      styles.typeText,
+
+                      active
+                        ? styles.typeTextActive
+                        : null,
+                    ]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                  >
+                    {
+                      item.label
+                    }
+                  </Text>
+                </Pressable>
+              );
+            }
           )}
         </View>
       </View>
@@ -752,11 +909,17 @@ export default function PengajuanBaruScreen() {
 
       <View
         style={
-          styles.twoCol
+          isOvertime
+            ? styles.singleCol
+            : styles.twoCol
         }
       >
         <DateField
-          label="Tanggal mulai"
+          label={
+            isOvertime
+              ? "Tanggal lembur"
+              : "Tanggal mulai"
+          }
           value={startDate}
           onPress={() =>
             openDatePicker(
@@ -768,19 +931,57 @@ export default function PengajuanBaruScreen() {
           }
         />
 
-        <DateField
-          label="Tanggal selesai"
-          value={endDate}
-          onPress={() =>
-            openDatePicker(
-              "end"
-            )
-          }
-          disabled={
-            loadingRequest
-          }
-        />
+        {!isOvertime ? (
+          <DateField
+            label="Tanggal selesai"
+            value={endDate}
+            onPress={() =>
+              openDatePicker(
+                "end"
+              )
+            }
+            disabled={
+              loadingRequest
+            }
+          />
+        ) : null}
       </View>
+
+      {isOvertime ? (
+        <View
+          style={
+            styles.twoCol
+          }
+        >
+          <Field
+            label="Jam mulai"
+            value={
+              plannedStartTime
+            }
+            onChangeText={
+              setPlannedStartTime
+            }
+            placeholder="17:00"
+            disabled={
+              loadingRequest
+            }
+          />
+
+          <Field
+            label="Jam selesai"
+            value={
+              plannedEndTime
+            }
+            onChangeText={
+              setPlannedEndTime
+            }
+            placeholder="19:00"
+            disabled={
+              loadingRequest
+            }
+          />
+        </View>
+      ) : null}
 
       {/* ==================================================
           ALASAN
@@ -849,7 +1050,7 @@ export default function PengajuanBaruScreen() {
             styles.fieldLabel
           }
         >
-          Dokumen pendukung
+          {documentLabel}
         </Text>
 
         {!selectedFile ? (
@@ -883,8 +1084,7 @@ export default function PengajuanBaruScreen() {
                 styles.uploadText
               }
             >
-              Unggah surat /
-              dokumen pendukung
+              {uploadText}
             </Text>
 
             <Text
@@ -1459,14 +1659,14 @@ const styles =
 
     typeOption: {
       width:
-        "23%",
+        "48.5%",
       alignItems:
         "center",
       borderRadius: 11,
       paddingHorizontal:
-        12,
+        8,
       paddingVertical:
-        10,
+        11,
       backgroundColor:
         Colors.white,
       borderWidth: 1,
@@ -1529,6 +1729,10 @@ const styles =
     twoCol: {
       flexDirection:
         "row",
+      gap: 10,
+    },
+
+    singleCol: {
       gap: 10,
     },
 

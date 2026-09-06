@@ -26,7 +26,10 @@ import {
   getToken,
   getWfhRequests,
   postLeaveRequest,
+  postNotification,
+  postOvertimeRequest,
   postWfhRequest,
+  subscribeSessionChange,
   markNotificationRead as markBackendNotificationRead,
   type ApiUser,
   type ApiAttendance,
@@ -35,6 +38,10 @@ import {
   type ApiWfhRequest,
   type ApiNotification,
 } from "../services/api";
+import {
+  formatWitaShortWeekday,
+  formatWitaTime,
+} from "../constants/time";
 
 /* =====================================================
    TYPE
@@ -47,6 +54,7 @@ type AttendanceState =
 
 type RequestStatus =
   | "Disetujui"
+  | "Diproses"
   | "Menunggu"
   | "Ditolak"
   | "Dibatalkan";
@@ -84,12 +92,23 @@ export interface ApprovalItem {
 export interface ApprovalHistoryItem
   extends ApprovalItem {
   decision: Decision;
+  requestStatus?: RequestStatus;
 }
 
 export type NotificationStatus =
   | "loading"
   | "success"
-  | "error";
+  | "error"
+  | "waiting"
+  | "processing"
+  | "approved"
+  | "rejected";
+
+export type NotificationCategory =
+  | "attendance"
+  | "request"
+  | "approval"
+  | "system";
 
 export interface AttendanceHistoryItem {
   date: string;
@@ -107,6 +126,8 @@ export interface NotificationItem {
   time: string;
   unread: boolean;
   status?: NotificationStatus;
+  category?: NotificationCategory;
+  ownerEmployeeId?: number | null;
 }
 
 export interface OvertimeItem {
@@ -172,6 +193,8 @@ interface PrototypeContextValue {
       doctorLetterType?: "dokter_biasa" | "tim_penguji_kesehatan";
       doctorLetterNumber?: string;
       doctorFacilityName?: string;
+      plannedStartTime?: string;
+      plannedEndTime?: string;
     }
   ) => Promise<boolean>;
 
@@ -182,6 +205,19 @@ interface PrototypeContextValue {
 
   markNotificationRead: (
     id: string
+  ) => void;
+
+  pushNotification: (
+    item: Omit<
+      NotificationItem,
+      "id" | "time" | "unread"
+    > &
+      Partial<
+        Pick<
+          NotificationItem,
+          "id" | "time" | "unread"
+        >
+      >
   ) => void;
 }
 
@@ -237,32 +273,7 @@ function delay(
 function formatTime(
   value: string | null
 ) {
-  if (!value) {
-    return "--:--";
-  }
-
-  const date =
-    new Date(value);
-
-  if (
-    Number.isNaN(
-      date.getTime()
-    )
-  ) {
-    return value.slice(0, 5);
-  }
-
-  return `${String(
-    date.getHours()
-  ).padStart(
-    2,
-    "0"
-  )}:${String(
-    date.getMinutes()
-  ).padStart(
-    2,
-    "0"
-  )}`;
+  return formatWitaTime(value, "--:--");
 }
 
 function formatDateRange(
@@ -298,6 +309,13 @@ function statusToDisplay(
     status
       ?.toLowerCase()
       .trim() ?? "";
+
+  if (
+    value === "diproses" ||
+    value === "proses"
+  ) {
+    return "Diproses";
+  }
 
   if (
     value === "disetujui" ||
@@ -338,10 +356,175 @@ function isPendingApprovalStatus(
   );
 }
 
+function isAlreadyProcessedMessage(
+  message: string
+) {
+  const value =
+    message
+      .toLowerCase()
+      .trim();
+
+  return (
+    value.includes(
+      "sudah selesai diproses"
+    ) ||
+    value.includes(
+      "sudah diproses"
+    ) ||
+    value.includes(
+      "bukan status diajukan"
+    )
+  );
+}
+
+function isForbiddenApprovalMessage(
+  message: string
+) {
+  const value =
+    message
+      .toLowerCase()
+      .trim();
+
+  return (
+    value.includes(
+      "tidak punya wewenang"
+    ) ||
+    value.includes(
+      "tidak punya izin"
+    )
+  );
+}
+
+function userHasRole(
+  user: ApiUser | null | undefined,
+  roles: string[]
+) {
+  return (
+    user?.roles?.some(
+      (role) =>
+        roles.includes(
+          role.name
+        )
+    ) ?? false
+  );
+}
+
+function canApproveLeaveStep(
+  user: ApiUser | null | undefined,
+  approverRole?: string | null
+) {
+  if (
+    userHasRole(user, [
+      "super_admin",
+    ])
+  ) {
+    return true;
+  }
+
+  if (
+    approverRole ===
+    "atasan_langsung"
+  ) {
+    return userHasRole(user, [
+      "pimpinan",
+    ]);
+  }
+
+  if (
+    approverRole ===
+    "admin_kepegawaian"
+  ) {
+    return userHasRole(user, [
+      "admin_kepegawaian",
+    ]);
+  }
+
+  return false;
+}
+
+function currentPendingLeaveStep(
+  item: ApiLeaveRequest
+) {
+  return item.approval_steps
+    ?.filter(
+      (step) =>
+        step.status ===
+        "menunggu"
+    )
+    .sort(
+      (a, b) =>
+        a.sequence -
+        b.sequence
+    )[0];
+}
+
+function isLeaveAwaitingCurrentUser(
+  item: ApiLeaveRequest,
+  user: ApiUser | null | undefined
+) {
+  const step =
+    currentPendingLeaveStep(
+      item
+    );
+
+  return (
+    Boolean(step) &&
+    canApproveLeaveStep(
+      user,
+      step?.approver_role
+    )
+  );
+}
+
+function hasUserProcessedLeave(
+  item: ApiLeaveRequest,
+  user: ApiUser | null | undefined
+) {
+  const employeeId =
+    user?.employee?.id;
+
+  if (!employeeId) {
+    return false;
+  }
+
+  return (
+    item.approval_steps?.some(
+      (step) =>
+        step.approver?.id ===
+          employeeId &&
+        [
+          "disetujui",
+          "ditolak",
+        ].includes(
+          step.status
+        )
+    ) ?? false
+  );
+}
+
+function leaveDecisionForUser(
+  item: ApiLeaveRequest,
+  user: ApiUser | null | undefined
+): Decision {
+  const employeeId =
+    user?.employee?.id;
+  const step =
+    item.approval_steps?.find(
+      (approvalStep) =>
+        approvalStep.approver?.id ===
+        employeeId
+    );
+
+  return step?.status === "ditolak"
+    ? "Ditolak"
+    : "Disetujui";
+}
+
 const LEAVE_TYPE_IDS = {
   Cuti: 1,
   Sakit: 3,
   Izin: 8,
+  Perjadi: 9,
 } as const;
 
 /* =====================================================
@@ -554,7 +737,7 @@ function mapWfhRequest(
     id: `wfh-${item.id}`,
 
     title:
-      "Work From Home",
+      "Work From Anywhere",
 
     meta:
       formatDateRange(
@@ -571,7 +754,7 @@ function mapWfhRequest(
         item.status
       ),
 
-    type: "WFH",
+    type: "WFA",
   };
 }
 
@@ -590,7 +773,7 @@ function mapWfhApproval(
       "-",
 
     type:
-      "Work From Home",
+      "Work From Anywhere",
 
     range:
       formatDateRange(
@@ -613,16 +796,11 @@ function mapAttendance(
 ): AttendanceHistoryItem {
   const day =
     item.date
-      ? new Date(
-          item.date
-        )
-          .toLocaleDateString(
-            "id-ID",
-            {
-              weekday:
-                "short",
-            }
+      ? formatWitaShortWeekday(
+          new Date(
+            `${item.date}T00:00:00`
           )
+        )
           .toUpperCase()
       : "-";
 
@@ -668,8 +846,142 @@ function mapAttendance(
   };
 }
 
+function inferNotificationStatus(
+  item: Pick<
+    ApiNotification,
+    "type" | "title" | "message"
+  >
+): NotificationStatus | undefined {
+  const text =
+    `${item.type ?? ""} ${item.title ?? ""} ${item.message ?? ""}`
+      .toLowerCase();
+
+  if (
+    text.includes("gagal") ||
+    text.includes("error")
+  ) {
+    return "error";
+  }
+
+  if (
+    text.includes("berhasil")
+  ) {
+    return "success";
+  }
+
+  if (
+    text.includes("ditolak")
+  ) {
+    return "rejected";
+  }
+
+  if (
+    text.includes("disetujui")
+  ) {
+    return "approved";
+  }
+
+  if (
+    text.includes("diproses") ||
+    text.includes("proses")
+  ) {
+    return "processing";
+  }
+
+  if (
+    text.includes("pengajuan_baru") ||
+    text.includes("menunggu") ||
+    text.includes("diajukan")
+  ) {
+    return "waiting";
+  }
+
+  return undefined;
+}
+
+function inferNotificationCategory(
+  item: Pick<
+    ApiNotification,
+    "type" | "title" | "message"
+  >
+): NotificationCategory {
+  const text =
+    `${item.type ?? ""} ${item.title ?? ""} ${item.message ?? ""}`
+      .toLowerCase();
+
+  if (
+    text.includes("presensi") ||
+    text.includes("attendance") ||
+    text.includes("check-in") ||
+    text.includes("check-out")
+  ) {
+    return "attendance";
+  }
+
+  if (
+    text.includes("persetujuan") ||
+    text.includes("approval") ||
+    text.includes("approv")
+  ) {
+    return "approval";
+  }
+
+  if (
+    text.includes("pengajuan") ||
+    text.includes("cuti") ||
+    text.includes("wfh") ||
+    text.includes("wfa") ||
+    text.includes("lembur")
+  ) {
+    return "request";
+  }
+
+  return "system";
+}
+
+function notificationTypeFor(
+  item: Pick<
+    NotificationItem,
+    "category" | "status"
+  >
+) {
+  const category =
+    item.category ?? "system";
+  const status =
+    item.status ?? "info";
+
+  const statusMap: Record<
+    string,
+    string
+  > = {
+    loading: "diproses",
+    processing: "diproses",
+    waiting: "menunggu",
+    approved: "disetujui",
+    rejected: "ditolak",
+    success: "berhasil",
+    error: "gagal",
+    info: "info",
+  };
+
+  const categoryMap: Record<
+    NotificationCategory,
+    string
+  > = {
+    attendance: "presensi",
+    request: "pengajuan",
+    approval: "persetujuan",
+    system: "sistem",
+  };
+
+  return `${categoryMap[category]}_${
+    statusMap[status] ?? status
+  }`;
+}
+
 function mapNotification(
-  item: ApiNotification
+  item: ApiNotification,
+  ownerEmployeeId?: number | null
 ): NotificationItem {
   return {
     id: String(
@@ -691,6 +1003,18 @@ function mapNotification(
 
     unread:
       !item.is_read,
+
+    status:
+      inferNotificationStatus(
+        item
+      ),
+
+    category:
+      inferNotificationCategory(
+        item
+      ),
+
+    ownerEmployeeId,
   };
 }
 
@@ -916,12 +1240,29 @@ export function PrototypeProvider({
   useEffect(() => {
     let active = true;
 
+    function resetLocalState() {
+      setProfile(null);
+      setAttendanceHistory([]);
+      setRequests([]);
+      setApprovals([]);
+      setApprovalHistory([]);
+      setNotifications([]);
+      setOvertimeRequests([]);
+      setJamMasuk(null);
+      setJamPulang(null);
+      setAttendanceState("belum");
+    }
+
     async function syncFromBackend() {
       try {
         const token =
           await getToken();
 
         if (!token) {
+          if (active) {
+            resetLocalState();
+          }
+
           return;
         }
 
@@ -969,9 +1310,7 @@ export function PrototypeProvider({
             await clearSession();
 
             if (active) {
-              setProfile(
-                null
-              );
+              resetLocalState();
             }
 
             return;
@@ -983,21 +1322,75 @@ export function PrototypeProvider({
           );
         }
 
+        const currentUser =
+          profileResponse?.user ||
+          storedUser ||
+          null;
+        const employeeId =
+          currentUser?.employee?.id;
+        const canLoadLeaveApprovals =
+          userHasRole(currentUser, [
+            "super_admin",
+            "admin_kepegawaian",
+            "pimpinan",
+          ]);
+        const canLoadWfhApprovals =
+          userHasRole(currentUser, [
+            "super_admin",
+            "admin_kepegawaian",
+            "admin_unit",
+            "pimpinan",
+          ]);
+        const canLoadOvertimeApprovals =
+          userHasRole(currentUser, [
+            "super_admin",
+            "admin_kepegawaian",
+            "pimpinan",
+          ]);
+        const emptyResponse =
+          Promise.resolve({
+            data: [],
+          });
+
         const results =
           await Promise.allSettled([
             getAttendance({
+              employee_id:
+                employeeId,
+
               per_page: 15,
             }),
 
-            getLeaveRequests(),
+            getLeaveRequests({
+              employee_id:
+                employeeId,
+            }),
 
-            getWfhRequests(),
+            getWfhRequests({
+              employee_id:
+                employeeId,
+            }),
 
             getNotifications({
               per_page: 20,
             }),
 
-            getOvertimeRequests(),
+            getOvertimeRequests({
+              employee_id:
+                employeeId,
+            }),
+
+            canLoadLeaveApprovals
+              ? getLeaveRequests()
+              : emptyResponse,
+
+            canLoadWfhApprovals
+              ? getWfhRequests()
+              : emptyResponse,
+
+            canLoadOvertimeApprovals
+              ? getOvertimeRequests()
+              : emptyResponse,
           ]);
 
         if (!active) {
@@ -1010,6 +1403,9 @@ export function PrototypeProvider({
           wfhResult,
           notificationResult,
           overtimeResult,
+          approvalLeaveResult,
+          approvalWfhResult,
+          approvalOvertimeResult,
         ] = results;
 
         /* ATTENDANCE */
@@ -1174,19 +1570,36 @@ export function PrototypeProvider({
 
         /* APPROVALS */
 
+        const approvalLeaveData =
+          approvalLeaveResult.status ===
+          "fulfilled"
+            ? approvalLeaveResult.value.data as ApiLeaveRequest[]
+            : [];
+        const approvalWfhData =
+          approvalWfhResult.status ===
+          "fulfilled"
+            ? approvalWfhResult.value.data as ApiWfhRequest[]
+            : [];
+        const approvalOvertimeData =
+          approvalOvertimeResult.status ===
+          "fulfilled"
+            ? approvalOvertimeResult.value.data as ApiOvertimeRequest[]
+            : [];
+
         setApprovals([
-          ...leaveData
+          ...approvalLeaveData
             .filter(
               (item) =>
-                isPendingApprovalStatus(
-                  item.status
+                isLeaveAwaitingCurrentUser(
+                  item,
+                  currentUser
                 )
             )
             .map(
               mapLeaveApproval
             ),
 
-          ...wfhData
+          ...approvalWfhData
             .filter(
               (item) =>
                 isPendingApprovalStatus(
@@ -1197,7 +1610,7 @@ export function PrototypeProvider({
               mapWfhApproval
             ),
 
-          ...overtimeData
+          ...approvalOvertimeData
             .filter(
               (item) =>
                 isPendingApprovalStatus(
@@ -1205,7 +1618,34 @@ export function PrototypeProvider({
                 )
             )
             .map(
-              mapOvertimeApproval
+            mapOvertimeApproval
+            ),
+        ]);
+
+        setApprovalHistory([
+          ...approvalLeaveData
+            .filter(
+              (item) =>
+                hasUserProcessedLeave(
+                  item,
+                  currentUser
+                )
+            )
+            .map(
+              (item) => ({
+                ...mapLeaveApproval(
+                  item
+                ),
+                decision:
+                  leaveDecisionForUser(
+                    item,
+                    currentUser
+                  ),
+                requestStatus:
+                  statusToDisplay(
+                    item.status
+                  ),
+              })
             ),
         ]);
 
@@ -1216,9 +1656,33 @@ export function PrototypeProvider({
           "fulfilled"
         ) {
           setNotifications(
-            notificationResult.value.data.map(
-              mapNotification
-            )
+            (current) => {
+              const backendNotifications =
+                notificationResult.value.data.map(
+                  (item) =>
+                    mapNotification(
+                      item,
+                      employeeId
+                    )
+                );
+
+              const localNotifications =
+                current.filter(
+                  (item) =>
+                    !/^\d+$/.test(
+                      item.id
+                    ) &&
+                    (item.ownerEmployeeId ===
+                      undefined ||
+                      item.ownerEmployeeId ===
+                        employeeId)
+                );
+
+              return [
+                ...localNotifications,
+                ...backendNotifications,
+              ];
+            }
           );
         } else {
           console.error(
@@ -1244,10 +1708,16 @@ export function PrototypeProvider({
       }
     }
 
-    syncFromBackend();
+    void syncFromBackend();
+
+    const unsubscribe =
+      subscribeSessionChange(() => {
+        void syncFromBackend();
+      });
 
     return () => {
       active = false;
+      unsubscribe();
     };
   }, []);
 
@@ -1259,10 +1729,23 @@ export function PrototypeProvider({
     useMemo<PrototypeContextValue>(
       () => {
         const unreadCount =
-          notifications.filter(
+          notifications
+            .filter(
+              (item) =>
+                item.ownerEmployeeId ===
+                profile?.employee?.id
+            )
+            .filter(
             (item) =>
               item.unread
           ).length;
+
+        const visibleNotifications =
+          notifications.filter(
+            (item) =>
+              item.ownerEmployeeId ===
+              profile?.employee?.id
+          );
 
         const workDuration =
           attendanceState ===
@@ -1292,7 +1775,8 @@ export function PrototypeProvider({
 
           approvalHistory,
 
-          notifications,
+          notifications:
+            visibleNotifications,
 
           overtimeRequests,
 
@@ -1423,6 +1907,13 @@ export function PrototypeProvider({
 
                     status:
                       "success",
+
+                    category:
+                      "attendance",
+
+                    ownerEmployeeId:
+                      profile?.employee?.id ??
+                      null,
                   },
 
                   ...current,
@@ -1470,6 +1961,13 @@ export function PrototypeProvider({
 
                     status:
                       "error",
+
+                    category:
+                      "attendance",
+
+                    ownerEmployeeId:
+                      profile?.employee?.id ??
+                      null,
                   },
 
                   ...current,
@@ -1530,6 +2028,13 @@ export function PrototypeProvider({
 
                   status:
                     "loading",
+
+                  category:
+                    "request",
+
+                  ownerEmployeeId:
+                    profile?.employee?.id ??
+                    null,
                 },
 
                 ...current,
@@ -1542,12 +2047,47 @@ export function PrototypeProvider({
               );
 
               /* =====================================
-                 WFH
+                 WFA / WFH
               ===================================== */
 
               if (
                 payload.type ===
-                "WFH"
+                "Lembur"
+              ) {
+                const response =
+                  await postOvertimeRequest(
+                    {
+                      date:
+                        payload.startDate,
+
+                      planned_start_time:
+                        payload.plannedStartTime ||
+                        "17:00",
+
+                      planned_end_time:
+                        payload.plannedEndTime ||
+                        "19:00",
+
+                      work_description:
+                        payload.reason ||
+                        payload.title,
+                    }
+                  );
+
+                setRequests(
+                  (current) => [
+                    mapOvertimeRequest(
+                      response.data
+                    ),
+
+                    ...current,
+                  ]
+                );
+              }
+
+              else if (
+                payload.type === "WFH" ||
+                payload.type === "WFA"
               ) {
                 const response =
                   await postWfhRequest(
@@ -1706,6 +2246,13 @@ export function PrototypeProvider({
                             status:
                               "success",
 
+                            category:
+                              "request",
+
+                            ownerEmployeeId:
+                              profile?.employee?.id ??
+                              null,
+
                             unread:
                               true,
                           }
@@ -1752,6 +2299,13 @@ export function PrototypeProvider({
 
                             status:
                               "error",
+
+                            category:
+                              "request",
+
+                            ownerEmployeeId:
+                              profile?.employee?.id ??
+                              null,
 
                             unread:
                               true,
@@ -1838,6 +2392,13 @@ export function PrototypeProvider({
 
                   status:
                     "loading",
+
+                  category:
+                    "approval",
+
+                  ownerEmployeeId:
+                    profile?.employee?.id ??
+                    null,
                 },
 
                 ...items,
@@ -1863,33 +2424,92 @@ export function PrototypeProvider({
                   ? "approve"
                   : "reject";
 
+              const decisionNote =
+                decision ===
+                "Ditolak"
+                  ? "Ditolak melalui aplikasi mobile."
+                  : undefined;
+
+              let updatedRequest:
+                | RequestItem
+                | null = null;
+
               if (
                 kind ===
                 "wfh"
               ) {
-                await decideWfhRequest(
+                const response =
+                  await decideWfhRequest(
                   rawId,
-                  apiDecision
+                  apiDecision,
+                  decisionNote
                 );
+
+                updatedRequest =
+                  mapWfhRequest(
+                    response.data
+                  );
               } else if (
                 kind ===
                 "leave"
               ) {
-                await decideLeaveRequest(
+                const response =
+                  await decideLeaveRequest(
                   rawId,
-                  apiDecision
+                  apiDecision,
+                  decisionNote
                 );
+
+                updatedRequest =
+                  mapLeaveRequest(
+                    response.data
+                  );
               } else if (
                 kind ===
                 "overtime"
               ) {
-                await decideOvertimeRequest(
+                const response =
+                  await decideOvertimeRequest(
                   rawId,
-                  apiDecision
+                  apiDecision,
+                  decisionNote
                 );
+
+                updatedRequest =
+                  mapOvertimeRequest(
+                    response.data
+                  );
               } else {
                 throw new Error(
                   "Jenis pengajuan tidak dikenali."
+                );
+              }
+
+              if (updatedRequest) {
+                setRequests(
+                  (current) => {
+                    const exists =
+                      current.some(
+                        (item) =>
+                          item.id ===
+                          updatedRequest.id
+                      );
+
+                    if (!exists) {
+                      return [
+                        updatedRequest,
+                        ...current,
+                      ];
+                    }
+
+                    return current.map(
+                      (item) =>
+                        item.id ===
+                        updatedRequest.id
+                          ? updatedRequest
+                          : item
+                    );
+                  }
                 );
               }
 
@@ -1898,6 +2518,8 @@ export function PrototypeProvider({
                   {
                     ...selected,
                     decision,
+                    requestStatus:
+                      updatedRequest?.status,
                   },
 
                   ...history,
@@ -1934,6 +2556,13 @@ export function PrototypeProvider({
                             status:
                               "success",
 
+                            category:
+                              "approval",
+
+                            ownerEmployeeId:
+                              profile?.employee?.id ??
+                              null,
+
                             unread:
                               true,
                           }
@@ -1961,6 +2590,29 @@ export function PrototypeProvider({
                   error
                 );
 
+              const alreadyProcessed =
+                isAlreadyProcessedMessage(
+                  message
+                );
+              const forbiddenApproval =
+                isForbiddenApprovalMessage(
+                  message
+                );
+
+              if (
+                alreadyProcessed ||
+                forbiddenApproval
+              ) {
+                setApprovals(
+                  (current) =>
+                    current.filter(
+                      (item) =>
+                        item.id !==
+                        id
+                    )
+                );
+              }
+
               setNotifications(
                 (items) =>
                   items.map(
@@ -1974,10 +2626,24 @@ export function PrototypeProvider({
                               "Proses pengajuan gagal",
 
                             desc:
-                              message,
+                              alreadyProcessed
+                                ? "Data persetujuan diperbarui dari server."
+                                : forbiddenApproval
+                                ? "Pengajuan ini bukan giliran akun Anda."
+                                : message,
 
                             status:
-                              "error",
+                              alreadyProcessed ||
+                              forbiddenApproval
+                                ? "success"
+                                : "error",
+
+                            category:
+                              "approval",
+
+                            ownerEmployeeId:
+                              profile?.employee?.id ??
+                              null,
 
                             unread:
                               true,
@@ -1988,7 +2654,11 @@ export function PrototypeProvider({
 
               flash(
                 setToast,
-                message
+                alreadyProcessed
+                  ? "Pengajuan sudah diproses, daftar diperbarui"
+                  : forbiddenApproval
+                  ? "Pengajuan dihapus dari daftar menunggu akun ini"
+                  : message
               );
 
               return false;
@@ -2035,8 +2705,80 @@ export function PrototypeProvider({
                             false,
                         }
                       : item
-                )
+                  )
+                );
+          },
+
+          pushNotification(
+            item
+          ) {
+            const localId =
+              item.id ??
+              `local-${Date.now()}`;
+            const localItem: NotificationItem =
+              {
+                id: localId,
+                title: item.title,
+                desc: item.desc,
+                time:
+                  item.time ??
+                  "Baru saja",
+                unread:
+                  item.unread ??
+                  true,
+                status:
+                  item.status,
+                category:
+                  item.category ??
+                  "system",
+                ownerEmployeeId:
+                  profile?.employee?.id ??
+                  null,
+              };
+
+            setNotifications(
+              (current) => [
+                localItem,
+
+                ...current,
+              ]
             );
+
+            void postNotification({
+              title: localItem.title,
+              message: localItem.desc,
+              type:
+                notificationTypeFor(
+                  localItem
+                ),
+            })
+              .then((response) => {
+                const stored =
+                  mapNotification(
+                    response.data,
+                    profile?.employee?.id ??
+                      null
+                  );
+
+                setNotifications(
+                  (current) =>
+                    current.map(
+                      (existing) =>
+                        existing.id ===
+                        localId
+                          ? stored
+                          : existing
+                    )
+                );
+              })
+              .catch((error) => {
+                console.error(
+                  "Persist notification failed:",
+                  getErrorMessage(
+                    error
+                  )
+                );
+              });
           },
         };
       },

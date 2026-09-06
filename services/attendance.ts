@@ -1,4 +1,7 @@
 import type { AttendanceRecord, AttendanceType } from "../types/attendance";
+import {
+  formatWitaTime,
+} from "../constants/time";
 import { checkIn, checkOut } from "./api";
 
 export async function submitAttendance(type: AttendanceType): Promise<AttendanceRecord> {
@@ -18,7 +21,7 @@ export function createLocalAttendanceRecord(type: AttendanceType): AttendanceRec
     id: Date.now().toString(),
     date: new Date().toISOString(),
     type,
-    time: new Date().toTimeString().slice(0, 5),
+    time: formatWitaTime(new Date(), "--:--"),
     status: "hadir",
   };
 }

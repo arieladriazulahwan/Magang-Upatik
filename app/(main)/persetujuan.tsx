@@ -162,7 +162,7 @@ export default function PersetujuanScreen() {
 
             return (
               <View
-                key={`${item.name}-${item.range}`}
+                key={item.id}
                 style={[
                   styles.card,
                   processing
@@ -202,7 +202,8 @@ export default function PersetujuanScreen() {
                     tone={
                       item.type.includes("Cuti")
                         ? "purple"
-                        : item.type.includes("WFH")
+                        : item.type.includes("WFA") ||
+                          item.type.includes("Work From Anywhere")
                         ? "green"
                         : "blue"
                     }
@@ -322,7 +323,8 @@ export default function PersetujuanScreen() {
                     tone={
                       item.type.includes("Cuti")
                         ? "purple"
-                        : item.type.includes("WFH")
+                        : item.type.includes("WFA") ||
+                          item.type.includes("Work From Anywhere")
                         ? "green"
                         : "blue"
                     }
@@ -337,6 +339,20 @@ export default function PersetujuanScreen() {
                         : "red"
                     }
                   />
+
+                  {item.requestStatus &&
+                  item.requestStatus !==
+                    item.decision ? (
+                    <Badge
+                      label={item.requestStatus}
+                      tone={
+                        item.requestStatus ===
+                        "Diproses"
+                          ? "blue"
+                          : "amber"
+                      }
+                    />
+                  ) : null}
                 </View>
 
                 <Text style={styles.reason}>

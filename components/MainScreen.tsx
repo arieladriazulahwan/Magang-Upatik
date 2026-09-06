@@ -30,6 +30,7 @@ interface MainScreenProps {
 const tabs = [
   { label: "Beranda", href: "/(main)", match: ["/"], icon: "home" },
   { label: "Riwayat", href: "/(main)/riwayat", match: ["/riwayat"], icon: "history" },
+  { label: "ABSEN", href: "/(main)/presensi", match: ["/presensi"], icon: "attendance", featured: true },
   { label: "Pengajuan", href: "/(main)/pengajuan", match: ["/pengajuan"], icon: "file" },
   { label: "Profil", href: "/(main)/profil", match: ["/profil"], icon: "user" },
 ];
@@ -46,6 +47,14 @@ function TabIcon({ name, color }: { name: string; color: string }) {
     return (
       <Svg width={23} height={23} viewBox="0 0 24 24">
         <Path d="M3 3v5h5M3.05 13a9 9 0 1 0 2.6-6.4L3 8M12 7v5l4 2" stroke={color} strokeWidth="1.95" fill="none" />
+      </Svg>
+    );
+  }
+  if (name === "attendance") {
+    return (
+      <Svg width={23} height={23} viewBox="0 0 24 24">
+        <Path d="M8 3h8M9 21h6M12 3v4M12 17v4M7 12h10M12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10z" stroke={color} strokeWidth="1.95" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        <Path d="m10.4 12 1.1 1.2 2.2-2.5" stroke={color} strokeWidth="1.95" fill="none" strokeLinecap="round" strokeLinejoin="round" />
       </Svg>
     );
   }
@@ -189,6 +198,43 @@ export default function MainScreen({ children, scroll = true }: MainScreenProps)
         {tabs.map((tab) => {
           const active = tab.match.some((item) => pathname === item || pathname.endsWith(item));
           const color = active ? Colors.primaryDark : "#9AA5B6";
+          const featuredColor = Colors.white;
+
+          if (tab.featured) {
+            return (
+              <Pressable
+                key={tab.label}
+                style={styles.featuredNavItem}
+                onPress={() =>
+                  router.replace(
+                    tab.href as never
+                  )
+                }
+              >
+                <View
+                  style={[
+                    styles.featuredButton,
+                    active
+                      ? styles.featuredButtonActive
+                      : null,
+                  ]}
+                >
+                  <TabIcon
+                    name={tab.icon}
+                    color={featuredColor}
+                  />
+                  <Text
+                    style={
+                      styles.featuredLabel
+                    }
+                  >
+                    {tab.label}
+                  </Text>
+                </View>
+              </Pressable>
+            );
+          }
+
           return (
             <Pressable key={tab.label} style={styles.navItem} onPress={() => router.replace(tab.href as never)}>
               <TabIcon name={tab.icon} color={color} />
@@ -211,8 +257,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: 18,
-    paddingTop: 18,
+    paddingHorizontal: 16,
+    paddingTop: 4,
     gap: 14,
   },
   staticContent: {
@@ -224,7 +270,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-end",
     paddingHorizontal: 8,
     paddingTop: 8,
     backgroundColor: Colors.white,
@@ -263,7 +309,45 @@ const styles = StyleSheet.create({
   navItem: {
     flex: 1,
     alignItems: "center",
+    justifyContent: "center",
     gap: 4,
+    minHeight: 46,
+  },
+  featuredNavItem: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "flex-end",
+    minHeight: 46,
+  },
+  featuredButton: {
+    width: 66,
+    height: 66,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 1,
+    marginTop: -30,
+    marginBottom: 2,
+    borderRadius: 33,
+    backgroundColor: Colors.background,
+    borderWidth: 4,
+    borderColor: Colors.white,
+    shadowColor: Colors.background,
+    shadowOffset: {
+      width: 0,
+      height: 12,
+    },
+    shadowOpacity: 0.34,
+    shadowRadius: 18,
+    elevation: 10,
+  },
+  featuredButtonActive: {
+    backgroundColor: Colors.primaryDark,
+  },
+  featuredLabel: {
+    color: Colors.white,
+    fontSize: 10,
+    fontWeight: "900",
+    lineHeight: 12,
   },
   navLabel: {
     fontSize: 9.5,

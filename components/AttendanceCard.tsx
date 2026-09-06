@@ -19,8 +19,13 @@ export default function AttendanceCard({ title, subtitle }: AttendanceCardProps)
 const styles = StyleSheet.create({
   card: {
     backgroundColor: Colors.background,
-    borderRadius: 18,
+    borderRadius: 22,
     padding: 18,
+    shadowColor: Colors.background,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.28,
+    shadowRadius: 18,
+    elevation: 8,
   },
   title: {
     color: Colors.white,

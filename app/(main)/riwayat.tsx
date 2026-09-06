@@ -6,7 +6,6 @@ import React, {
 } from "react";
 
 import {
-  ActivityIndicator,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -19,10 +18,26 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 
 import MainScreen from "../../components/MainScreen";
-import { getAttendance, ApiAttendance } from "../../services/api";
+import {
+  getAttendance,
+  getProfile,
+  ApiAttendance,
+} from "../../services/api";
 import { Colors } from "../../constants/colors";
+import {
+  formatWitaDay,
+  formatWitaShortWeekday,
+  formatWitaTime,
+  isWitaDateKeyInCurrentYear,
+  isWitaDateKeyInCurrentMonth,
+  isWitaDateKeyInCurrentWeek,
+  isWitaDateKeyToday,
+} from "../../constants/time";
 import Badge from "../../components/Badge";
 import StatCard from "../../components/StatCard";
+import {
+  SkeletonRow,
+} from "../../components/Skeleton";
 
 /* ============================================================
    TYPES
@@ -30,6 +45,7 @@ import StatCard from "../../components/StatCard";
 
 type HistoryRow = {
   id: number;
+  rawDate: string | null;
   date: string;
   day: string;
   time: string;
@@ -50,33 +66,6 @@ function normalizeStatus(
   )
     .toLowerCase()
     .replace(/[\s_-]+/g, "");
-}
-
-/* ============================================================
-   FORMAT TIME
-============================================================ */
-
-function formatTime(
-  value: string | null | undefined
-) {
-  if (!value) {
-    return "--";
-  }
-
-  const date = new Date(value);
-
-  if (!Number.isNaN(date.getTime())) {
-    return date.toLocaleTimeString(
-      "id-ID",
-      {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-      }
-    );
-  }
-
-  return value.slice(0, 5);
 }
 
 /* ============================================================
@@ -105,22 +94,33 @@ function getDateInfo(
   }
 
   return {
-    date: date.toLocaleDateString(
-      "id-ID",
-      {
-        day: "2-digit",
-      }
-    ),
+    date: formatWitaDay(date),
 
-    day: date
-      .toLocaleDateString(
-        "id-ID",
-        {
-          weekday: "short",
-        }
-      )
+    day: formatWitaShortWeekday(date)
       .toUpperCase(),
   };
+}
+
+function isInPeriod(
+  rawDate: string | null,
+  period: PeriodFilter
+) {
+  switch (period) {
+    case "all":
+      return true;
+
+    case "today":
+      return isWitaDateKeyToday(rawDate);
+
+    case "week":
+      return isWitaDateKeyInCurrentWeek(rawDate);
+
+    case "year":
+      return isWitaDateKeyInCurrentYear(rawDate);
+
+    default:
+      return isWitaDateKeyInCurrentMonth(rawDate);
+  }
 }
 
 /* ============================================================
@@ -164,7 +164,7 @@ function mapAttendanceMode(
 ) {
   switch (type) {
     case "wfh":
-      return "WFH";
+      return "WFA";
 
     case "shift":
       return "Shift";
@@ -232,17 +232,18 @@ function toHistoryRow(
     );
 
   const masuk =
-    formatTime(
+    formatWitaTime(
       item.check_in
     );
 
   const keluar =
-    formatTime(
+    formatWitaTime(
       item.check_out
     );
 
   return {
     id: item.id,
+    rawDate: item.date,
 
     date:
       dateInfo.date,
@@ -269,6 +270,39 @@ function toHistoryRow(
       ),
   };
 }
+
+type PeriodFilter =
+  | "all"
+  | "today"
+  | "week"
+  | "month"
+  | "year";
+
+const periodFilters: {
+  label: string;
+  value: PeriodFilter;
+}[] = [
+  {
+    label: "Semua",
+    value: "all",
+  },
+  {
+    label: "Hari ini",
+    value: "today",
+  },
+  {
+    label: "Minggu ini",
+    value: "week",
+  },
+  {
+    label: "Bulan ini",
+    value: "month",
+  },
+  {
+    label: "Tahun ini",
+    value: "year",
+  },
+];
 
 /* ============================================================
    MAIN SCREEN
@@ -299,6 +333,29 @@ export default function RiwayatScreen() {
     null
   );
 
+  const [
+    periodFilter,
+    setPeriodFilter,
+  ] = useState<PeriodFilter>(
+    "month"
+  );
+
+  const filteredHistory =
+    useMemo(
+      () =>
+        attendanceHistory.filter(
+          (item) =>
+            isInPeriod(
+              item.rawDate,
+              periodFilter
+            )
+        ),
+      [
+        attendanceHistory,
+        periodFilter,
+      ]
+    );
+
   /* ==========================================================
      LOAD HISTORY
   ========================================================== */
@@ -309,8 +366,16 @@ export default function RiwayatScreen() {
         try {
           setError(null);
 
+          const profile =
+            await getProfile();
+          const employeeId =
+            profile.user.employee?.id;
+
           const result =
             await getAttendance({
+              employee_id:
+                employeeId,
+
               per_page: 100,
             });
 
@@ -395,7 +460,7 @@ export default function RiwayatScreen() {
       let izin = 0;
       let alpha = 0;
 
-      attendanceHistory.forEach(
+      filteredHistory.forEach(
         (item) => {
           switch (
             item.status
@@ -426,7 +491,7 @@ export default function RiwayatScreen() {
         alpha,
       };
     }, [
-      attendanceHistory,
+      filteredHistory,
     ]);
 
   /* ==========================================================
@@ -435,16 +500,24 @@ export default function RiwayatScreen() {
 
   const periodLabel =
     useMemo(() => {
-      if (
-        attendanceHistory.length ===
-        0
-      ) {
-        return "Rekap presensi";
-      }
+      switch (periodFilter) {
+        case "all":
+          return "Rekap seluruh presensi";
 
-      return "Rekap presensi";
+        case "today":
+          return "Rekap presensi hari ini";
+
+        case "week":
+          return "Rekap presensi minggu ini";
+
+        case "year":
+          return "Rekap presensi tahun ini";
+
+        default:
+          return "Rekap presensi bulan ini";
+      }
     }, [
-      attendanceHistory,
+      periodFilter,
     ]);
 
   /* ==========================================================
@@ -525,6 +598,47 @@ export default function RiwayatScreen() {
             </Pressable>
           </View>
         </View>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={
+            styles.periodTabs
+          }
+        >
+          {periodFilters.map((item) => {
+            const active =
+              item.value === periodFilter;
+
+            return (
+              <Pressable
+                key={item.value}
+                style={[
+                  styles.periodTab,
+                  active
+                    ? styles.periodTabActive
+                    : null,
+                ]}
+                onPress={() =>
+                  setPeriodFilter(
+                    item.value
+                  )
+                }
+              >
+                <Text
+                  style={[
+                    styles.periodTabText,
+                    active
+                      ? styles.periodTabTextActive
+                      : null,
+                  ]}
+                >
+                  {item.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
 
         {/* ====================================================
             ERROR
@@ -634,27 +748,12 @@ export default function RiwayatScreen() {
           }
         >
           {loading ? (
-            <View
-              style={
-                styles.loadingBox
-              }
-            >
-              <ActivityIndicator
-                size="small"
-                color={
-                  Colors.primary
-                }
-              />
-
-              <Text
-                style={
-                  styles.loadingText
-                }
-              >
-                Memuat riwayat presensi...
-              </Text>
-            </View>
-          ) : attendanceHistory.length ===
+            <>
+              <SkeletonRow />
+              <SkeletonRow />
+              <SkeletonRow />
+            </>
+          ) : filteredHistory.length ===
             0 ? (
             <View
               style={
@@ -695,7 +794,7 @@ export default function RiwayatScreen() {
               </Text>
             </View>
           ) : (
-            attendanceHistory.map(
+            filteredHistory.map(
               (
                 row,
                 index
@@ -706,8 +805,8 @@ export default function RiwayatScreen() {
                   }
                   style={[
                     styles.row,
-                    index !==
-                      attendanceHistory.length -
+                      index !==
+                      filteredHistory.length -
                         1 &&
                       styles.rowBorder,
                   ]}
@@ -778,7 +877,7 @@ export default function RiwayatScreen() {
                         }
                         tone={
                           row.mode ===
-                          "WFH"
+                          "WFA"
                             ? "green"
                             : "blue"
                         }
@@ -814,7 +913,7 @@ export default function RiwayatScreen() {
         ==================================================== */}
 
         {!loading &&
-          attendanceHistory.length >
+          filteredHistory.length >
             0 && (
             <Text
               style={
@@ -823,7 +922,7 @@ export default function RiwayatScreen() {
             >
               Menampilkan{" "}
               {
-                attendanceHistory.length
+                filteredHistory.length
               }{" "}
               data presensi
             </Text>
@@ -892,6 +991,40 @@ const styles =
         "center",
       justifyContent:
         "center",
+    },
+
+    periodTabs: {
+      flexDirection: "row",
+      gap: 8,
+      marginTop: 12,
+      paddingRight: 8,
+    },
+
+    periodTab: {
+      alignItems: "center",
+      justifyContent: "center",
+      minWidth: 84,
+      paddingVertical: 9,
+      paddingHorizontal: 12,
+      borderRadius: 9,
+      backgroundColor: Colors.white,
+      borderWidth: 1,
+      borderColor: Colors.line,
+    },
+
+    periodTabActive: {
+      backgroundColor: Colors.background,
+      borderColor: Colors.background,
+    },
+
+    periodTabText: {
+      color: Colors.textBody,
+      fontSize: 12,
+      fontWeight: "800",
+    },
+
+    periodTabTextActive: {
+      color: Colors.white,
     },
 
     /* ========================================================
@@ -970,23 +1103,6 @@ const styles =
       borderWidth: 1,
       borderColor:
         Colors.line,
-    },
-
-    loadingBox: {
-      minHeight: 180,
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
-      gap: 9,
-    },
-
-    loadingText: {
-      color:
-        "#7A8699",
-      fontSize: 11.5,
-      fontWeight:
-        "600",
     },
 
     emptyBox: {

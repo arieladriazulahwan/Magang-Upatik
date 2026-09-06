@@ -6,7 +6,6 @@ import React, {
 } from "react";
 
 import {
-  ActivityIndicator,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -18,11 +17,27 @@ import {
 
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import * as Location from "expo-location";
 
 import MainScreen from "../../components/MainScreen";
 import {
+  SkeletonRow,
+} from "../../components/Skeleton";
+import {
+  formatWitaDay,
+  formatWitaLongDate,
+  formatWitaShortWeekday,
+  formatWitaTime,
+  getWitaDateKey,
+  getWitaMonthStartKey,
+  isWitaDateKeyInCurrentMonth,
+} from "../../constants/time";
+import {
   ApiAttendance,
+  ApiLeaveRequest,
+  ApiWorkLocation,
   ApiUser,
+  clearSession,
   getAttendance,
   getDashboardMe,
   getLeaveRequests,
@@ -30,6 +45,7 @@ import {
   getOvertimeRequests,
   getProfile,
   getStoredUser,
+  getWorkUnit,
   getWfhRequests,
 } from "../../services/api";
 /* ============================================================
@@ -90,42 +106,14 @@ type Activity = {
   statusBg: string;
 };
 
-/* ============================================================
-   DATE HELPERS
-============================================================ */
-
-function formatLongDate(value: Date) {
-  return value.toLocaleDateString("id-ID", {
-    weekday: "long",
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  });
-}
-
-/* ============================================================
-   TIME HELPERS
-============================================================ */
-
-function formatTime(
-  value: string | null | undefined
-) {
-  if (!value) {
-    return "--";
-  }
-
-  const date = new Date(value);
-
-  if (!Number.isNaN(date.getTime())) {
-    return date.toLocaleTimeString("id-ID", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
-  }
-
-  return value.slice(0, 5);
-}
+type DashboardLocationStatus = {
+  kind:
+    | "idle"
+    | "inside"
+    | "outside"
+    | "unknown";
+  text: string;
+};
 
 /* ============================================================
    DURATION
@@ -145,6 +133,140 @@ function formatDuration(
   const mins = minutes % 60;
 
   return `${hours}j ${mins}m`;
+}
+
+function toNumber(
+  value: number | string
+) {
+  return typeof value === "number"
+    ? value
+    : Number(value);
+}
+
+function distanceMeters(
+  from: {
+    latitude: number;
+    longitude: number;
+  },
+  to: {
+    latitude: number;
+    longitude: number;
+  }
+) {
+  const earthRadius =
+    6371000;
+  const lat1 =
+    (from.latitude * Math.PI) /
+    180;
+  const lat2 =
+    (to.latitude * Math.PI) /
+    180;
+  const deltaLat =
+    ((to.latitude - from.latitude) *
+      Math.PI) /
+    180;
+  const deltaLng =
+    ((to.longitude - from.longitude) *
+      Math.PI) /
+    180;
+
+  const a =
+    Math.sin(deltaLat / 2) *
+      Math.sin(deltaLat / 2) +
+    Math.cos(lat1) *
+      Math.cos(lat2) *
+      Math.sin(deltaLng / 2) *
+      Math.sin(deltaLng / 2);
+
+  return (
+    earthRadius *
+    2 *
+    Math.atan2(
+      Math.sqrt(a),
+      Math.sqrt(1 - a)
+    )
+  );
+}
+
+function buildLocationStatus(
+  currentLocation: {
+    latitude: number;
+    longitude: number;
+  },
+  locations: ApiWorkLocation[]
+): DashboardLocationStatus {
+  const activeLocations =
+    locations.filter(
+      (item) =>
+        item.is_active !== false
+    );
+
+  if (
+    activeLocations.length === 0
+  ) {
+    return {
+      kind: "unknown",
+      text: "Lokasi presensi unit belum tersedia",
+    };
+  }
+
+  const nearest =
+    activeLocations
+      .map((item) => {
+        const latitude =
+          toNumber(item.latitude);
+        const longitude =
+          toNumber(item.longitude);
+
+        return {
+          item,
+          distance:
+            distanceMeters(
+              currentLocation,
+              {
+                latitude,
+                longitude,
+              }
+            ),
+        };
+      })
+      .filter(
+        (entry) =>
+          Number.isFinite(
+            entry.distance
+          )
+      )
+      .sort(
+        (a, b) =>
+          a.distance - b.distance
+      )[0];
+
+  if (!nearest) {
+    return {
+      kind: "unknown",
+      text: "Lokasi presensi belum dapat dihitung",
+    };
+  }
+
+  const roundedDistance =
+    Math.round(
+      nearest.distance
+    );
+
+  if (
+    nearest.distance <=
+    nearest.item.radius_meters
+  ) {
+    return {
+      kind: "inside",
+      text: `Di area ${nearest.item.name}`,
+    };
+  }
+
+  return {
+    kind: "outside",
+    text: `${roundedDistance} m dari ${nearest.item.name}`,
+  };
 }
 
 /* ============================================================
@@ -186,6 +308,80 @@ function normalizeStatus(
   )
     .toLowerCase()
     .replace(/[\s_-]+/g, "");
+}
+
+function userHasRole(
+  user: ApiUser | null,
+  roles: string[]
+) {
+  return (
+    user?.roles?.some((role) =>
+      roles.includes(role.name)
+    ) ?? false
+  );
+}
+
+function currentPendingLeaveStep(
+  item: ApiLeaveRequest
+) {
+  return item.approval_steps
+    ?.filter(
+      (step) =>
+        step.status === "menunggu"
+    )
+    .sort(
+      (a, b) =>
+        a.sequence - b.sequence
+    )[0];
+}
+
+function canApproveLeaveStep(
+  user: ApiUser | null,
+  approverRole?: string | null
+) {
+  if (
+    userHasRole(user, [
+      "super_admin",
+    ])
+  ) {
+    return true;
+  }
+
+  if (
+    approverRole ===
+    "atasan_langsung"
+  ) {
+    return userHasRole(user, [
+      "pimpinan",
+    ]);
+  }
+
+  if (
+    approverRole ===
+    "admin_kepegawaian"
+  ) {
+    return userHasRole(user, [
+      "admin_kepegawaian",
+    ]);
+  }
+
+  return false;
+}
+
+function isLeaveAwaitingCurrentUser(
+  item: ApiLeaveRequest,
+  user: ApiUser | null
+) {
+  const step =
+    currentPendingLeaveStep(item);
+
+  return (
+    Boolean(step) &&
+    canApproveLeaveStep(
+      user,
+      step?.approver_role
+    )
+  );
 }
 
 /* ============================================================
@@ -246,7 +442,7 @@ function mapAttendanceMode(
 ) {
   switch (type) {
     case "wfh":
-      return "WFH";
+      return "WFA";
 
     case "shift":
       return "Shift";
@@ -271,34 +467,27 @@ function toActivity(
 
   return {
     date: item.date
-      ? new Date(
-          `${item.date}T00:00:00`
-        ).toLocaleDateString(
-          "id-ID",
-          {
-            day: "2-digit",
-          }
-      )
+      ? formatWitaDay(
+          new Date(
+            `${item.date}T00:00:00`
+          )
+        )
       : "--",
 
     day: item.date
-      ? new Date(
-          `${item.date}T00:00:00`
+      ? formatWitaShortWeekday(
+          new Date(
+            `${item.date}T00:00:00`
+          )
         )
-          .toLocaleDateString(
-            "id-ID",
-            {
-              weekday: "short",
-            }
-      )
-      .toUpperCase()
+          .toUpperCase()
       : "--",
 
-    masuk: formatTime(
+    masuk: formatWitaTime(
       item.check_in
     ),
 
-    keluar: formatTime(
+    keluar: formatWitaTime(
       item.check_out
     ),
 
@@ -400,6 +589,15 @@ export default function DashboardScreen() {
       null
     );
 
+  const [
+    locationStatus,
+    setLocationStatus,
+  ] =
+    useState<DashboardLocationStatus>({
+      kind: "idle",
+      text: "Mendeteksi lokasi presensi...",
+    });
+
   /* ==========================================================
      TODAY
   ========================================================== */
@@ -431,6 +629,82 @@ export default function DashboardScreen() {
     );
   }, [user]);
 
+  const loadLocationStatus =
+    useCallback(
+      async (currentUser: ApiUser) => {
+        try {
+          const workUnitId =
+            currentUser.employee
+              ?.work_unit?.id;
+
+          if (!workUnitId) {
+            setLocationStatus({
+              kind: "unknown",
+              text: "Unit kerja belum tertaut",
+            });
+            return;
+          }
+
+          setLocationStatus({
+            kind: "idle",
+            text: "Mendeteksi lokasi presensi...",
+          });
+
+          const permission =
+            await Location.requestForegroundPermissionsAsync();
+
+          if (
+            permission.status !==
+            "granted"
+          ) {
+            setLocationStatus({
+              kind: "unknown",
+              text: "Izin lokasi belum diberikan",
+            });
+            return;
+          }
+
+          const [
+            workUnitResult,
+            currentLocation,
+          ] =
+            await Promise.all([
+              getWorkUnit(workUnitId),
+              Location.getCurrentPositionAsync({
+                accuracy:
+                  Location.Accuracy.High,
+              }),
+            ]);
+
+          setLocationStatus(
+            buildLocationStatus(
+              {
+                latitude:
+                  currentLocation.coords
+                    .latitude,
+                longitude:
+                  currentLocation.coords
+                    .longitude,
+              },
+              workUnitResult.data
+                .locations || []
+            )
+          );
+        } catch (error) {
+          console.error(
+            "DASHBOARD LOCATION ERROR:",
+            error
+          );
+
+          setLocationStatus({
+            kind: "unknown",
+            text: "Lokasi presensi belum dapat dicek",
+          });
+        }
+      },
+      []
+    );
+
   /* ==========================================================
      LOAD DASHBOARD
   ========================================================== */
@@ -460,31 +734,35 @@ export default function DashboardScreen() {
           ------------------------------------------------ */
 
           const todayText =
-            today
-              .toISOString()
-              .slice(
-                0,
-                10
-              );
+            getWitaDateKey(
+              today
+            );
 
           const monthStart =
-            new Date(
-              today.getFullYear(),
-              today.getMonth(),
-              1
-            )
-              .toISOString()
-              .slice(
-                0,
-                10
-              );
+            getWitaMonthStartKey(
+              today
+            );
 
           /* -----------------------------------------------
              REQUEST API
           ------------------------------------------------ */
 
+          const profileResult =
+            await getProfile();
+          const currentUser =
+            profileResult.user;
+          const employeeId =
+            currentUser.employee?.id;
+
+          setUser(
+            currentUser
+          );
+
+          loadLocationStatus(
+            currentUser
+          );
+
           const [
-            profileResult,
             todayResult,
             historyResult,
             notificationResult,
@@ -494,9 +772,10 @@ export default function DashboardScreen() {
             overtimeResult,
           ] =
             await Promise.all([
-              getProfile(),
-
               getAttendance({
+                employee_id:
+                  employeeId,
+
                 date_from:
                   todayText,
 
@@ -507,6 +786,9 @@ export default function DashboardScreen() {
               }),
 
               getAttendance({
+                employee_id:
+                  employeeId,
+
                 date_from:
                   monthStart,
 
@@ -522,23 +804,21 @@ export default function DashboardScreen() {
 
               getDashboardMe(),
 
-              getLeaveRequests(),
+              getLeaveRequests({
+                employee_id:
+                  employeeId,
+              }),
 
-              getWfhRequests(),
+              getWfhRequests({
+                employee_id:
+                  employeeId,
+              }),
 
-              getOvertimeRequests(),
+              getOvertimeRequests({
+                employee_id:
+                  employeeId,
+              }),
             ]);
-
-          /* -----------------------------------------------
-             PROFILE
-          ------------------------------------------------ */
-
-          const currentUser =
-            profileResult.user;
-
-          setUser(
-            currentUser
-          );
 
           /* -----------------------------------------------
              TODAY ATTENDANCE
@@ -635,22 +915,46 @@ export default function DashboardScreen() {
 
           const ownOrVisibleRequests =
             [
-              ...(leaveResult.data ||
-                []),
+              ...(leaveResult.data || []).map(
+                (item) => ({
+                  status: item.status,
+                  date:
+                    item.start_date,
+                })
+              ),
 
-              ...(wfhResult.data ||
-                []),
+              ...(wfhResult.data || []).map(
+                (item) => ({
+                  status: item.status,
+                  date:
+                    item.start_date,
+                })
+              ),
 
-              ...(overtimeResult.data ||
-                []),
+              ...(overtimeResult.data || []).map(
+                (item) => ({
+                  status: item.status,
+                  date:
+                    item.date,
+                })
+              ),
             ];
+
+          const currentMonthRequests =
+            ownOrVisibleRequests.filter(
+              (item) =>
+                isWitaDateKeyInCurrentMonth(
+                  item.date,
+                  today
+                )
+            );
 
           /* -----------------------------------------------
              PROCESSED REQUEST
           ------------------------------------------------ */
 
           setProcessedCount(
-            ownOrVisibleRequests.filter(
+            currentMonthRequests.filter(
               (item) =>
                 pendingStatuses.has(
                   normalizeStatus(
@@ -680,15 +984,102 @@ export default function DashboardScreen() {
           if (
             currentUserIsApprover
           ) {
-            setApprovalCount(
-              ownOrVisibleRequests.filter(
-                (item) =>
+            const hasRole =
+              (roles: string[]) =>
+                currentUser.roles?.some(
+                  (role) =>
+                    roles.includes(
+                      role.name
+                    )
+                ) ?? false;
+
+            const canApproveLeave =
+              hasRole([
+                "super_admin",
+                "admin_kepegawaian",
+                "pimpinan",
+              ]);
+            const canApproveWfa =
+              hasRole([
+                "super_admin",
+                "admin_kepegawaian",
+                "admin_unit",
+                "pimpinan",
+              ]);
+            const canApproveOvertime =
+              hasRole([
+                "super_admin",
+                "admin_kepegawaian",
+                "pimpinan",
+              ]);
+
+            const emptyRequests =
+              Promise.resolve({
+                data: [],
+              });
+
+            const [
+              approvalLeaveResult,
+              approvalWfhResult,
+              approvalOvertimeResult,
+            ] =
+              await Promise.allSettled([
+                canApproveLeave
+                  ? getLeaveRequests()
+                  : emptyRequests,
+                canApproveWfa
+                  ? getWfhRequests()
+                  : emptyRequests,
+                canApproveOvertime
+                  ? getOvertimeRequests()
+                  : emptyRequests,
+              ]);
+
+            const leaveApprovalCount =
+              (approvalLeaveResult.status ===
+              "fulfilled"
+                ? approvalLeaveResult.value.data ||
+                  []
+                : []
+              ).filter((item) =>
+                isLeaveAwaitingCurrentUser(
+                  item,
+                  currentUser
+                )
+              ).length;
+
+            const wfhApprovalCount =
+              (approvalWfhResult.status ===
+              "fulfilled"
+                ? approvalWfhResult.value.data ||
+                  []
+                : []
+              ).filter((item) =>
+                pendingStatuses.has(
+                  normalizeStatus(
+                    item.status
+                  )
+                )
+              ).length;
+
+            const overtimeApprovalCount =
+              (approvalOvertimeResult.status ===
+              "fulfilled"
+                ? approvalOvertimeResult.value
+                    .data || []
+                : []
+              ).filter((item) =>
                   pendingStatuses.has(
                     normalizeStatus(
                       item.status
                     )
                   )
-              ).length
+              ).length;
+
+            setApprovalCount(
+              leaveApprovalCount +
+                wfhApprovalCount +
+                overtimeApprovalCount
             );
           } else {
             setApprovalCount(
@@ -703,6 +1094,21 @@ export default function DashboardScreen() {
             error
           );
 
+          if (
+            error instanceof Error &&
+            error.message
+              .toLowerCase()
+              .includes(
+                "unauthenticated"
+              )
+          ) {
+            await clearSession();
+            router.replace(
+              "/login"
+            );
+            return;
+          }
+
           setLoadError(
             error instanceof
               Error
@@ -714,8 +1120,11 @@ export default function DashboardScreen() {
             false
           );
         }
-      },
-      [today]
+    },
+      [
+        loadLocationStatus,
+        today,
+      ]
     );
 
   /* ==========================================================
@@ -890,12 +1299,12 @@ export default function DashboardScreen() {
           COLORS.orangeLight,
 
         route:
-          "/(main)/lembur",
+          "/(main)/pengajuan-baru?type=Lembur",
       },
 
       {
         label:
-          "WFH",
+          "WFA",
 
         icon:
           "home-outline",
@@ -907,7 +1316,7 @@ export default function DashboardScreen() {
           COLORS.cyanLight,
 
         route:
-          "/(main)/pengajuan",
+          "/(main)/pengajuan-baru?type=WFA",
       },
 
       {
@@ -924,7 +1333,7 @@ export default function DashboardScreen() {
           COLORS.redLight,
 
         route:
-          "/(main)/pengajuan",
+          "/(main)/pengajuan-baru?type=Sakit",
       },
 
       {
@@ -961,6 +1370,13 @@ export default function DashboardScreen() {
           "/(main)/notifikasi",
       },
     ];
+
+  const displayShortcuts =
+    shortcuts.filter(
+      (item) =>
+        item.label !== "Persetujuan" ||
+        isApprover
+    );
 
   const displayActivities =
     activities.slice(
@@ -1189,7 +1605,7 @@ export default function DashboardScreen() {
                   styles.heroDate
                 }
               >
-                {formatLongDate(
+                {formatWitaLongDate(
                   today
                 )}
               </Text>
@@ -1274,7 +1690,7 @@ export default function DashboardScreen() {
                       styles.timeValue
                     }
                   >
-                    {formatTime(
+                    {formatWitaTime(
                       todayAttendance?.check_in
                     )}
                   </Text>
@@ -1300,7 +1716,7 @@ export default function DashboardScreen() {
                         styles.timeDisabled,
                     ]}
                   >
-                    {formatTime(
+                    {formatWitaTime(
                       todayAttendance?.check_out
                     )}
                   </Text>
@@ -1313,22 +1729,55 @@ export default function DashboardScreen() {
             ================================================= */}
 
             <View
-              style={
-                styles.locationStatus
-              }
+              style={[
+                styles.locationStatus,
+                locationStatus.kind ===
+                "inside"
+                  ? styles.locationStatusInside
+                  : null,
+                locationStatus.kind ===
+                "outside"
+                  ? styles.locationStatusOutside
+                  : null,
+              ]}
             >
               <Ionicons
-                name="location-outline"
+                name={
+                  locationStatus.kind ===
+                  "inside"
+                    ? "checkmark-circle"
+                    : locationStatus.kind ===
+                      "outside"
+                    ? "alert-circle"
+                    : "location-outline"
+                }
                 size={17}
-                color="#6ee7b7"
+                color={
+                  locationStatus.kind ===
+                  "inside"
+                    ? "#6ee7b7"
+                    : locationStatus.kind ===
+                      "outside"
+                    ? "#fca5a5"
+                    : "#bfdbfe"
+                }
               />
 
               <Text
-                style={
-                  styles.locationText
-                }
+                style={[
+                  styles.locationText,
+                  locationStatus.kind ===
+                  "inside"
+                    ? styles.locationTextInside
+                    : null,
+                  locationStatus.kind ===
+                  "outside"
+                    ? styles.locationTextOutside
+                    : null,
+                ]}
+                numberOfLines={2}
               >
-                Lokasi presensi diverifikasi oleh server
+                {locationStatus.text}
               </Text>
             </View>
 
@@ -1482,7 +1931,8 @@ export default function DashboardScreen() {
               PERSETUJUAN
           ================================================= */}
 
-          {isApprover && (
+          {isApprover &&
+          approvalCount > 0 && (
             <Pressable
               style={
                 styles.approvalCard
@@ -1570,7 +2020,7 @@ export default function DashboardScreen() {
               styles.shortcutGrid
             }
           >
-            {shortcuts.map(
+            {displayShortcuts.map(
               (item) => (
                 <Pressable
                   key={
@@ -1663,25 +2113,11 @@ export default function DashboardScreen() {
             }
           >
             {loading ? (
-              <View
-                style={
-                  styles.loadingBox
-                }
-              >
-                <ActivityIndicator
-                  color={
-                    COLORS.blue
-                  }
-                />
-
-                <Text
-                  style={
-                    styles.loadingText
-                  }
-                >
-                  Memuat aktivitas...
-                </Text>
-              </View>
+              <>
+                <SkeletonRow />
+                <SkeletonRow />
+                <SkeletonRow />
+              </>
             ) : displayActivities.length ===
               0 ? (
               <View
@@ -2176,20 +2612,44 @@ const styles =
       paddingVertical: 9,
       borderRadius: 11,
       backgroundColor:
-        "rgba(52,211,153,0.12)",
+        "rgba(59,130,246,0.12)",
       borderWidth: 1,
       borderColor:
-        "rgba(52,211,153,0.22)",
+        "rgba(147,197,253,0.24)",
+    },
+
+    locationStatusInside: {
+      backgroundColor:
+        "rgba(52,211,153,0.13)",
+      borderColor:
+        "rgba(52,211,153,0.28)",
+    },
+
+    locationStatusOutside: {
+      backgroundColor:
+        "rgba(239,68,68,0.15)",
+      borderColor:
+        "rgba(248,113,113,0.34)",
     },
 
     locationText: {
       flex: 1,
       color:
-        "#d7f3e6",
+        "#dbeafe",
       fontSize: 11.5,
       fontWeight:
         "600",
       lineHeight: 16,
+    },
+
+    locationTextInside: {
+      color:
+        "#d7f3e6",
+    },
+
+    locationTextOutside: {
+      color:
+        "#fee2e2",
     },
 
     attendanceButton: {
@@ -2381,7 +2841,8 @@ const styles =
       flexWrap:
         "wrap",
       justifyContent:
-        "space-between",
+        "flex-start",
+      columnGap: "2.666%",
       paddingHorizontal: 16,
       paddingTop: 8,
       rowGap: 9,
