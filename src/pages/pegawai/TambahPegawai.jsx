@@ -1,27 +1,25 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AdminLayout from "../../components/layout/AdminLayout";
-import { apiRequest } from "../../services/api";
-
-const normalizeArray = (payload) => {
-	if (Array.isArray(payload)) return payload;
-	if (Array.isArray(payload?.data)) return payload.data;
-	if (Array.isArray(payload?.items)) return payload.items;
-	return [];
-};
+import { createEmployee, getStructuralPositions, getWorkUnits } from "../../services/pegawaiService";
 
 function TambahPegawai() {
 	const navigate = useNavigate();
 	const [units, setUnits] = useState([]);
+	const [positions, setPositions] = useState([]);
 	const [loadingUnits, setLoadingUnits] = useState(true);
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState("");
 
 	useEffect(() => {
-		const fetchUnits = async () => {
+		const fetchReferenceData = async () => {
 			try {
-				const response = await apiRequest("/work-units");
-				setUnits(normalizeArray(response));
+				const [unitData, positionResult] = await Promise.all([
+					getWorkUnits(),
+					getStructuralPositions().catch(() => []),
+				]);
+				setUnits(unitData);
+				setPositions(positionResult);
 			} catch (err) {
 				setError(err.message || "Gagal mengambil daftar unit kerja.");
 			} finally {
@@ -29,7 +27,7 @@ function TambahPegawai() {
 			}
 		};
 
-		fetchUnits();
+		fetchReferenceData();
 	}, []);
 
 	const handleSubmit = async (event) => {
@@ -40,9 +38,7 @@ function TambahPegawai() {
 			setSaving(true);
 			setError("");
 
-			await apiRequest("/employees", {
-				method: "POST",
-				body: JSON.stringify({
+			await createEmployee({
 					name: form.get("name"),
 					nip: form.get("nip") || null,
 					nik: form.get("nik") || null,
@@ -59,7 +55,6 @@ function TambahPegawai() {
 					grade: form.get("grade") || null,
 					rank: form.get("rank") || null,
 					is_active: true,
-				}),
 			});
 
 			navigate("/pegawai");
@@ -94,6 +89,16 @@ function TambahPegawai() {
 						<div className="form-field full-width">
 							<label htmlFor="name">Nama Lengkap</label>
 							<input id="name" name="name" required placeholder="mis. Dr. Andi Pratama, M.T." />
+						</div>
+						<div className="form-field full-width">
+							<label htmlFor="structural_position_id">Jabatan Struktural <small>(opsional)</small></label>
+							<select id="structural_position_id" name="structural_position_id">
+								<option value="">Tidak ada jabatan struktural</option>
+								{positions.filter((position) => position.is_active !== false).map((position) => (
+									<option key={position.id} value={position.id}>{position.name}</option>
+								))}
+							</select>
+							{!loadingUnits && positions.length === 0 && <small className="field-hint">Daftar jabatan belum tersedia.</small>}
 						</div>
 
 						<div className="form-field">

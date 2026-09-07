@@ -4,6 +4,55 @@ import { apiRequest } from "../../services/api";
 
 const APP_TIME_ZONE = "Asia/Makassar";
 
+const normalizeArray = (payload) => {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload?.items)) return payload.items;
+  if (Array.isArray(payload?.results)) return payload.results;
+  return [];
+};
+
+const toLabel = (value) => String(value || "-")
+  .replace(/_/g, " ")
+  .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
+const formatAttendanceTime = (value) => {
+  if (!value || value === "-") return "-";
+  const match = String(value).match(/(?:T|\s)(\d{2}:\d{2})|^(\d{2}:\d{2})/);
+  return match?.[1] || match?.[2] || String(value);
+};
+
+const getEmployeeId = (item) => item.employee_id ?? item.employee?.id ?? item.pegawai?.id;
+
+const enrichAttendance = (attendance, employees) => {
+  const employeesById = new Map(employees.map((employee) => [String(employee.id), employee]));
+
+  return attendance.map((item) => {
+    const employee = item.employee || item.pegawai || employeesById.get(String(getEmployeeId(item))) || {};
+    const status = String(item.status || item.attendance_status || "-").toLowerCase();
+
+    return {
+      ...item,
+      name: item.name || item.nama || employee.name || employee.nama || "-",
+      nip: item.nip || employee.nip || employee.nik || "-",
+      unit: item.unit || item.unit_kerja || item.work_unit?.name || employee.work_unit?.name || employee.unit || employee.unit_kerja || "-",
+      masuk: formatAttendanceTime(item.masuk || item.jam_masuk || item.check_in || item.clock_in),
+      keluar: formatAttendanceTime(item.keluar || item.jam_keluar || item.check_out || item.clock_out),
+      metode: item.metode || item.method || item.type || "-",
+      status,
+    };
+  });
+};
+
+const getSummary = (attendance) => attendance.reduce((result, item) => {
+  const status = String(item.status || "").toLowerCase();
+  if (status === "hadir") result.hadir += 1;
+  else if (status === "terlambat") result.terlambat += 1;
+  else if (["izin", "cuti", "sakit", "dinas", "dinas_luar"].includes(status)) result.izin += 1;
+  else if (["alpha", "tidak_lengkap", "belum_absen"].includes(status)) result.belum_absen += 1;
+  return result;
+}, { hadir: 0, terlambat: 0, izin: 0, belum_absen: 0 });
+
 const getToday = () => {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: APP_TIME_ZONE,
@@ -55,7 +104,10 @@ function Monitoring() {
       // Backend menerima filter tanggal agar ringkasan dan data yang dikirim
       // hanya untuk tanggal yang dipilih. Penyaringan ulang di frontend mengantisipasi
       // backend lama yang belum menerapkan query parameter tersebut.
-      const response = await apiRequest(`/attendance?date=${selectedDate}`);
+      const [response, employeesResponse] = await Promise.all([
+        apiRequest(`/attendance?date=${selectedDate}`),
+        apiRequest("/employees").catch(() => []),
+      ]);
 
       console.log(
         "Data monitoring dari backend:",
@@ -77,15 +129,17 @@ function Monitoring() {
        * }
        */
 
-      const attendance = Array.isArray(response?.data) ? response.data : Array.isArray(response) ? response : [];
-      setData(attendance.filter((item) => !getAttendanceDate(item) || getAttendanceDate(item) === selectedDate));
+      const attendance = normalizeArray(response)
+        .filter((item) => !getAttendanceDate(item) || getAttendanceDate(item) === selectedDate);
+      const normalizedAttendance = enrichAttendance(attendance, normalizeArray(employeesResponse));
+      const calculatedSummary = getSummary(normalizedAttendance);
+      setData(normalizedAttendance);
 
       setSummary({
-        hadir: response.summary?.hadir || 0,
-        terlambat: response.summary?.terlambat || 0,
-        izin: response.summary?.izin || 0,
-        belum_absen:
-          response.summary?.belum_absen || 0,
+        hadir: response.summary?.hadir ?? calculatedSummary.hadir,
+        terlambat: response.summary?.terlambat ?? calculatedSummary.terlambat,
+        izin: response.summary?.izin ?? calculatedSummary.izin,
+        belum_absen: response.summary?.belum_absen ?? calculatedSummary.belum_absen,
       });
 
     } catch (error) {
@@ -121,21 +175,17 @@ function Monitoring() {
 
     const name =
       item.name ||
-      item.nama ||
       "";
 
     const nip =
-      item.nip ||
-      "";
+      item.nip || "";
 
     const itemUnit =
       item.unit ||
       item.unit_kerja ||
       "";
 
-    const itemStatus =
-      item.status ||
-      "";
+    const itemStatus = toLabel(item.status);
 
     const matchSearch =
       name.toLowerCase().includes(keyword) ||
@@ -165,8 +215,7 @@ function Monitoring() {
       data
         .map(
           (item) =>
-            item.unit ||
-            item.unit_kerja
+            item.unit
         )
         .filter(Boolean)
     ),
@@ -488,38 +537,19 @@ function Monitoring() {
 
                   filteredData.map((item) => {
 
-                    const name =
-                      item.name ||
-                      item.nama ||
-                      "-";
+                    const name = item.name || "-";
 
-                    const nip =
-                      item.nip ||
-                      "-";
+                    const nip = item.nip || "-";
 
-                    const itemUnit =
-                      item.unit ||
-                      item.unit_kerja ||
-                      "-";
+                    const itemUnit = item.unit || "-";
 
-                    const masuk =
-                      item.masuk ||
-                      item.jam_masuk ||
-                      "-";
+                    const masuk = item.masuk || "-";
 
-                    const keluar =
-                      item.keluar ||
-                      item.jam_keluar ||
-                      "-";
+                    const keluar = item.keluar || "-";
 
-                    const metode =
-                      item.metode ||
-                      item.method ||
-                      "-";
+                    const metode = toLabel(item.metode);
 
-                    const itemStatus =
-                      item.status ||
-                      "-";
+                    const itemStatus = toLabel(item.status);
 
                     return (
 

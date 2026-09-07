@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AdminLayout from "../../components/layout/AdminLayout";
-import { apiRequest } from "../../services/api";
+import { getEmployees } from "../../services/pegawaiService";
 import { canAddEmployee, canEditEmployee, isRestrictedToUnit, getUserUnit } from "../../utils/access";
 
 function Pegawai() {
@@ -13,7 +13,7 @@ function Pegawai() {
 
   const [employees, setEmployees] = useState([]);
   const [search, setSearch] = useState("");
-  const [type, setType] = useState("Semua");
+  const [type, setType] = useState("semua");
   const [loading, setLoading] = useState(true);
 
   // =========================
@@ -24,22 +24,7 @@ function Pegawai() {
     try {
       setLoading(true);
 
-      const response = await apiRequest("/employees");
-
-      console.log("Response pegawai:", response);
-
-      /*
-       * Menyesuaikan beberapa kemungkinan
-       * bentuk response dari backend.
-       */
-
-      if (Array.isArray(response)) {
-        setEmployees(response);
-      } else if (Array.isArray(response.data)) {
-        setEmployees(response.data);
-      } else {
-        setEmployees([]);
-      }
+      setEmployees(await getEmployees());
 
     } catch (error) {
       console.error("Gagal mengambil data pegawai:", error);
@@ -74,15 +59,16 @@ function Pegawai() {
       "";
 
     const unit =
+      employee.work_unit?.name ||
       employee.unit ||
       employee.unit_kerja ||
       employee.unitKerja ||
       "";
 
     const employeeType =
+      employee.employment_status ||
+      employee.status_kepegawaian ||
       employee.type ||
-      employee.jenis_kepegawaian ||
-      employee.jenis_kepegawaian ||
       "";
 
     const matchesSearch =
@@ -91,8 +77,8 @@ function Pegawai() {
       unit.toLowerCase().includes(keyword);
 
     const matchesType =
-      type === "Semua" ||
-      employeeType === type;
+      type === "semua" ||
+      employeeType.toLowerCase() === type;
 
     // Filter berdasarkan unit jika user adalah admin_unit atau pimpinan
     const matchesUnit = 
@@ -111,23 +97,17 @@ function Pegawai() {
 
   const totalPNS = employees.filter(
     (employee) =>
-      (employee.type ||
-        employee.jenis_kepegawaian ||
-        "") === "PNS"
+      (employee.employment_status || employee.status_kepegawaian || employee.type || "").toLowerCase() === "pns"
   ).length;
 
   const totalPPPK = employees.filter(
     (employee) =>
-      (employee.type ||
-        employee.jenis_kepegawaian ||
-        "") === "PPPK"
+      (employee.employment_status || employee.status_kepegawaian || employee.type || "").toLowerCase() === "pppk"
   ).length;
 
   const totalNonASN = employees.filter(
     (employee) =>
-      (employee.type ||
-        employee.jenis_kepegawaian ||
-        "") === "Non-ASN"
+      (employee.employment_status || employee.status_kepegawaian || employee.type || "").toLowerCase() === "non_asn"
   ).length;
 
 
@@ -268,19 +248,19 @@ function Pegawai() {
                 className="filter-select"
               >
 
-                <option value="Semua">
+                <option value="semua">
                   Semua
                 </option>
 
-                <option value="PNS">
+                <option value="pns">
                   PNS
                 </option>
 
-                <option value="PPPK">
+                <option value="pppk">
                   PPPK
                 </option>
 
-                <option value="Non-ASN">
+                <option value="non_asn">
                   Non-ASN
                 </option>
 
@@ -376,29 +356,33 @@ function Pegawai() {
                       "-";
 
                     const unit =
+                      employee.work_unit?.name ||
                       employee.unit ||
                       employee.unit_kerja ||
                       employee.unitKerja ||
                       "-";
 
                     const position =
+                      employee.structural_position?.name ||
                       employee.position ||
                       employee.jabatan ||
                       "-";
 
                     const employeeType =
-                      employee.type ||
-                      employee.jenis_kepegawaian ||
+                      employee.employee_type ||
+                      employee.jenis_pegawai ||
                       "-";
 
                     const employeeStatus =
-                      employee.status ||
-                      "Aktif";
+                      employee.is_active === false || employee.deleted_at
+                        ? "Nonaktif"
+                        : "Aktif";
 
-                    const face =
-                      employee.face ||
-                      employee.face_status ||
-                      "Belum";
+                    const face = Number(
+                      employee.face_data_count || employee.face_samples || employee.face_count || 0,
+                    ) > 0
+                      ? "Terdaftar"
+                      : "Belum";
 
                     return (
 

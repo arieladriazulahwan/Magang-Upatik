@@ -1641,6 +1641,138 @@ img {
   color: #26354b;
 }
 
+/* Detail koreksi presensi */
+.correction-detail {
+  padding: 22px;
+}
+
+.correction-detail-person {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding-bottom: 18px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid #edf0f4;
+}
+
+.correction-detail-person > div:last-child {
+  min-width: 0;
+}
+
+.correction-detail-person strong,
+.correction-detail-person span,
+.correction-detail-person small {
+  display: block;
+}
+
+.correction-detail-person strong {
+  color: #26354b;
+  font-size: 13px;
+}
+
+.correction-detail-person span,
+.correction-detail-person small {
+  margin-top: 3px;
+  color: #7a8699;
+  font-size: 10px;
+}
+
+.correction-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.employee-modal .correction-detail-grid {
+  padding: 0;
+}
+
+.correction-detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.correction-detail-item > span {
+  color: #7a8699;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.correction-detail-item > strong {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  padding: 0 11px;
+  border: 1px solid #e1e7ef;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #2b3650;
+  font-size: 12px;
+}
+
+.correction-detail-item input,
+.correction-detail-item textarea {
+  width: 100%;
+  border: 1px solid #dfe5ec;
+  border-radius: 8px;
+  outline: none;
+  background: #ffffff;
+  color: #344054;
+  font: inherit;
+  font-size: 12px;
+}
+
+.correction-detail-item input {
+  height: 38px;
+  padding: 0 10px;
+}
+
+.correction-detail-item textarea {
+  min-height: 88px;
+  padding: 10px;
+  resize: vertical;
+}
+
+.correction-detail-item input:focus,
+.correction-detail-item textarea:focus {
+  border-color: #315b86;
+  box-shadow: 0 0 0 3px rgba(49, 91, 134, 0.08);
+}
+
+.correction-detail-full-width,
+.correction-detail-actions {
+  grid-column: 1 / -1;
+}
+
+.correction-detail-actions {
+  margin-top: 4px;
+}
+
+.correction-detail-actions .approve-submit {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+@media (max-width: 600px) {
+  .correction-detail {
+    padding: 16px;
+  }
+
+  .correction-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .correction-detail-full-width,
+  .correction-detail-actions {
+    grid-column: auto;
+  }
+}
+
 .employee-modal form {
   padding: 20px;
 }
@@ -5008,11 +5140,15 @@ img {
 .siga8-mapping-form .primary-button { height: 36px; white-space: nowrap; }
 .siga8-mapping-table-card { overflow: hidden; }
 .siga8-mapping-table-wrapper { overflow-x: auto; }
-.siga8-mapping-table { width: 100%; border-collapse: collapse; min-width: 750px; }
+.siga8-mapping-table { width: 100%; border-collapse: collapse; min-width: 850px; }
 .siga8-mapping-table th { padding: 12px 16px; background: #f8fafc; color: #7d899c; font-size: 10px; font-weight: 800; text-align: left; text-transform: uppercase; letter-spacing: .04em; }
 .siga8-mapping-table td { padding: 12px 16px; border-top: 1px solid #edf0f5; color: #59667d; font-size: 12px; }
 .siga8-mapping-table td strong { color: #334155; }
 .siga8-mapping-table code { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: #f3f6fa; color: #64748b; font-size: 10px; }
+.mapping-local-role { display: block; overflow: hidden; color: #405574; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.mapping-role-id { width: 82px; height: 34px; box-sizing: border-box; padding: 0 8px; border: 1px solid #dbe2ee; border-radius: 7px; outline: none; background: #ffffff; color: #334155; font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 700; }
+.mapping-role-id:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, .1); }
+.mapping-role-id:disabled { cursor: wait; opacity: .65; }
 .mapping-status, .mapping-delete { border: 0; border-radius: 6px; padding: 6px 9px; font-size: 11px; font-weight: 700; }
 .mapping-status { background: #f1f5f9; color: #64748b; }
 .mapping-status.active { background: #e7f6ed; color: #0f7a4a; }

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import AdminLayout from "../../components/layout/AdminLayout";
-import { apiRequest } from "../../services/api";
+import { getEmployee } from "../../services/pegawaiService";
 
 function DetailPegawai() {
 	const { id } = useParams();
@@ -13,8 +13,7 @@ function DetailPegawai() {
 	useEffect(() => {
 		const fetchEmployee = async () => {
 			try {
-				const response = await apiRequest(`/employees/${id}`);
-				setEmployee(response?.data || response);
+				setEmployee(await getEmployee(id));
 			} catch (err) {
 				setError(err.message || "Gagal mengambil detail pegawai.");
 			} finally {

@@ -18,6 +18,12 @@ const getNestedValue = (obj, keys) => {
   return "";
 };
 
+const formatAttendanceTime = (value) => {
+  if (!value || value === "-") return "-";
+  const match = String(value).match(/(?:T|\s)(\d{2}:\d{2})|^(\d{2}:\d{2})/);
+  return match?.[1] || match?.[2] || String(value);
+};
+
 const normalizeVerificationData = (item, index) => {
   const employee = item.employee || item.user || item.pegawai || {};
   const name =
@@ -35,10 +41,10 @@ const normalizeVerificationData = (item, index) => {
   const tanggal =
     getNestedValue(item, ["date", "tanggal", "attendance_date"]) ||
     "-";
-  const jamMasuk =
+  const rawJamMasuk =
     getNestedValue(item, ["check_in", "clock_in", "jam_masuk", "masuk", "in_time"]) ||
     "-";
-  const jamPulang =
+  const rawJamPulang =
     getNestedValue(item, ["check_out", "clock_out", "jam_pulang", "pulang", "out_time"]) ||
     "-";
   const status =
@@ -54,8 +60,8 @@ const normalizeVerificationData = (item, index) => {
     nip,
     unit,
     tanggal,
-    jamMasuk,
-    jamPulang,
+    jamMasuk: formatAttendanceTime(rawJamMasuk),
+    jamPulang: formatAttendanceTime(rawJamPulang),
     status,
     keterangan,
   };
@@ -365,8 +371,8 @@ function Verifikasi() {
                 </button>
               </div>
 
-              <div className="approval-detail">
-                <div className="detail-person">
+              <div className="correction-detail">
+                <div className="correction-detail-person">
                   <div className="employee-avatar large">
                     {selectedData.name
                       .split(" ")
@@ -382,31 +388,31 @@ function Verifikasi() {
                   </div>
                 </div>
 
-                <form className="detail-grid" onSubmit={handleCorrect}>
-                  <div className="detail-item">
+                <form className="correction-detail-grid" onSubmit={handleCorrect}>
+                  <div className="correction-detail-item">
                     <span>Tanggal</span>
                     <strong>{selectedData.tanggal}</strong>
                   </div>
 
-                  <div className="detail-item">
+                  <div className="correction-detail-item">
                     <span>Status</span>
                     <strong>{selectedData.status}</strong>
                   </div>
 
-                  <div className="detail-item">
+                  <div className="correction-detail-item">
                     <span>Jam Masuk</span>
                     <input name="check_in" type="time" defaultValue={selectedData.jamMasuk === "-" ? "" : selectedData.jamMasuk} />
                   </div>
 
-                  <div className="detail-item">
+                  <div className="correction-detail-item">
                     <span>Jam Pulang</span>
                     <input name="check_out" type="time" defaultValue={selectedData.jamPulang === "-" ? "" : selectedData.jamPulang} />
                   </div>
-                  <div className="detail-item full-width">
+                  <div className="correction-detail-item correction-detail-full-width">
                     <span>Keterangan koreksi</span>
                     <textarea name="note" defaultValue={selectedData.keterangan === "-" ? "" : selectedData.keterangan} rows="3" required />
                   </div>
-                  <div className="modal-actions full-width">
+                  <div className="modal-actions correction-detail-actions">
                     <button type="button" className="secondary-button" onClick={() => setSelectedData(null)}>
                       Batal
                     </button>
