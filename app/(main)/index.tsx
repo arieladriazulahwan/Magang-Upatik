@@ -6,6 +6,7 @@ import React, {
 } from "react";
 
 import {
+  ActivityIndicator,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -20,9 +21,6 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 
 import MainScreen from "../../components/MainScreen";
-import {
-  SkeletonRow,
-} from "../../components/Skeleton";
 import {
   formatWitaDay,
   formatWitaLongDate,
@@ -259,7 +257,7 @@ function buildLocationStatus(
   ) {
     return {
       kind: "inside",
-      text: `Di area ${nearest.item.name}`,
+      text: `${roundedDistance} m dari ${nearest.item.name}`,
     };
   }
 
@@ -2113,11 +2111,15 @@ export default function DashboardScreen() {
             }
           >
             {loading ? (
-              <>
-                <SkeletonRow />
-                <SkeletonRow />
-                <SkeletonRow />
-              </>
+              <View style={styles.loadingBox}>
+                <ActivityIndicator
+                  size="large"
+                  color={COLORS.blue}
+                />
+                <Text style={styles.loadingText}>
+                  Memuat data dashboard
+                </Text>
+              </View>
             ) : displayActivities.length ===
               0 ? (
               <View

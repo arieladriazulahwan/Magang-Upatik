@@ -9,6 +9,9 @@ import { router } from "expo-router";
 import Avatar from "../../components/Avatar";
 import Badge from "../../components/Badge";
 import MainScreen from "../../components/MainScreen";
+import {
+  LoadingDots,
+} from "../../components/Skeleton";
 import { Colors } from "../../constants/colors";
 import { usePrototype } from "../../contexts/PrototypeContext";
 
@@ -22,6 +25,7 @@ export default function PersetujuanScreen() {
     approvalHistory,
     decideApproval,
     loadingApprovalId,
+    syncing,
   } = usePrototype();
 
   const showingPending =
@@ -41,6 +45,10 @@ export default function PersetujuanScreen() {
    */
   const isAnyProcessing =
     loadingApprovalId !== null;
+  const showLoading =
+    syncing &&
+    approvals.length === 0 &&
+    approvalHistory.length === 0;
 
   /**
    * Proses keputusan approval.
@@ -155,7 +163,11 @@ export default function PersetujuanScreen() {
       {/* ================================
           TAB MENUNGGU
           ================================= */}
-      {showingPending
+      {showLoading ? (
+        <View style={styles.loadingList}>
+          <LoadingDots label="Memuat persetujuan" />
+        </View>
+      ) : showingPending
         ? approvals.map((item, index) => {
             const processing =
               isProcessing(item.id);
@@ -363,10 +375,10 @@ export default function PersetujuanScreen() {
           )}
 
       {/* EMPTY STATE */}
-      {(
-        showingPending
-          ? approvals
-          : approvalHistory
+      {!showLoading &&
+      (showingPending
+        ? approvals
+        : approvalHistory
       ).length === 0 ? (
         <View style={styles.empty}>
           <Text style={styles.emptyTitle}>
@@ -472,6 +484,16 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     textAlign: "center",
+  },
+
+  loadingList: {
+    minHeight: 170,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 15,
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.line,
   },
 
   activeTabText: {

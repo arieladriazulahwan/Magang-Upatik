@@ -102,7 +102,11 @@ export type NotificationStatus =
   | "waiting"
   | "processing"
   | "approved"
-  | "rejected";
+  | "rejected"
+  | "present"
+  | "late"
+  | "permit"
+  | "absent";
 
 export type NotificationCategory =
   | "attendance"
@@ -124,6 +128,7 @@ export interface NotificationItem {
   title: string;
   desc: string;
   time: string;
+  createdAt?: string | null;
   unread: boolean;
   status?: NotificationStatus;
   category?: NotificationCategory;
@@ -170,6 +175,8 @@ interface PrototypeContextValue {
 
   toast: string | null;
 
+  syncing: boolean;
+
   loadingRequest: boolean;
 
   loadingApprovalId: string | null;
@@ -189,10 +196,13 @@ interface PrototypeContextValue {
       startDate: string;
       endDate: string;
       reason: string;
+      leaveTypeId?: number;
       attachment?: RequestAttachment | null;
       doctorLetterType?: "dokter_biasa" | "tim_penguji_kesehatan";
       doctorLetterNumber?: string;
       doctorFacilityName?: string;
+      childNumber?: number;
+      subCategory?: "menikah" | "keluarga_sakit" | "keluarga_meninggal" | "bencana";
       plannedStartTime?: string;
       plannedEndTime?: string;
     }
@@ -656,6 +666,68 @@ function getErrorMessage(
   return "Terjadi kesalahan pada server.";
 }
 
+function attendanceNotificationStatus(
+  status?: string | null
+): NotificationStatus {
+  const value =
+    status
+      ?.toLowerCase()
+      .replace(/[\s_-]+/g, "") ?? "";
+
+  if (
+    value.includes("terlambat")
+  ) {
+    return "late";
+  }
+
+  if (
+    value.includes("izin")
+  ) {
+    return "permit";
+  }
+
+  if (
+    value.includes("alpa") ||
+    value.includes("alpha") ||
+    value.includes("tidakhadir")
+  ) {
+    return "absent";
+  }
+
+  if (
+    value.includes("hadir")
+  ) {
+    return "present";
+  }
+
+  return "success";
+}
+
+function attendanceStatusLabel(
+  status?: string | null
+) {
+  switch (
+    attendanceNotificationStatus(
+      status
+    )
+  ) {
+    case "late":
+      return "Terlambat";
+
+    case "permit":
+      return "Izin";
+
+    case "absent":
+      return "Alpa";
+
+    case "present":
+      return "Hadir";
+
+    default:
+      return "Berhasil";
+  }
+}
+
 /* =====================================================
    MAPPING
 ===================================================== */
@@ -864,6 +936,50 @@ function inferNotificationStatus(
   }
 
   if (
+    (
+      text.includes("presensi") ||
+      text.includes("attendance")
+    ) &&
+    text.includes("terlambat")
+  ) {
+    return "late";
+  }
+
+  if (
+    (
+      text.includes("presensi") ||
+      text.includes("attendance")
+    ) &&
+    (
+      text.includes("alpa") ||
+      text.includes("alpha") ||
+      text.includes("tidak hadir")
+    )
+  ) {
+    return "absent";
+  }
+
+  if (
+    (
+      text.includes("presensi") ||
+      text.includes("attendance")
+    ) &&
+    text.includes("izin")
+  ) {
+    return "permit";
+  }
+
+  if (
+    (
+      text.includes("presensi") ||
+      text.includes("attendance")
+    ) &&
+    text.includes("hadir")
+  ) {
+    return "present";
+  }
+
+  if (
     text.includes("berhasil")
   ) {
     return "success";
@@ -959,6 +1075,10 @@ function notificationTypeFor(
     waiting: "menunggu",
     approved: "disetujui",
     rejected: "ditolak",
+    present: "hadir",
+    late: "terlambat",
+    permit: "izin",
+    absent: "alpa",
     success: "berhasil",
     error: "gagal",
     info: "info",
@@ -1000,6 +1120,9 @@ function mapNotification(
             item.created_at
           )
         : "-",
+
+    createdAt:
+      item.created_at,
 
     unread:
       !item.is_read,
@@ -1226,6 +1349,11 @@ export function PrototypeProvider({
     useState(false);
 
   const [
+    syncing,
+    setSyncing,
+  ] = useState(true);
+
+  const [
     loadingApprovalId,
     setLoadingApprovalId,
   ] =
@@ -1254,6 +1382,10 @@ export function PrototypeProvider({
     }
 
     async function syncFromBackend() {
+      if (active) {
+        setSyncing(true);
+      }
+
       try {
         const token =
           await getToken();
@@ -1705,6 +1837,10 @@ export function PrototypeProvider({
             error
           )
         );
+      } finally {
+        if (active) {
+          setSyncing(false);
+        }
       }
     }
 
@@ -1784,6 +1920,8 @@ export function PrototypeProvider({
 
           toast,
 
+          syncing,
+
           loadingRequest,
 
           loadingApprovalId,
@@ -1832,6 +1970,24 @@ export function PrototypeProvider({
                     ? attendance.check_in
                     : attendance.check_out
                 );
+              const notificationStatus =
+                attendanceNotificationStatus(
+                  attendance.status
+                );
+              const statusLabel =
+                attendanceStatusLabel(
+                  attendance.status
+                );
+              const notificationTitle =
+                type === "masuk"
+                  ? "Presensi masuk tercatat"
+                  : "Presensi pulang tercatat";
+              const notificationDesc =
+                `Presensi ${
+                  type === "masuk"
+                    ? "masuk"
+                    : "pulang"
+                } tercatat pada ${time} dengan status ${statusLabel}`;
 
               if (
                 type === "masuk"
@@ -1886,27 +2042,22 @@ export function PrototypeProvider({
                     id: `attendance-${Date.now()}`,
 
                     title:
-                      type ===
-                      "masuk"
-                        ? "Presensi masuk berhasil"
-                        : "Presensi pulang berhasil",
+                      notificationTitle,
 
                     desc:
-                      `Presensi ${
-                        type ===
-                        "masuk"
-                          ? "masuk"
-                          : "pulang"
-                      } tercatat pada ${time}`,
+                      notificationDesc,
 
                     time:
                       "Baru saja",
+
+                    createdAt:
+                      new Date().toISOString(),
 
                     unread:
                       true,
 
                     status:
-                      "success",
+                      notificationStatus,
 
                     category:
                       "attendance",
@@ -1919,6 +2070,25 @@ export function PrototypeProvider({
                   ...current,
                 ]
               );
+
+              void postNotification({
+                title:
+                  notificationTitle,
+                message:
+                  notificationDesc,
+                type:
+                  notificationTypeFor({
+                    category:
+                      "attendance",
+                    status:
+                      notificationStatus,
+                  }),
+              }).catch((error) => {
+                console.error(
+                  "Persist notification failed:",
+                  getErrorMessage(error)
+                );
+              });
 
               flash(
                 setToast,
@@ -1955,6 +2125,9 @@ export function PrototypeProvider({
 
                     time:
                       "Baru saja",
+
+                    createdAt:
+                      new Date().toISOString(),
 
                     unread:
                       true,
@@ -2022,6 +2195,9 @@ export function PrototypeProvider({
 
                   time:
                     "Baru saja",
+
+                  createdAt:
+                    new Date().toISOString(),
 
                   unread:
                     true,
@@ -2121,6 +2297,7 @@ export function PrototypeProvider({
 
               else {
                 const selectedTypeId =
+                  payload.leaveTypeId ??
                   LEAVE_TYPE_IDS[
                     payload.type as keyof typeof LEAVE_TYPE_IDS
                   ];
@@ -2183,6 +2360,26 @@ export function PrototypeProvider({
                   formData.append(
                     "doctor_facility_name",
                     payload.doctorFacilityName
+                  );
+                }
+
+                if (
+                  payload.childNumber
+                ) {
+                  formData.append(
+                    "child_number",
+                    String(
+                      payload.childNumber
+                    )
+                  );
+                }
+
+                if (
+                  payload.subCategory
+                ) {
+                  formData.append(
+                    "sub_category",
+                    payload.subCategory
                   );
                 }
 
@@ -2386,6 +2583,9 @@ export function PrototypeProvider({
 
                   time:
                     "Baru saja",
+
+                  createdAt:
+                    new Date().toISOString(),
 
                   unread:
                     true,
@@ -2720,10 +2920,13 @@ export function PrototypeProvider({
                 id: localId,
                 title: item.title,
                 desc: item.desc,
-                time:
-                  item.time ??
-                  "Baru saja",
-                unread:
+                  time:
+                    item.time ??
+                    "Baru saja",
+                  createdAt:
+                    item.createdAt ??
+                    new Date().toISOString(),
+                  unread:
                   item.unread ??
                   true,
                 status:
@@ -2793,6 +2996,7 @@ export function PrototypeProvider({
         overtimeRequests,
         profile,
         requests,
+        syncing,
         toast,
         loadingRequest,
         loadingApprovalId,

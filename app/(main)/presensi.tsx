@@ -46,6 +46,7 @@ import {
   formatWitaTime,
 } from "../../constants/time";
 import {
+  NotificationStatus,
   usePrototype,
 } from "../../contexts/PrototypeContext";
 
@@ -122,6 +123,69 @@ function getErrorMessage(
   }
 
   return "Terjadi kesalahan saat melakukan presensi.";
+}
+
+function attendanceNotificationStatus(
+  status?: string | null
+): NotificationStatus {
+  const value =
+    status
+      ?.toLowerCase()
+      .replace(/[\s_-]+/g, "") ?? "";
+
+  if (
+    value.includes("terlambat")
+  ) {
+    return "late";
+  }
+
+  if (
+    value.includes("izin")
+  ) {
+    return "permit";
+  }
+
+  if (
+    value.includes("alpa") ||
+    value.includes("alpha") ||
+    value.includes("tidakhadir")
+  ) {
+    return "absent";
+  }
+
+  if (
+    value.includes("hadir")
+  ) {
+    return "present";
+  }
+
+  return "success";
+}
+
+function attendanceStatusLabel(
+  status?: string | null
+) {
+  const value =
+    attendanceNotificationStatus(
+      status
+    );
+
+  switch (value) {
+    case "late":
+      return "Terlambat";
+
+    case "permit":
+      return "Izin";
+
+    case "absent":
+      return "Alpa";
+
+    case "present":
+      return "Hadir";
+
+    default:
+      return "Berhasil";
+  }
 }
 
 function toNumber(
@@ -906,9 +970,12 @@ export default function PresensiScreen() {
               : "Presensi pulang berhasil",
           desc:
             attendanceKind === "masuk"
-              ? `Presensi masuk tercatat pada ${finalTime}`
-              : `Presensi pulang tercatat pada ${finalTime}`,
-          status: "success",
+              ? `Presensi masuk tercatat pada ${finalTime} dengan status ${attendanceStatusLabel(attendance?.status)}`
+              : `Presensi pulang tercatat pada ${finalTime} dengan status ${attendanceStatusLabel(attendance?.status)}`,
+          status:
+            attendanceNotificationStatus(
+              attendance?.status
+            ),
           category: "attendance",
         });
 

@@ -5,6 +5,7 @@ import React, {
 import {
   Animated,
   StyleSheet,
+  Text,
   View,
   type DimensionValue,
   type StyleProp,
@@ -98,6 +99,83 @@ export function SkeletonCard() {
   );
 }
 
+type LoadingDotsProps = {
+  label?: string;
+};
+
+export function LoadingDots({
+  label = "Memuat data",
+}: LoadingDotsProps) {
+  const dots =
+    useRef([
+      new Animated.Value(0.35),
+      new Animated.Value(0.35),
+      new Animated.Value(0.35),
+    ]).current;
+
+  useEffect(() => {
+    const animations =
+      dots.map((dot, index) =>
+        Animated.sequence([
+          Animated.delay(index * 160),
+          Animated.timing(dot, {
+            toValue: 1,
+            duration: 280,
+            useNativeDriver: true,
+          }),
+          Animated.timing(dot, {
+            toValue: 0.35,
+            duration: 280,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+    const animation =
+      Animated.loop(
+        Animated.stagger(
+          90,
+          animations
+        )
+      );
+
+    animation.start();
+
+    return () => {
+      animation.stop();
+    };
+  }, [dots]);
+
+  return (
+    <View style={styles.loadingDotsBox}>
+      <Text style={styles.loadingDotsLabel}>
+        {label}
+      </Text>
+
+      <View style={styles.loadingDots}>
+        {dots.map((dot, index) => (
+          <Animated.View
+            key={index}
+            style={[
+              styles.loadingDot,
+              {
+                opacity: dot,
+                transform: [
+                  {
+                    scale: dot.interpolate({
+                      inputRange: [0.35, 1],
+                      outputRange: [0.8, 1.15],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          />
+        ))}
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   block: {
     backgroundColor: "#E5EAF2",
@@ -130,5 +208,29 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     gap: 8,
+  },
+  loadingDotsBox: {
+    minHeight: 36,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 9,
+    paddingVertical: 3,
+  },
+  loadingDotsLabel: {
+    color: "#7A8699",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  loadingDots: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  loadingDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: "#2F6BFF",
   },
 });

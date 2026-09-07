@@ -4,10 +4,10 @@ import React, {
 } from "react";
 import {
   Alert,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -138,6 +138,11 @@ export default function LoginScreen() {
 
   const [loading, setLoading] =
     useState(false);
+  const [
+    keyboardVisible,
+    setKeyboardVisible,
+  ] =
+    useState(false);
 
   useEffect(() => {
     let active = true;
@@ -154,6 +159,24 @@ export default function LoginScreen() {
 
     return () => {
       active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const showSubscription =
+      Keyboard.addListener(
+        "keyboardDidShow",
+        () => setKeyboardVisible(true)
+      );
+    const hideSubscription =
+      Keyboard.addListener(
+        "keyboardDidHide",
+        () => setKeyboardVisible(false)
+      );
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
     };
   }, []);
 
@@ -249,35 +272,42 @@ export default function LoginScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
+      <KeyboardAvoidingView
       style={styles.root}
       behavior={
         Platform.OS === "ios"
           ? "padding"
-          : "height"
+          : undefined
       }
+      keyboardVerticalOffset={0}
     >
       <View style={styles.grid} />
       <View style={styles.glowTop} />
       <View style={styles.glowBottom} />
 
-      <ScrollView
-        contentInsetAdjustmentBehavior="always"
-        keyboardDismissMode="on-drag"
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[
-          styles.scrollContent,
+      <View
+        style={[
+          styles.content,
           {
             paddingTop:
               Math.max(
-                36,
-                insets.top + 26
+                keyboardVisible
+                  ? 18
+                  : 36,
+                insets.top +
+                  (keyboardVisible
+                    ? 12
+                    : 26)
               ),
             paddingBottom:
               Math.max(
-                36,
-                insets.bottom + 36
+                keyboardVisible
+                  ? 28
+                  : 36,
+                insets.bottom +
+                  (keyboardVisible
+                    ? 20
+                  : 36)
               ),
           },
         ]}
@@ -305,18 +335,27 @@ export default function LoginScreen() {
 
         {/* LOGO */}
 
-        <View style={styles.scanWrap}>
-          <View style={styles.scanPanel}>
-            <LogoMark
-              size={92}
-              variant="scan"
-            />
+        {!keyboardVisible ? (
+          <View style={styles.scanWrap}>
+            <View style={styles.scanPanel}>
+              <LogoMark
+                size={92}
+                variant="scan"
+              />
+            </View>
           </View>
-        </View>
+        ) : null}
 
         {/* TITLE */}
 
-        <View style={styles.titleBlock}>
+        <View
+          style={[
+            styles.titleBlock,
+            keyboardVisible
+              ? styles.titleBlockCompact
+              : null,
+          ]}
+        >
           <Text style={styles.title}>
             Masuk ke akun Anda
           </Text>
@@ -449,27 +488,31 @@ export default function LoginScreen() {
 
         {/* SECURITY */}
 
-        <View
-          style={styles.securityNote}
-        >
+        {!keyboardVisible ? (
           <View
-            style={styles.securityDot}
-          />
-
-          <Text
-            style={styles.securityText}
+            style={styles.securityNote}
           >
-            Koneksi aman terenkripsi
-          </Text>
-        </View>
+            <View
+              style={styles.securityDot}
+            />
+
+            <Text
+              style={styles.securityText}
+            >
+              Koneksi aman terenkripsi
+            </Text>
+          </View>
+        ) : null}
 
         {/* FOOTER */}
 
-        <Text style={styles.footer}>
-          Versi {AppConfig.version} -{" "}
-          {AppConfig.ssoName}
-        </Text>
-      </ScrollView>
+        {!keyboardVisible ? (
+          <Text style={styles.footer}>
+            Versi {AppConfig.version} -{" "}
+            {AppConfig.ssoName}
+          </Text>
+        ) : null}
+      </View>
     </KeyboardAvoidingView>
   );
 }
@@ -509,8 +552,8 @@ const styles = StyleSheet.create({
     left: -110,
   },
 
-  scrollContent: {
-    flexGrow: 1,
+  content: {
+    minHeight: "100%",
     paddingHorizontal: 26,
   },
 
@@ -555,6 +598,10 @@ const styles = StyleSheet.create({
   titleBlock: {
     alignItems: "center",
     marginTop: 17,
+  },
+
+  titleBlockCompact: {
+    marginTop: 28,
   },
 
   title: {

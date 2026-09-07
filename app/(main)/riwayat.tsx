@@ -26,8 +26,14 @@ import {
 import { Colors } from "../../constants/colors";
 import {
   formatWitaDay,
+  formatWitaLongDate,
+  formatWitaShortDate,
   formatWitaShortWeekday,
   formatWitaTime,
+  getWitaDateKey,
+  getWitaMonthStartKey,
+  getWitaWeekRangeKeys,
+  getWitaYearStartKey,
   isWitaDateKeyInCurrentYear,
   isWitaDateKeyInCurrentMonth,
   isWitaDateKeyInCurrentWeek,
@@ -36,7 +42,7 @@ import {
 import Badge from "../../components/Badge";
 import StatCard from "../../components/StatCard";
 import {
-  SkeletonRow,
+  LoadingDots,
 } from "../../components/Skeleton";
 
 /* ============================================================
@@ -48,11 +54,19 @@ type HistoryRow = {
   rawDate: string | null;
   date: string;
   day: string;
+  dateLabel: string;
   time: string;
   duration: string;
   mode: string;
   status: string;
 };
+
+type AttendanceStatusFilter =
+  | "all"
+  | "Hadir"
+  | "Terlambat"
+  | "Izin"
+  | "Alpha";
 
 /* ============================================================
    HELPERS
@@ -101,10 +115,161 @@ function getDateInfo(
   };
 }
 
+function dateKeyToUtcDate(
+  key: string
+) {
+  const [
+    year,
+    month,
+    day,
+  ] =
+    key.split("-").map(Number);
+
+  return new Date(
+    Date.UTC(
+      year,
+      month - 1,
+      day
+    )
+  );
+}
+
+function diffDaysFromToday(
+  key: string
+) {
+  const today =
+    dateKeyToUtcDate(
+      getWitaDateKey()
+    );
+  const target =
+    dateKeyToUtcDate(key);
+
+  return Math.round(
+    (today.getTime() -
+      target.getTime()) /
+      86400000
+  );
+}
+
+function shiftDateKey(
+  key: string,
+  days: number
+) {
+  const date =
+    dateKeyToUtcDate(key);
+
+  date.setUTCDate(
+    date.getUTCDate() + days
+  );
+
+  return `${date.getUTCFullYear()}-${String(
+    date.getUTCMonth() + 1
+  ).padStart(2, "0")}-${String(
+    date.getUTCDate()
+  ).padStart(2, "0")}`;
+}
+
+function buildDateKey(
+  year: number,
+  month: number,
+  day: number
+) {
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function daysInMonth(
+  year: number,
+  month: number
+) {
+  return new Date(
+    year,
+    month,
+    0
+  ).getDate();
+}
+
+function shortDateFromKey(
+  key: string
+) {
+  return formatWitaShortDate(
+    new Date(`${key}T12:00:00+08:00`)
+  );
+}
+
+function longDateFromKey(
+  key: string
+) {
+  return formatWitaLongDate(
+    new Date(`${key}T12:00:00+08:00`)
+  );
+}
+
+function historyDateLabel(
+  rawDate: string | null
+) {
+  if (!rawDate) {
+    return "Tanggal tidak tersedia";
+  }
+
+  const diff =
+    diffDaysFromToday(rawDate);
+
+  if (diff === 0) {
+    return "Hari ini";
+  }
+
+  if (diff === 1) {
+    return "Kemarin";
+  }
+
+  if (diff > 1 && diff < 7) {
+    return dateKeyToUtcDate(
+      rawDate
+    ).toLocaleDateString(
+      "id-ID",
+      {
+        weekday: "long",
+        timeZone: "UTC",
+      }
+    );
+  }
+
+  return longDateFromKey(rawDate);
+}
+
 function isInPeriod(
   rawDate: string | null,
-  period: PeriodFilter
+  period: PeriodFilter,
+  customFilter?: CustomDateFilter
 ) {
+  if (
+    period === "custom"
+  ) {
+    if (!rawDate || !customFilter) {
+      return false;
+    }
+
+    const monthPrefix =
+      `${customFilter.year}-${String(
+        customFilter.month
+      ).padStart(2, "0")}`;
+
+    if (customFilter.day) {
+      return (
+        rawDate ===
+        buildDateKey(
+          customFilter.year,
+          customFilter.month,
+          customFilter.day
+        )
+      );
+    }
+
+    return rawDate.startsWith(
+      monthPrefix
+    );
+  }
+
   switch (period) {
     case "all":
       return true;
@@ -112,8 +277,25 @@ function isInPeriod(
     case "today":
       return isWitaDateKeyToday(rawDate);
 
+    case "yesterday":
+      return rawDate
+        ? diffDaysFromToday(rawDate) === 1
+        : false;
+
     case "week":
       return isWitaDateKeyInCurrentWeek(rawDate);
+
+    case "last7":
+      return rawDate
+        ? diffDaysFromToday(rawDate) >= 0 &&
+            diffDaysFromToday(rawDate) <= 6
+        : false;
+
+    case "last30":
+      return rawDate
+        ? diffDaysFromToday(rawDate) >= 0 &&
+            diffDaysFromToday(rawDate) <= 29
+        : false;
 
     case "year":
       return isWitaDateKeyInCurrentYear(rawDate);
@@ -251,6 +433,11 @@ function toHistoryRow(
     day:
       dateInfo.day,
 
+    dateLabel:
+      historyDateLabel(
+        item.date
+      ),
+
     time:
       `${masuk} -> ${keluar}`,
 
@@ -274,9 +461,39 @@ function toHistoryRow(
 type PeriodFilter =
   | "all"
   | "today"
+  | "yesterday"
   | "week"
+  | "last7"
+  | "last30"
   | "month"
-  | "year";
+  | "year"
+  | "custom";
+
+type CustomDateFilter = {
+  month: number;
+  year: number;
+  day: number | null;
+};
+
+type CustomPickerKey =
+  | "month"
+  | "year"
+  | "day";
+
+const monthOptions = [
+  "Januari",
+  "Februari",
+  "Maret",
+  "April",
+  "Mei",
+  "Juni",
+  "Juli",
+  "Agustus",
+  "September",
+  "Oktober",
+  "November",
+  "Desember",
+];
 
 const periodFilters: {
   label: string;
@@ -291,8 +508,20 @@ const periodFilters: {
     value: "today",
   },
   {
+    label: "Kemarin",
+    value: "yesterday",
+  },
+  {
     label: "Minggu ini",
     value: "week",
+  },
+  {
+    label: "7 hari",
+    value: "last7",
+  },
+  {
+    label: "30 hari",
+    value: "last30",
   },
   {
     label: "Bulan ini",
@@ -301,6 +530,10 @@ const periodFilters: {
   {
     label: "Tahun ini",
     value: "year",
+  },
+  {
+    label: "Kustom",
+    value: "custom",
   },
 ];
 
@@ -337,22 +570,75 @@ export default function RiwayatScreen() {
     periodFilter,
     setPeriodFilter,
   ] = useState<PeriodFilter>(
-    "month"
+    "all"
   );
+  const currentDate =
+    dateKeyToUtcDate(
+      getWitaDateKey()
+    );
+  const [
+    customFilter,
+    setCustomFilter,
+  ] =
+    useState<CustomDateFilter>({
+      month:
+        currentDate.getUTCMonth() + 1,
+      year:
+        currentDate.getUTCFullYear(),
+      day: null,
+    });
+  const [
+    openCustomPicker,
+    setOpenCustomPicker,
+  ] =
+    useState<CustomPickerKey | null>(
+      null
+    );
 
-  const filteredHistory =
+  const [
+    statusFilter,
+    setStatusFilter,
+  ] =
+    useState<AttendanceStatusFilter>(
+      "all"
+    );
+
+  const periodHistory =
     useMemo(
       () =>
         attendanceHistory.filter(
           (item) =>
             isInPeriod(
               item.rawDate,
-              periodFilter
+              periodFilter,
+              customFilter
             )
         ),
       [
         attendanceHistory,
         periodFilter,
+        customFilter,
+      ]
+    );
+
+  const filteredHistory =
+    useMemo(
+      () => {
+        if (
+          statusFilter === "all"
+        ) {
+          return periodHistory;
+        }
+
+        return periodHistory.filter(
+          (item) =>
+            item.status ===
+            statusFilter
+        );
+      },
+      [
+        periodHistory,
+        statusFilter,
       ]
     );
 
@@ -460,7 +746,7 @@ export default function RiwayatScreen() {
       let izin = 0;
       let alpha = 0;
 
-      filteredHistory.forEach(
+      periodHistory.forEach(
         (item) => {
           switch (
             item.status
@@ -491,7 +777,7 @@ export default function RiwayatScreen() {
         alpha,
       };
     }, [
-      filteredHistory,
+      periodHistory,
     ]);
 
   /* ==========================================================
@@ -500,25 +786,139 @@ export default function RiwayatScreen() {
 
   const periodLabel =
     useMemo(() => {
+      const todayKey =
+        getWitaDateKey();
+
       switch (periodFilter) {
         case "all":
           return "Rekap seluruh presensi";
 
         case "today":
-          return "Rekap presensi hari ini";
+          return `Hari ini, ${shortDateFromKey(
+            todayKey
+          )}`;
 
-        case "week":
-          return "Rekap presensi minggu ini";
+        case "yesterday": {
+          const yesterdayKey =
+            shiftDateKey(
+              todayKey,
+              -1
+            );
+
+          return `Kemarin, ${shortDateFromKey(
+            yesterdayKey
+          )}`;
+        }
+
+        case "week": {
+          const range =
+            getWitaWeekRangeKeys();
+
+          return `${shortDateFromKey(
+            range.start
+          )} - ${shortDateFromKey(
+            range.end
+          )}`;
+        }
+
+        case "last7": {
+          const start =
+            shiftDateKey(
+              todayKey,
+              -6
+            );
+
+          return `${shortDateFromKey(
+            start
+          )} - ${shortDateFromKey(
+            todayKey
+          )}`;
+        }
+
+        case "last30": {
+          const start =
+            shiftDateKey(
+              todayKey,
+              -29
+            );
+
+          return `${shortDateFromKey(
+            start
+          )} - ${shortDateFromKey(
+            todayKey
+          )}`;
+        }
 
         case "year":
-          return "Rekap presensi tahun ini";
+          return `${shortDateFromKey(
+            getWitaYearStartKey()
+          )} - ${shortDateFromKey(
+            todayKey
+          )}`;
+
+        case "custom":
+          if (customFilter.day) {
+            return longDateFromKey(
+              buildDateKey(
+                customFilter.year,
+                customFilter.month,
+                customFilter.day
+              )
+            );
+          }
+
+          return `${
+            monthOptions[
+              customFilter.month - 1
+            ]
+          } ${customFilter.year}`;
 
         default:
-          return "Rekap presensi bulan ini";
+          return `${shortDateFromKey(
+            getWitaMonthStartKey()
+          )} - ${shortDateFromKey(
+            todayKey
+          )}`;
       }
     }, [
       periodFilter,
+      customFilter,
     ]);
+
+  const customYearOptions =
+    useMemo(() => {
+      const currentYear =
+        currentDate.getUTCFullYear();
+
+      return Array.from(
+        {
+          length: 6,
+        },
+        (_, index) =>
+          currentYear - index
+      );
+    }, [
+      currentDate,
+    ]);
+
+  const customDayOptions =
+    useMemo(
+      () =>
+        Array.from(
+          {
+            length: daysInMonth(
+              customFilter.year,
+              customFilter.month
+            ),
+          },
+          (_, index) =>
+            index + 1
+        ),
+      [
+        customFilter.year,
+        customFilter.month,
+      ]
+    );
 
   /* ==========================================================
      RENDER
@@ -619,11 +1019,14 @@ export default function RiwayatScreen() {
                     ? styles.periodTabActive
                     : null,
                 ]}
-                onPress={() =>
+                onPress={() => {
                   setPeriodFilter(
                     item.value
-                  )
-                }
+                  );
+                  setOpenCustomPicker(
+                    null
+                  );
+                }}
               >
                 <Text
                   style={[
@@ -639,6 +1042,280 @@ export default function RiwayatScreen() {
             );
           })}
         </ScrollView>
+
+        {periodFilter === "custom" ? (
+          <View style={styles.customFilterBox}>
+            <View style={styles.customFilterRow}>
+              <Pressable
+                style={styles.customButton}
+                onPress={() =>
+                  setOpenCustomPicker(
+                    openCustomPicker ===
+                      "month"
+                      ? null
+                      : "month"
+                  )
+                }
+              >
+                <Text style={styles.customLabel}>
+                  Bulan
+                </Text>
+                <Text
+                  style={styles.customValue}
+                  numberOfLines={1}
+                >
+                  {
+                    monthOptions[
+                      customFilter.month - 1
+                    ]
+                  }
+                </Text>
+              </Pressable>
+
+              <Pressable
+                style={styles.customButton}
+                onPress={() =>
+                  setOpenCustomPicker(
+                    openCustomPicker ===
+                      "year"
+                      ? null
+                      : "year"
+                  )
+                }
+              >
+                <Text style={styles.customLabel}>
+                  Tahun
+                </Text>
+                <Text style={styles.customValue}>
+                  {customFilter.year}
+                </Text>
+              </Pressable>
+
+              <Pressable
+                style={styles.customButton}
+                onPress={() =>
+                  setOpenCustomPicker(
+                    openCustomPicker ===
+                      "day"
+                      ? null
+                      : "day"
+                  )
+                }
+              >
+                <Text style={styles.customLabel}>
+                  Tanggal
+                </Text>
+                <Text style={styles.customValue}>
+                  {customFilter.day ??
+                    "Semua"}
+                </Text>
+              </Pressable>
+            </View>
+
+            {openCustomPicker ? (
+              <View style={styles.customPanel}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={
+                    false
+                  }
+                  contentContainerStyle={
+                    styles.customOptions
+                  }
+                >
+                  {openCustomPicker ===
+                  "month"
+                    ? monthOptions.map(
+                        (label, index) => {
+                          const value =
+                            index + 1;
+                          const active =
+                            customFilter.month ===
+                            value;
+
+                          return (
+                            <Pressable
+                              key={label}
+                              style={[
+                                styles.customOption,
+                                active
+                                  ? styles.customOptionActive
+                                  : null,
+                              ]}
+                              onPress={() => {
+                                setCustomFilter(
+                                  (current) => ({
+                                    ...current,
+                                    month:
+                                      value,
+                                    day:
+                                      current.day &&
+                                      current.day >
+                                        daysInMonth(
+                                          current.year,
+                                          value
+                                        )
+                                        ? null
+                                        : current.day,
+                                  })
+                                );
+                                setOpenCustomPicker(
+                                  null
+                                );
+                              }}
+                            >
+                              <Text
+                                style={[
+                                  styles.customOptionText,
+                                  active
+                                    ? styles.customOptionTextActive
+                                    : null,
+                                ]}
+                              >
+                                {label}
+                              </Text>
+                            </Pressable>
+                          );
+                        }
+                      )
+                    : null}
+
+                  {openCustomPicker ===
+                  "year"
+                    ? customYearOptions.map(
+                        (year) => {
+                          const active =
+                            customFilter.year ===
+                            year;
+
+                          return (
+                            <Pressable
+                              key={year}
+                              style={[
+                                styles.customOption,
+                                active
+                                  ? styles.customOptionActive
+                                  : null,
+                              ]}
+                              onPress={() => {
+                                setCustomFilter(
+                                  (current) => ({
+                                    ...current,
+                                    year,
+                                    day:
+                                      current.day &&
+                                      current.day >
+                                        daysInMonth(
+                                          year,
+                                          current.month
+                                        )
+                                        ? null
+                                        : current.day,
+                                  })
+                                );
+                                setOpenCustomPicker(
+                                  null
+                                );
+                              }}
+                            >
+                              <Text
+                                style={[
+                                  styles.customOptionText,
+                                  active
+                                    ? styles.customOptionTextActive
+                                    : null,
+                                ]}
+                              >
+                                {year}
+                              </Text>
+                            </Pressable>
+                          );
+                        }
+                      )
+                    : null}
+
+                  {openCustomPicker ===
+                  "day" ? (
+                    <>
+                      <Pressable
+                        style={[
+                          styles.customOption,
+                          customFilter.day === null
+                            ? styles.customOptionActive
+                            : null,
+                        ]}
+                        onPress={() => {
+                          setCustomFilter(
+                            (current) => ({
+                              ...current,
+                              day: null,
+                            })
+                          );
+                          setOpenCustomPicker(
+                            null
+                          );
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.customOptionText,
+                            customFilter.day === null
+                              ? styles.customOptionTextActive
+                              : null,
+                          ]}
+                        >
+                          Semua
+                        </Text>
+                      </Pressable>
+
+                      {customDayOptions.map(
+                        (day) => {
+                          const active =
+                            customFilter.day ===
+                            day;
+
+                          return (
+                            <Pressable
+                              key={day}
+                              style={[
+                                styles.customOption,
+                                active
+                                  ? styles.customOptionActive
+                                  : null,
+                              ]}
+                              onPress={() => {
+                                setCustomFilter(
+                                  (current) => ({
+                                    ...current,
+                                    day,
+                                  })
+                                );
+                                setOpenCustomPicker(
+                                  null
+                                );
+                              }}
+                            >
+                              <Text
+                                style={[
+                                  styles.customOptionText,
+                                  active
+                                    ? styles.customOptionTextActive
+                                    : null,
+                                ]}
+                              >
+                                {day}
+                              </Text>
+                            </Pressable>
+                          );
+                        }
+                      )}
+                    </>
+                  ) : null}
+                </ScrollView>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
 
         {/* ====================================================
             ERROR
@@ -714,6 +1391,18 @@ export default function RiwayatScreen() {
               statistics.hadir
             )}
             label="Hadir"
+            active={
+              statusFilter ===
+              "Hadir"
+            }
+            onPress={() =>
+              setStatusFilter(
+                statusFilter ===
+                  "Hadir"
+                  ? "all"
+                  : "Hadir"
+              )
+            }
           />
 
           <StatCard
@@ -721,6 +1410,18 @@ export default function RiwayatScreen() {
               statistics.terlambat
             )}
             label="Terlambat"
+            active={
+              statusFilter ===
+              "Terlambat"
+            }
+            onPress={() =>
+              setStatusFilter(
+                statusFilter ===
+                  "Terlambat"
+                  ? "all"
+                  : "Terlambat"
+              )
+            }
           />
 
           <StatCard
@@ -728,6 +1429,18 @@ export default function RiwayatScreen() {
               statistics.izin
             )}
             label="Izin"
+            active={
+              statusFilter ===
+              "Izin"
+            }
+            onPress={() =>
+              setStatusFilter(
+                statusFilter ===
+                  "Izin"
+                  ? "all"
+                  : "Izin"
+              )
+            }
           />
 
           <StatCard
@@ -735,8 +1448,47 @@ export default function RiwayatScreen() {
               statistics.alpha
             )}
             label="Alpha"
+            active={
+              statusFilter ===
+              "Alpha"
+            }
+            onPress={() =>
+              setStatusFilter(
+                statusFilter ===
+                  "Alpha"
+                  ? "all"
+                  : "Alpha"
+              )
+            }
           />
         </View>
+
+        {statusFilter !== "all" ? (
+          <Pressable
+            style={styles.activeStatus}
+            onPress={() =>
+              setStatusFilter(
+                "all"
+              )
+            }
+          >
+            <Text
+              style={
+                styles.activeStatusText
+              }
+            >
+              Filter status: {statusFilter}
+            </Text>
+
+            <Ionicons
+              name="close"
+              size={16}
+              color={
+                Colors.primaryDark
+              }
+            />
+          </Pressable>
+        ) : null}
 
         {/* ====================================================
             LIST
@@ -748,11 +1500,9 @@ export default function RiwayatScreen() {
           }
         >
           {loading ? (
-            <>
-              <SkeletonRow />
-              <SkeletonRow />
-              <SkeletonRow />
-            </>
+            <View style={styles.loadingBox}>
+              <LoadingDots label="Memuat riwayat" />
+            </View>
           ) : filteredHistory.length ===
             0 ? (
             <View
@@ -846,6 +1596,16 @@ export default function RiwayatScreen() {
                       styles.info
                     }
                   >
+                    <Text
+                      style={
+                        styles.dateLabel
+                      }
+                    >
+                      {
+                        row.dateLabel
+                      }
+                    </Text>
+
                     <Text
                       style={
                         styles.time
@@ -1027,6 +1787,83 @@ const styles =
       color: Colors.white,
     },
 
+    customFilterBox: {
+      marginTop: 10,
+      padding: 10,
+      borderRadius: 14,
+      backgroundColor: Colors.white,
+      borderWidth: 1,
+      borderColor: Colors.line,
+    },
+
+    customFilterRow: {
+      flexDirection: "row",
+      gap: 8,
+    },
+
+    customButton: {
+      flex: 1,
+      minHeight: 54,
+      justifyContent: "center",
+      paddingHorizontal: 11,
+      borderRadius: 11,
+      backgroundColor: "#F7F9FD",
+      borderWidth: 1,
+      borderColor: "#E6EBF3",
+    },
+
+    customLabel: {
+      color: Colors.textMuted,
+      fontSize: 10,
+      fontWeight: "800",
+      marginBottom: 3,
+    },
+
+    customValue: {
+      color: Colors.textInk,
+      fontSize: 12.5,
+      fontWeight: "800",
+    },
+
+    customPanel: {
+      marginTop: 9,
+      paddingTop: 9,
+      borderTopWidth: 1,
+      borderTopColor: "#EEF1F6",
+    },
+
+    customOptions: {
+      gap: 8,
+      paddingRight: 8,
+    },
+
+    customOption: {
+      minWidth: 46,
+      minHeight: 38,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 12,
+      borderRadius: 10,
+      backgroundColor: "#F7F9FD",
+      borderWidth: 1,
+      borderColor: "#E6EBF3",
+    },
+
+    customOptionActive: {
+      backgroundColor: Colors.background,
+      borderColor: Colors.background,
+    },
+
+    customOptionText: {
+      color: Colors.textBody,
+      fontSize: 12,
+      fontWeight: "800",
+    },
+
+    customOptionTextActive: {
+      color: Colors.white,
+    },
+
     /* ========================================================
        ERROR
     ======================================================== */
@@ -1089,6 +1926,26 @@ const styles =
       marginTop: 14,
     },
 
+    activeStatus: {
+      alignSelf: "flex-start",
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      marginTop: 10,
+      paddingVertical: 7,
+      paddingHorizontal: 10,
+      borderRadius: 9,
+      backgroundColor: "#E7EEFC",
+      borderWidth: 1,
+      borderColor: "#B9CDF3",
+    },
+
+    activeStatusText: {
+      color: Colors.primaryDark,
+      fontSize: 11.5,
+      fontWeight: "800",
+    },
+
     /* ========================================================
        LIST
     ======================================================== */
@@ -1113,6 +1970,14 @@ const styles =
         "center",
       paddingHorizontal: 30,
       paddingVertical: 30,
+    },
+
+    loadingBox: {
+      minHeight: 170,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
     },
 
     emptyIcon: {
@@ -1204,6 +2069,13 @@ const styles =
       fontSize: 14,
       fontWeight:
         "800",
+    },
+
+    dateLabel: {
+      color: "#667085",
+      fontSize: 11,
+      fontWeight: "800",
+      marginBottom: 1,
     },
 
     duration: {

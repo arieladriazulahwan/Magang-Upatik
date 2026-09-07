@@ -45,6 +45,26 @@ type RequestType =
   | "Lembur"
   | "Perjadi";
 
+type CutiCategory = {
+  label: string;
+  value: number;
+  code:
+    | "cuti_tahunan"
+    | "cuti_besar"
+    | "cuti_melahirkan"
+    | "cuti_alasan_penting"
+    | "cuti_bersama"
+    | "cltn";
+  needsAttachment?: boolean;
+  needsDoctorLetter?: boolean;
+};
+
+type ImportantLeaveSubCategory =
+  | "menikah"
+  | "keluarga_sakit"
+  | "keluarga_meninggal"
+  | "bencana";
+
 const requestTypes: {
   label: string;
   value?: RequestType;
@@ -73,6 +93,65 @@ const requestTypes: {
   {
     label: "Perjadi",
     value: "Perjadi",
+  },
+];
+
+const cutiCategories: CutiCategory[] = [
+  {
+    label: "Cuti Tahunan",
+    value: 1,
+    code: "cuti_tahunan",
+  },
+  {
+    label: "Cuti Besar",
+    value: 2,
+    code: "cuti_besar",
+  },
+  {
+    label: "Cuti Melahirkan",
+    value: 4,
+    code: "cuti_melahirkan",
+    needsAttachment: true,
+    needsDoctorLetter: true,
+  },
+  {
+    label: "Cuti Alasan Penting",
+    value: 5,
+    code: "cuti_alasan_penting",
+    needsAttachment: true,
+  },
+  {
+    label: "Cuti Bersama",
+    value: 6,
+    code: "cuti_bersama",
+  },
+  {
+    label: "CLTN",
+    value: 7,
+    code: "cltn",
+    needsAttachment: true,
+  },
+];
+
+const importantLeaveSubCategories: {
+  label: string;
+  value: ImportantLeaveSubCategory;
+}[] = [
+  {
+    label: "Menikah",
+    value: "menikah",
+  },
+  {
+    label: "Keluarga sakit",
+    value: "keluarga_sakit",
+  },
+  {
+    label: "Keluarga meninggal",
+    value: "keluarga_meninggal",
+  },
+  {
+    label: "Bencana",
+    value: "bencana",
   },
 ];
 
@@ -336,6 +415,26 @@ export default function PengajuanBaruScreen() {
     useState("");
 
   const [
+    cutiCategoryId,
+    setCutiCategoryId,
+  ] =
+    useState(1);
+
+  const [
+    childNumber,
+    setChildNumber,
+  ] =
+    useState(1);
+
+  const [
+    importantLeaveSubCategory,
+    setImportantLeaveSubCategory,
+  ] =
+    useState<ImportantLeaveSubCategory>(
+      "menikah"
+    );
+
+  const [
     plannedStartTime,
     setPlannedStartTime,
   ] =
@@ -376,14 +475,26 @@ export default function PengajuanBaruScreen() {
     );
 
   const documentLabel =
-    type === "Sakit"
+    type === "Cuti" &&
+    cutiCategories.find(
+      (item) =>
+        item.value === cutiCategoryId
+    )?.needsDoctorLetter
+      ? "Surat dokter"
+      : type === "Sakit"
       ? "Surat dokter"
       : type === "Perjadi"
       ? "Surat tugas"
       : "Dokumen pendukung";
 
   const uploadText =
-    type === "Sakit"
+    type === "Cuti" &&
+    cutiCategories.find(
+      (item) =>
+        item.value === cutiCategoryId
+    )?.needsDoctorLetter
+      ? "Unggah surat dokter"
+      : type === "Sakit"
       ? "Unggah surat dokter"
       : type === "Perjadi"
       ? "Unggah surat tugas"
@@ -391,6 +502,11 @@ export default function PengajuanBaruScreen() {
 
   const isOvertime =
     type === "Lembur";
+  const selectedCutiCategory =
+    cutiCategories.find(
+      (item) =>
+        item.value === cutiCategoryId
+    ) ?? cutiCategories[0];
 
   const [
     calendarMonth,

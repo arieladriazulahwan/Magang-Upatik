@@ -19,7 +19,7 @@
     },
     "android": {
       "package": "id.ac.untad.klikpresensi",
-      "softwareKeyboardLayoutMode": "resize",
+      "softwareKeyboardLayoutMode": "pan",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
