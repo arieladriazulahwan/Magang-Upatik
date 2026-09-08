@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import AdminLayout from "../../components/layout/AdminLayout";
 import { getEmployees } from "../../services/pegawaiService";
 import { canAddEmployee, canEditEmployee, isRestrictedToUnit, getUserUnit } from "../../utils/access";
+import { hasFaceEnrollment } from "../../utils/faceData";
 
 function Pegawai() {
   const navigate = useNavigate();
@@ -378,9 +379,7 @@ function Pegawai() {
                         ? "Nonaktif"
                         : "Aktif";
 
-                    const face = Number(
-                      employee.face_data_count || employee.face_samples || employee.face_count || 0,
-                    ) > 0
+                    const face = hasFaceEnrollment(employee)
                       ? "Terdaftar"
                       : "Belum";
 

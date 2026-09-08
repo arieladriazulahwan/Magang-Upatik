@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import AdminLayout from "../../components/layout/AdminLayout";
 import { apiRequest } from "../../services/api";
+import { hasFaceEnrollment } from "../../utils/faceData";
 
 const normalizeArray = (payload) => {
   if (Array.isArray(payload)) return payload;
@@ -65,8 +66,18 @@ function Dashboard() {
           ["alpha", "belum_absen"].includes(getStatus(item))
         ).length;
 
+        // Sebagian API mengirim relasi face_data/flag enrollment, bukan field
+        // face_data_count. Presensi yang lolos verifikasi wajah juga menjadi
+        // bukti cadangan agar dashboard tetap sinkron dengan aplikasi mobile.
+        const verifiedEmployeeIds = new Set(
+          records
+            .filter((record) => record.face_matched === true || record.face_verified === true)
+            .map((record) => record.employee_id || record.employee?.id || record.pegawai_id)
+            .filter((id) => id !== undefined && id !== null)
+            .map(String)
+        );
         const registeredFaces = employees.filter((item) =>
-          Number(item.face_data_count || item.face_samples || item.face_count || item.face || 0) > 0
+          hasFaceEnrollment(item) || verifiedEmployeeIds.has(String(item.id))
         ).length;
 
         setFaceStats({ registered: registeredFaces, total: employees.length });

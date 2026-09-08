@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import AdminLayout from "../../components/layout/AdminLayout";
 import { getEmployee } from "../../services/pegawaiService";
+import { getFaceSampleCount } from "../../utils/faceData";
 
 function DetailPegawai() {
 	const { id } = useParams();
@@ -43,7 +44,7 @@ function DetailPegawai() {
 	const status = employee.employment_status || employee.status || "-";
 	const type = employee.employee_type || employee.type || "-";
 	const unit = employee.work_unit?.name || employee.unit || employee.unit_kerja || "-";
-	const faceSamples = employee.face_data_count || employee.face_samples || employee.face_count || 0;
+	const faceSamples = getFaceSampleCount(employee);
 
 	return (
 		<AdminLayout>
