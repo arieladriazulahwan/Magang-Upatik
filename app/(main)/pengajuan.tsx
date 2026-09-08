@@ -46,6 +46,9 @@ const filters = [
   "Perjadi",
 ];
 
+const LIVE_REFRESH_INTERVAL_MS =
+  15000;
+
 type RequestItem = {
   id: string;
   type: string;
@@ -393,9 +396,13 @@ export default function PengajuanScreen() {
    * ============================================================
    */
 
-  const loadRequests = useCallback(async () => {
+  const loadRequests = useCallback(async (
+    showLoading = true
+  ) => {
     try {
-      setLoading(true);
+      if (showLoading) {
+        setLoading(true);
+      }
       setError(null);
 
       const profile =
@@ -579,7 +586,9 @@ export default function PengajuanScreen() {
           : "Gagal mengambil data pengajuan."
       );
     } finally {
-      setLoading(false);
+      if (showLoading) {
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -591,6 +600,15 @@ export default function PengajuanScreen() {
   useFocusEffect(
     useCallback(() => {
       loadRequests();
+
+      const intervalId =
+        setInterval(() => {
+          void loadRequests(false);
+        }, LIVE_REFRESH_INTERVAL_MS);
+
+      return () => {
+        clearInterval(intervalId);
+      };
     }, [loadRequests])
   );
 
@@ -1073,7 +1091,9 @@ export default function PengajuanScreen() {
 
           <Pressable
             style={styles.retryButton}
-            onPress={loadRequests}
+            onPress={() =>
+              loadRequests()
+            }
           >
             <Text style={styles.retryText}>
               Coba Lagi

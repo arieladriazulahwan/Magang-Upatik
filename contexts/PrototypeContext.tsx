@@ -240,6 +240,9 @@ const PrototypeContext =
     null
   );
 
+const LIVE_REFRESH_INTERVAL_MS =
+  15000;
+
 /* =====================================================
    HELPER
 ===================================================== */
@@ -1381,8 +1384,10 @@ export function PrototypeProvider({
       setAttendanceState("belum");
     }
 
-    async function syncFromBackend() {
-      if (active) {
+    async function syncFromBackend(
+      showLoading = true
+    ) {
+      if (active && showLoading) {
         setSyncing(true);
       }
 
@@ -1838,7 +1843,7 @@ export function PrototypeProvider({
           )
         );
       } finally {
-        if (active) {
+        if (active && showLoading) {
           setSyncing(false);
         }
       }
@@ -1850,9 +1855,14 @@ export function PrototypeProvider({
       subscribeSessionChange(() => {
         void syncFromBackend();
       });
+    const intervalId =
+      setInterval(() => {
+        void syncFromBackend(false);
+      }, LIVE_REFRESH_INTERVAL_MS);
 
     return () => {
       active = false;
+      clearInterval(intervalId);
       unsubscribe();
     };
   }, []);

@@ -28,6 +28,9 @@ type BalanceRow = {
   tone: "green" | "purple" | "blue" | "red" | "amber" | "gray";
 };
 
+const LIVE_REFRESH_INTERVAL_MS =
+  15000;
+
 export default function SaldoScreen() {
   const [
     balances,
@@ -45,9 +48,13 @@ export default function SaldoScreen() {
   ] = useState<string | null>(null);
 
   const loadBalances =
-    useCallback(async () => {
+    useCallback(async (
+      showLoading = true
+    ) => {
       try {
-        setLoading(true);
+        if (showLoading) {
+          setLoading(true);
+        }
         setError(null);
 
         const response =
@@ -64,12 +71,23 @@ export default function SaldoScreen() {
             : "Saldo cuti gagal dimuat."
         );
       } finally {
-        setLoading(false);
+        if (showLoading) {
+          setLoading(false);
+        }
       }
     }, []);
 
   useEffect(() => {
     loadBalances();
+
+    const intervalId =
+      setInterval(() => {
+        void loadBalances(false);
+      }, LIVE_REFRESH_INTERVAL_MS);
+
+    return () => {
+      clearInterval(intervalId);
+    };
   }, [loadBalances]);
 
   const annualBalance =
@@ -200,7 +218,9 @@ export default function SaldoScreen() {
           </Text>
           <Pressable
             style={styles.retryButton}
-            onPress={loadBalances}
+            onPress={() =>
+              loadBalances()
+            }
           >
             <Text style={styles.retryText}>
               Coba Lagi

@@ -68,6 +68,9 @@ type AttendanceStatusFilter =
   | "Izin"
   | "Alpha";
 
+const LIVE_REFRESH_INTERVAL_MS =
+  15000;
+
 /* ============================================================
    HELPERS
 ============================================================ */
@@ -711,6 +714,15 @@ export default function RiwayatScreen() {
 
   useEffect(() => {
     loadHistory();
+
+    const intervalId =
+      setInterval(() => {
+        void loadHistory();
+      }, LIVE_REFRESH_INTERVAL_MS);
+
+    return () => {
+      clearInterval(intervalId);
+    };
   }, [
     loadHistory,
   ]);

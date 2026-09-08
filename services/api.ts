@@ -18,7 +18,7 @@ import * as SecureStore from "expo-secure-store";
 
 const DEFAULT_API_URL =
   Platform.OS === "android"
-    ? "http://192.168.1.189:8000/api"
+    ? "http://192.168.110.68:8000/api"
     : "http://127.0.0.1:8000/api";
 
 export const API_URL =
@@ -328,6 +328,19 @@ export type ApiDashboardMe = {
     leave: number;
     overtime: number;
   };
+};
+
+/**
+ * ============================================================
+ * FACE
+ * ============================================================
+ */
+
+export type ApiFaceStatus = {
+  registered: boolean;
+  sample_count: number;
+  minimum_samples: number;
+  latest_enrolled_at: string | null;
 };
 
 /**
@@ -819,7 +832,7 @@ export async function getAttendance(
  * ============================================================
  */
 
-type PhotoPayload =
+export type PhotoPayload =
   | Blob
   | {
       uri: string;
@@ -916,6 +929,60 @@ export async function checkOut(
       body,
     }
   );
+}
+
+/**
+ * ============================================================
+ * FACE ENROLLMENT
+ * ============================================================
+ */
+
+export async function getFaceStatus() {
+  return apiRequest<{
+    data: ApiFaceStatus;
+  }>("/face/status");
+}
+
+export async function enrollFace(payload: {
+  photos: PhotoPayload[];
+  replace?: boolean;
+}) {
+  const body = new FormData();
+
+  payload.photos.forEach((photo) => {
+    body.append("photos[]", photo as Blob);
+  });
+
+  body.append("replace", payload.replace === false ? "0" : "1");
+
+  return apiRequest<{
+    data: ApiFaceStatus;
+  }>("/face/enroll", {
+    method: "POST",
+    body,
+  });
+}
+
+export async function verifyFace(payload: {
+  photo: PhotoPayload;
+}) {
+  const body = new FormData();
+
+  body.append("photo", payload.photo as Blob);
+
+  return apiRequest<{
+    data: {
+      registered: boolean;
+      matched: boolean;
+      similarity_score: number | null;
+      liveness_passed: boolean | null;
+      proof_photo: string | null;
+      message: string;
+    };
+  }>("/face/verify", {
+    method: "POST",
+    body,
+  });
 }
 
 /**

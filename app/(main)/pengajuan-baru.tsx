@@ -59,6 +59,11 @@ type CutiCategory = {
   needsDoctorLetter?: boolean;
 };
 
+type CutiMainCategory =
+  | "cuti_tahunan"
+  | "cuti_melahirkan"
+  | "other";
+
 type ImportantLeaveSubCategory =
   | "menikah"
   | "keluarga_sakit"
@@ -132,6 +137,33 @@ const cutiCategories: CutiCategory[] = [
     needsAttachment: true,
   },
 ];
+
+const cutiMainCategories: {
+  label: string;
+  value: CutiMainCategory;
+}[] = [
+  {
+    label: "Cuti Tahunan",
+    value: "cuti_tahunan",
+  },
+  {
+    label: "Cuti Melahirkan",
+    value: "cuti_melahirkan",
+  },
+  {
+    label: "Other",
+    value: "other",
+  },
+];
+
+const otherCutiCategories =
+  cutiCategories.filter(
+    (item) =>
+      item.code !==
+        "cuti_tahunan" &&
+      item.code !==
+        "cuti_melahirkan"
+  );
 
 const importantLeaveSubCategories: {
   label: string;
@@ -474,32 +506,6 @@ export default function PengajuanBaruScreen() {
       null
     );
 
-  const documentLabel =
-    type === "Cuti" &&
-    cutiCategories.find(
-      (item) =>
-        item.value === cutiCategoryId
-    )?.needsDoctorLetter
-      ? "Surat dokter"
-      : type === "Sakit"
-      ? "Surat dokter"
-      : type === "Perjadi"
-      ? "Surat tugas"
-      : "Dokumen pendukung";
-
-  const uploadText =
-    type === "Cuti" &&
-    cutiCategories.find(
-      (item) =>
-        item.value === cutiCategoryId
-    )?.needsDoctorLetter
-      ? "Unggah surat dokter"
-      : type === "Sakit"
-      ? "Unggah surat dokter"
-      : type === "Perjadi"
-      ? "Unggah surat tugas"
-      : "Unggah surat / dokumen pendukung";
-
   const isOvertime =
     type === "Lembur";
   const selectedCutiCategory =
@@ -507,6 +513,49 @@ export default function PengajuanBaruScreen() {
       (item) =>
         item.value === cutiCategoryId
     ) ?? cutiCategories[0];
+  const isCuti =
+    type === "Cuti";
+  const selectedCutiMainCategory: CutiMainCategory =
+    selectedCutiCategory.code ===
+      "cuti_tahunan" ||
+    selectedCutiCategory.code ===
+      "cuti_melahirkan"
+      ? selectedCutiCategory.code
+      : "other";
+  const isBirthBeyondThird =
+    isCuti &&
+    selectedCutiCategory.code ===
+      "cuti_melahirkan" &&
+    childNumber > 3;
+  const effectiveCutiCategory =
+    isBirthBeyondThird
+      ? cutiCategories.find(
+          (item) =>
+            item.code === "cltn"
+        ) ?? selectedCutiCategory
+      : selectedCutiCategory;
+  const needsCutiAttachment =
+    isCuti &&
+    effectiveCutiCategory.needsAttachment;
+  const needsDoctorLetter =
+    type === "Sakit" ||
+    (isCuti &&
+      !isBirthBeyondThird &&
+      selectedCutiCategory.needsDoctorLetter);
+
+  const documentLabel =
+    needsDoctorLetter
+      ? "Surat dokter"
+      : type === "Perjadi"
+      ? "Surat tugas"
+      : "Dokumen pendukung";
+
+  const uploadText =
+    needsDoctorLetter
+      ? "Unggah surat dokter"
+      : type === "Perjadi"
+      ? "Unggah surat tugas"
+      : "Unggah surat / dokumen pendukung";
 
   const [
     calendarMonth,
@@ -752,24 +801,36 @@ export default function PengajuanBaruScreen() {
       }
 
       if (
-        type === "Sakit" &&
+        needsDoctorLetter &&
         !doctorLetterNumber.trim()
       ) {
         Alert.alert(
           "Nomor surat diperlukan",
-          "Cuti sakit wajib mengisi nomor surat dokter."
+          "Jenis pengajuan ini wajib mengisi nomor surat dokter."
         );
 
         return;
       }
 
       if (
-        type === "Sakit" &&
+        needsDoctorLetter &&
         !selectedFile
       ) {
         Alert.alert(
           "Dokumen diperlukan",
-          "Cuti sakit wajib melampirkan surat dokter."
+          "Jenis pengajuan ini wajib melampirkan surat dokter."
+        );
+
+        return;
+      }
+
+      if (
+        needsCutiAttachment &&
+        !selectedFile
+      ) {
+        Alert.alert(
+          "Dokumen diperlukan",
+          `${effectiveCutiCategory.label} wajib melampirkan dokumen pendukung.`
         );
 
         return;
@@ -795,7 +856,9 @@ export default function PengajuanBaruScreen() {
         await submitRequest({
           title:
             type === "Cuti"
-              ? "Cuti"
+              ? isBirthBeyondThird
+                ? "CLTN"
+                : selectedCutiCategory.label
               : type === "WFA"
               ? "Work From Anywhere"
               : type === "Sakit"
@@ -826,22 +889,42 @@ export default function PengajuanBaruScreen() {
           reason:
             reason.trim(),
 
+          leaveTypeId:
+            type === "Cuti"
+              ? effectiveCutiCategory.value
+              : undefined,
+
           attachment:
             selectedFile,
 
           doctorLetterType:
-            type === "Sakit"
+            needsDoctorLetter
               ? "dokter_biasa"
               : undefined,
 
           doctorLetterNumber:
-            type === "Sakit"
+            needsDoctorLetter
               ? doctorLetterNumber.trim()
               : undefined,
 
           doctorFacilityName:
-            type === "Sakit"
+            needsDoctorLetter
               ? doctorFacilityName.trim()
+              : undefined,
+
+          childNumber:
+            type === "Cuti" &&
+            selectedCutiCategory.code ===
+              "cuti_melahirkan" &&
+            !isBirthBeyondThird
+              ? childNumber
+              : undefined,
+
+          subCategory:
+            type === "Cuti" &&
+            selectedCutiCategory.code ===
+              "cuti_alasan_penting"
+              ? importantLeaveSubCategory
               : undefined,
 
           plannedStartTime:
@@ -1019,6 +1102,275 @@ export default function PengajuanBaruScreen() {
         </View>
       </View>
 
+      {type === "Cuti" ? (
+        <View
+          style={
+            styles.fieldBlock
+          }
+        >
+          <Text
+            style={
+              styles.fieldLabel
+            }
+          >
+            Kategori cuti
+          </Text>
+
+          <View
+            style={
+              styles.categoryGrid
+            }
+          >
+            {cutiMainCategories.map(
+              (item) => {
+                const active =
+                  item.value ===
+                  selectedCutiMainCategory;
+
+                return (
+                  <Pressable
+                    key={item.value}
+                    style={[
+                      styles.categoryOption,
+
+                      active
+                        ? styles.categoryOptionActive
+                        : null,
+
+                      loadingRequest
+                        ? styles.typeOptionDisabled
+                        : null,
+                    ]}
+                    onPress={() => {
+                      if (
+                        loadingRequest
+                      ) {
+                        return;
+                      }
+
+                      setCutiCategoryId(
+                        item.value ===
+                          "cuti_tahunan"
+                          ? 1
+                          : item.value ===
+                            "cuti_melahirkan"
+                          ? 4
+                          : otherCutiCategories[0]
+                              .value
+                      );
+                    }}
+                    disabled={
+                      loadingRequest
+                    }
+                  >
+                    <Text
+                      style={[
+                        styles.categoryText,
+
+                        active
+                          ? styles.categoryTextActive
+                          : null,
+                      ]}
+                    >
+                      {item.label}
+                    </Text>
+                  </Pressable>
+                );
+              }
+            )}
+          </View>
+
+          {selectedCutiMainCategory ===
+          "other" ? (
+            <>
+              <Text
+                style={[
+                  styles.fieldLabel,
+                  styles.detailLabel,
+                ]}
+              >
+                Detail cuti
+              </Text>
+
+              <View
+                style={
+                  styles.subCategoryGrid
+                }
+              >
+                {otherCutiCategories.map(
+                  (item) => {
+                    const active =
+                      item.value ===
+                      cutiCategoryId;
+
+                    return (
+                      <Pressable
+                        key={item.value}
+                        style={[
+                          styles.subCategoryOption,
+                          active
+                            ? styles.subCategoryOptionActive
+                            : null,
+                        ]}
+                        onPress={() =>
+                          setCutiCategoryId(
+                            item.value
+                          )
+                        }
+                        disabled={
+                          loadingRequest
+                        }
+                      >
+                        <Text
+                          style={[
+                            styles.subCategoryText,
+                            active
+                              ? styles.subCategoryTextActive
+                              : null,
+                          ]}
+                        >
+                          {item.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  }
+                )}
+              </View>
+            </>
+          ) : null}
+
+          {selectedCutiCategory.code ===
+          "cuti_melahirkan" ? (
+            <View
+              style={
+                styles.inlineChoices
+              }
+            >
+              <Text
+                style={
+                  styles.inlineLabel
+                }
+              >
+                Anak ke
+              </Text>
+
+              {[1, 2, 3, 4].map(
+                (item) => {
+                  const active =
+                    item === childNumber;
+
+                  return (
+                    <Pressable
+                      key={item}
+                      style={[
+                        styles.smallChoice,
+                        active
+                          ? styles.smallChoiceActive
+                          : null,
+                      ]}
+                      onPress={() =>
+                        setChildNumber(
+                          item
+                        )
+                      }
+                      disabled={
+                        loadingRequest
+                      }
+                    >
+                      <Text
+                        style={[
+                          styles.smallChoiceText,
+                          active
+                            ? styles.smallChoiceTextActive
+                            : null,
+                        ]}
+                      >
+                        {item > 3
+                          ? "4+"
+                          : item}
+                      </Text>
+                    </Pressable>
+                  );
+                }
+              )}
+
+              {isBirthBeyondThird ? (
+                <Text
+                  style={
+                    styles.inlineNote
+                  }
+                >
+                  Anak ke-4 dan seterusnya diproses sebagai CLTN.
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+
+      {type === "Cuti" &&
+      selectedCutiCategory.code ===
+        "cuti_alasan_penting" ? (
+        <View
+          style={
+            styles.fieldBlock
+          }
+        >
+          <Text
+            style={
+              styles.fieldLabel
+            }
+          >
+            Kategori alasan
+          </Text>
+
+          <View
+            style={
+              styles.subCategoryGrid
+            }
+          >
+            {importantLeaveSubCategories.map(
+              (item) => {
+                const active =
+                  item.value ===
+                  importantLeaveSubCategory;
+
+                return (
+                  <Pressable
+                    key={item.value}
+                    style={[
+                      styles.subCategoryOption,
+                      active
+                        ? styles.subCategoryOptionActive
+                        : null,
+                    ]}
+                    onPress={() =>
+                      setImportantLeaveSubCategory(
+                        item.value
+                      )
+                    }
+                    disabled={
+                      loadingRequest
+                    }
+                  >
+                    <Text
+                      style={[
+                        styles.subCategoryText,
+                        active
+                          ? styles.subCategoryTextActive
+                          : null,
+                      ]}
+                    >
+                      {item.label}
+                    </Text>
+                  </Pressable>
+                );
+              }
+            )}
+          </View>
+        </View>
+      ) : null}
+
       {/* ==================================================
           TANGGAL
       ================================================== */}
@@ -1116,7 +1468,7 @@ export default function PengajuanBaruScreen() {
         }
       />
 
-      {type === "Sakit" ? (
+      {needsDoctorLetter ? (
         <View
           style={
             styles.sickFields
@@ -1812,6 +2164,176 @@ const styles =
     typeTextActive: {
       color:
         Colors.white,
+    },
+
+    categoryGrid: {
+      flexDirection:
+        "row",
+      flexWrap:
+        "wrap",
+      gap: 8,
+    },
+
+    categoryOption: {
+      minWidth:
+        "31%",
+      flex: 1,
+      minHeight: 44,
+      justifyContent:
+        "center",
+      borderRadius: 11,
+      paddingHorizontal:
+        11,
+      paddingVertical:
+        10,
+      backgroundColor:
+        Colors.white,
+      borderWidth: 1,
+      borderColor:
+        "#E1E6EF",
+    },
+
+    categoryOptionActive: {
+      backgroundColor:
+        Colors.background,
+      borderColor:
+        Colors.background,
+    },
+
+    categoryText: {
+      color:
+        Colors.textBody,
+      fontSize: 12,
+      fontWeight:
+        "800",
+      textAlign:
+        "center",
+    },
+
+    categoryTextActive: {
+      color:
+        Colors.white,
+    },
+
+    detailLabel: {
+      marginTop: 3,
+    },
+
+    inlineChoices: {
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      flexWrap:
+        "wrap",
+      gap: 8,
+      marginTop: 2,
+    },
+
+    inlineLabel: {
+      color:
+        Colors.textBody,
+      fontSize: 12,
+      fontWeight:
+        "800",
+      marginRight: 2,
+    },
+
+    inlineNote: {
+      flexBasis:
+        "100%",
+      color:
+        "#7A8699",
+      fontSize: 11,
+      fontWeight:
+        "700",
+      lineHeight: 16,
+      marginTop: 1,
+    },
+
+    smallChoice: {
+      minWidth: 38,
+      minHeight: 36,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      borderRadius: 10,
+      backgroundColor:
+        Colors.white,
+      borderWidth: 1,
+      borderColor:
+        "#E1E6EF",
+    },
+
+    smallChoiceActive: {
+      backgroundColor:
+        Colors.background,
+      borderColor:
+        Colors.background,
+    },
+
+    smallChoiceText: {
+      color:
+        Colors.textBody,
+      fontSize: 12,
+      fontWeight:
+        "800",
+    },
+
+    smallChoiceTextActive: {
+      color:
+        Colors.white,
+    },
+
+    subCategoryGrid: {
+      flexDirection:
+        "row",
+      flexWrap:
+        "wrap",
+      gap: 8,
+      marginTop: 2,
+    },
+
+    subCategoryOption: {
+      minWidth:
+        "48%",
+      flex: 1,
+      minHeight: 40,
+      justifyContent:
+        "center",
+      paddingHorizontal:
+        10,
+      paddingVertical:
+        9,
+      borderRadius: 10,
+      backgroundColor:
+        Colors.white,
+      borderWidth: 1,
+      borderColor:
+        "#E1E6EF",
+    },
+
+    subCategoryOptionActive: {
+      backgroundColor:
+        "#E7EEFC",
+      borderColor:
+        "#B9CDF3",
+    },
+
+    subCategoryText: {
+      color:
+        Colors.textBody,
+      fontSize: 11.5,
+      fontWeight:
+        "800",
+      textAlign:
+        "center",
+    },
+
+    subCategoryTextActive: {
+      color:
+        Colors.primaryDark,
     },
 
     textarea: {

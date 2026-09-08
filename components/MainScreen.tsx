@@ -25,6 +25,7 @@ import { usePrototype } from "../contexts/PrototypeContext";
 interface MainScreenProps {
   children: React.ReactNode;
   scroll?: boolean;
+  showBottomNav?: boolean;
 }
 
 const tabs = [
@@ -73,7 +74,7 @@ function TabIcon({ name, color }: { name: string; color: string }) {
   );
 }
 
-export default function MainScreen({ children, scroll = true }: MainScreenProps) {
+export default function MainScreen({ children, scroll = true, showBottomNav = true }: MainScreenProps) {
   const pathname = usePathname();
   const { toast } = usePrototype();
   const insets = useSafeAreaInsets();
@@ -115,7 +116,9 @@ export default function MainScreen({ children, scroll = true }: MainScreenProps)
   const contentBottomPadding =
     keyboardVisible
       ? 28
-      : navHeight + 22;
+      : showBottomNav
+      ? navHeight + 22
+      : 22;
 
   const content = useMemo(() => scroll ? (
     <ScrollView
@@ -181,7 +184,7 @@ export default function MainScreen({ children, scroll = true }: MainScreenProps)
           <Text style={styles.toastText}>{toast}</Text>
         </View>
       ) : null}
-      {!keyboardVisible ? (
+      {showBottomNav && !keyboardVisible ? (
       <View
         style={[
           styles.nav,

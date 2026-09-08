@@ -1,8 +1,9 @@
 import React, {
+  useCallback,
   useState,
 } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import { router } from "expo-router";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { router, useFocusEffect } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import Avatar from "../../components/Avatar";
@@ -12,6 +13,7 @@ import { Colors } from "../../constants/colors";
 import { AppConfig } from "../../constants/config";
 import {
   clearSession,
+  getFaceStatus,
   logout,
 } from "../../services/api";
 import { usePrototype } from "../../contexts/PrototypeContext";
@@ -22,6 +24,18 @@ export default function ProfilScreen() {
     loggingOut,
     setLoggingOut,
   ] = useState(false);
+  const [
+    faceRegistered,
+    setFaceRegistered,
+  ] = useState(false);
+  const [
+    faceSampleCount,
+    setFaceSampleCount,
+  ] = useState(0);
+  const [
+    faceLoading,
+    setFaceLoading,
+  ] = useState(true);
 
   const employee = profile?.employee;
   const fullName = profile?.full_name || profile?.username || "Pegawai";
@@ -33,6 +47,32 @@ export default function ProfilScreen() {
     .join("")
     .toUpperCase();
   const role = profile?.roles?.map((item) => item.name).join(", ") || "Pegawai";
+  const hasRegisteredFace = faceRegistered;
+
+  const handleFaceEnrollment = () => {
+    router.push("/(main)/daftar-wajah");
+  };
+
+  const loadFaceStatus = useCallback(async () => {
+    try {
+      setFaceLoading(true);
+
+      const response = await getFaceStatus();
+
+      setFaceRegistered(response.data.registered);
+      setFaceSampleCount(response.data.sample_count);
+    } catch (error) {
+      console.error("FACE STATUS ERROR:", error);
+    } finally {
+      setFaceLoading(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadFaceStatus();
+    }, [loadFaceStatus])
+  );
 
   const handleLogout = async () => {
     if (loggingOut) {
@@ -114,20 +154,43 @@ export default function ProfilScreen() {
         <InfoRow label="Status" value={employee?.employment_status || "-"} />
       </View>
 
-      <View style={styles.faceCard}>
-        <View style={styles.faceIcon}>
-          <Ionicons
-            name="person-circle-outline"
-            size={23}
-            color="#16A34A"
-          />
+      <Pressable style={styles.faceCard} onPress={handleFaceEnrollment}>
+        <View style={[styles.faceIcon, hasRegisteredFace ? null : styles.faceIconPending]}>
+          {faceLoading ? (
+            <ActivityIndicator color={Colors.primary} />
+          ) : (
+            <Ionicons
+              name={hasRegisteredFace ? "person-circle-outline" : "scan-outline"}
+              size={23}
+              color={hasRegisteredFace ? "#16A34A" : Colors.primary}
+            />
+          )}
         </View>
         <View style={styles.faceContent}>
-          <Text style={styles.faceTitle}>Data wajah terdaftar</Text>
-          <Text style={styles.faceSubtitle}>Terverifikasi untuk presensi</Text>
+          <Text style={styles.faceTitle}>
+            {faceLoading
+              ? "Memeriksa data wajah"
+              : hasRegisteredFace
+              ? "Data wajah terdaftar"
+              : "Data wajah belum terdaftar"}
+          </Text>
+          <Text style={styles.faceSubtitle}>
+            {hasRegisteredFace
+              ? `${faceSampleCount} sampel wajah aktif untuk presensi`
+              : "Daftarkan wajah untuk verifikasi presensi"}
+          </Text>
         </View>
-        <Text style={styles.faceAction}>Perbarui</Text>
-      </View>
+        <View style={styles.faceActionBox}>
+          <Text style={styles.faceAction}>
+            {hasRegisteredFace ? "Perbarui" : "Daftar"}
+          </Text>
+          <Ionicons
+            name="chevron-forward"
+            size={16}
+            color={Colors.primaryDark}
+          />
+        </View>
+      </Pressable>
 
       <View style={styles.panel}>
         <MenuRow icon="mail-outline" label="Email" value={profile?.employee?.name ? profile.username : "-"} />
@@ -300,6 +363,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: "#E7F6ED",
   },
+  faceIconPending: {
+    backgroundColor: "#EAF1FF",
+  },
   faceContent: {
     flex: 1,
     minWidth: 0,
@@ -319,6 +385,11 @@ const styles = StyleSheet.create({
     color: Colors.primaryDark,
     fontSize: 11,
     fontWeight: "800",
+  },
+  faceActionBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
   },
   infoRow: {
     flexDirection: "row",

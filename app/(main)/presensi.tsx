@@ -79,6 +79,9 @@ const COLORS = {
   orangeLight: "#fdf2dd",
 };
 
+const LIVE_REFRESH_INTERVAL_MS =
+  15000;
+
 /* ============================================================
    TYPES
 ============================================================ */
@@ -460,9 +463,13 @@ export default function PresensiScreen() {
   ========================================================== */
 
   const loadTodayAttendance =
-    useCallback(async () => {
+    useCallback(async (
+      showLoading = true
+    ) => {
       try {
-        setAttendanceLoading(true);
+        if (showLoading) {
+          setAttendanceLoading(true);
+        }
 
         const today =
           getWitaDateKey();
@@ -535,8 +542,10 @@ export default function PresensiScreen() {
          */
         setAttendanceKind("masuk");
       } finally {
-        setAttendanceLoading(false);
-        setStep("camera");
+        if (showLoading) {
+          setAttendanceLoading(false);
+          setStep("camera");
+        }
       }
     }, []);
 
@@ -546,6 +555,15 @@ export default function PresensiScreen() {
 
   useEffect(() => {
     loadTodayAttendance();
+
+    const intervalId =
+      setInterval(() => {
+        void loadTodayAttendance(false);
+      }, LIVE_REFRESH_INTERVAL_MS);
+
+    return () => {
+      clearInterval(intervalId);
+    };
   }, [loadTodayAttendance]);
 
   useEffect(() => {

@@ -80,6 +80,9 @@ const COLORS = {
   redLight: "#fde8e8",
 };
 
+const LIVE_REFRESH_INTERVAL_MS =
+  15000;
+
 /* ============================================================
    TYPES
 ============================================================ */
@@ -1131,6 +1134,15 @@ export default function DashboardScreen() {
 
   useEffect(() => {
     loadDashboard();
+
+    const intervalId =
+      setInterval(() => {
+        void loadDashboard();
+      }, LIVE_REFRESH_INTERVAL_MS);
+
+    return () => {
+      clearInterval(intervalId);
+    };
   }, [
     loadDashboard,
   ]);
