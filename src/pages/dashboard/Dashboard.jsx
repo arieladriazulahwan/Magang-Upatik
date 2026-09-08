@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import AdminLayout from "../../components/layout/AdminLayout";
 import { apiRequest } from "../../services/api";
+import { getEmployees } from "../../services/pegawaiService";
 import { hasFaceEnrollment } from "../../utils/faceData";
 
 const normalizeArray = (payload) => {
@@ -37,7 +38,7 @@ function Dashboard() {
 
         const [attendanceResult, employeesResult, unitsResult, leaveResult] = await Promise.allSettled([
           apiRequest("/attendance"),
-          apiRequest("/employees"),
+          getEmployees(),
           apiRequest("/work-units"),
           apiRequest("/leave-requests"),
         ]);

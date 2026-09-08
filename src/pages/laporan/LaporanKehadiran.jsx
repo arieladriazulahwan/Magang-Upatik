@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { jsPDF } from "jspdf";
 import AdminLayout from "../../components/layout/AdminLayout";
 import { apiRequest } from "../../services/api";
+import { getEmployees } from "../../services/pegawaiService";
 import { isAdminUnitOrLeader, getUserUnit } from "../../utils/access";
 
 const normalizeArray = (payload) => {
@@ -23,6 +24,7 @@ function LaporanKehadiran() {
 	const [employees, setEmployees] = useState([]);
 	const [leaveRequests, setLeaveRequests] = useState([]);
 	const [period, setPeriod] = useState("bulan-ini");
+	const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));
 	const [unit, setUnit] = useState(isRestrictedUser && userUnit ? userUnit : "Semua Unit");
 	const [reportType, setReportType] = useState("kehadiran");
 	const [loading, setLoading] = useState(true);
@@ -34,12 +36,12 @@ function LaporanKehadiran() {
 			setError("");
 			const [attendanceResult, employeesResult, leaveResult] = await Promise.allSettled([
 				apiRequest("/attendance"),
-				apiRequest("/employees"),
+				getEmployees(),
 				apiRequest("/leave-requests"),
 			]);
 			const value = (result) => result.status === "fulfilled" ? normalizeArray(result.value) : [];
 			setAttendance(value(attendanceResult));
-			setEmployees(value(employeesResult));
+			setEmployees(employeesResult.status === "fulfilled" ? employeesResult.value : []);
 			setLeaveRequests(value(leaveResult));
 		} catch (err) {
 			setError(err.message || "Gagal memuat laporan.");
@@ -83,6 +85,13 @@ function LaporanKehadiran() {
 			return {
 				start: new Date(currentYear, 0, 1),
 				end: new Date(currentYear, 11, 31)
+			};
+		}
+		if (periodValue === "bulan-pilihan") {
+			const [year, month] = selectedMonth.split("-").map(Number);
+			return {
+				start: new Date(year, month - 1, 1),
+				end: new Date(year, month, 0)
 			};
 		}
 		return { start: null, end: null };
@@ -153,7 +162,7 @@ function LaporanKehadiran() {
 				status: item.status || item.attendance_status || "-",
 			};
 		});
-	}, [attendance, leaveRequests, reportType, unit, period, isRestrictedUser, userUnit]);
+	}, [attendance, leaveRequests, reportType, unit, period, selectedMonth, isRestrictedUser, userUnit]);
 
 	const getPeriodLabel = () => {
 		switch (period) {
@@ -165,130 +174,114 @@ function LaporanKehadiran() {
 				return lastMonth.toLocaleDateString("id-ID", { month: "long", year: "numeric" });
 			case "tahun-ini":
 				return new Date().getFullYear().toString();
+			case "bulan-pilihan":
+				return new Date(`${selectedMonth}-01T00:00:00`).toLocaleDateString("id-ID", { month: "long", year: "numeric" });
 			default:
 				return "";
 		}
 	};
 
 	const downloadPdf = () => {
-		const doc = new jsPDF();
+		const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
 		const title = reportType === "cuti" ? "REKAP CUTI & IZIN" : "REKAP KEHADIRAN PEGAWAI";
 		const pageWidth = doc.internal.pageSize.getWidth();
 		const pageHeight = doc.internal.pageSize.getHeight();
 		const periodLabel = getPeriodLabel();
 		const unitLabel = unit === "Semua Unit" ? "Semua Unit" : unit;
-		
-		// Set title
-		doc.setFontSize(14);
-		doc.setFont(undefined, "bold");
-		doc.text(title, pageWidth / 2, 15, { align: "center" });
-		
-		// Set subtitle with period and unit
-		doc.setFontSize(10);
-		doc.setFont(undefined, "normal");
-		doc.text(`Periode: ${periodLabel} | Unit: ${unitLabel}`, pageWidth / 2, 22, { align: "center" });
-		doc.text(`Tanggal Cetak: ${new Date().toLocaleDateString("id-ID")}`, pageWidth / 2, 28, { align: "center" });
-		
-		// Table headers
+		const margin = 14;
+		const printedAt = new Date().toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" });
 		const headers = reportType === "cuti"
 			? ["No", "Pegawai", "Unit Kerja", "Jenis", "Tanggal", "Status"]
 			: ["No", "Pegawai", "Unit Kerja", "Tanggal", "Hadir", "Telat", "Alpha", "Izin", "Status"];
-		
-		// Prepare table data
-		let tableData = rows.map((row, index) => {
+		const columnWidths = reportType === "cuti"
+			? [10, 62, 52, 34, 32, 60]
+			: [10, 58, 45, 28, 16, 16, 16, 16, 42];
+
+		const tableData = rows.map((row, index) => {
 			if (reportType === "cuti") {
-				return [
-					String(index + 1),
-					row.name,
-					row.unit,
-					row.category,
-					row.date,
-					row.status
-				];
+				return [String(index + 1), row.name, row.unit, row.category, row.date, toLabel(row.status)];
 			} else {
-				return [
-					String(index + 1),
-					row.name,
-					row.unit,
-					row.date,
-					String(row.hadir),
-					String(row.terlambat),
-					String(row.alpha),
-					String(row.izin),
-					row.status
-				];
+				return [String(index + 1), row.name, row.unit, row.date, String(row.hadir), String(row.terlambat), String(row.alpha), String(row.izin), toLabel(row.status)];
 			}
 		});
-		
-		// Calculate column widths
-		const columnCount = headers.length;
-		const columnWidth = (pageWidth - 20) / columnCount;
-		let yPosition = 40;
-		const lineHeight = 7;
-		const rowHeight = 6;
-		
-		// Draw headers
-		doc.setFontSize(10);
-		doc.setFont(undefined, "bold");
-		doc.setFillColor(41, 128, 185);
-		doc.setTextColor(255, 255, 255);
-		
-		headers.forEach((header, index) => {
-			const x = 10 + index * columnWidth;
-			doc.rect(x, yPosition, columnWidth, lineHeight, "F");
-			doc.text(header, x + columnWidth / 2, yPosition + 5, { align: "center", maxWidth: columnWidth - 2 });
-		});
-		
-		yPosition += lineHeight;
-		
-		// Draw rows
-		doc.setFont(undefined, "normal");
-		doc.setTextColor(0, 0, 0);
-		doc.setFillColor(240, 240, 240);
+
+		const drawReportHeader = () => {
+			doc.setFillColor(24, 91, 163);
+			doc.rect(0, 0, pageWidth, 7, "F");
+			doc.setTextColor(20, 45, 76);
+			doc.setFont("helvetica", "bold");
+			doc.setFontSize(16);
+			doc.text(title, margin, 18);
+			doc.setFont("helvetica", "normal");
+			doc.setFontSize(9);
+			doc.setTextColor(82, 97, 116);
+			doc.text(`Periode: ${periodLabel}`, margin, 25);
+			doc.text(`Unit kerja: ${unitLabel}`, margin, 30);
+			doc.text(`Dicetak ${printedAt}`, pageWidth - margin, 25, { align: "right" });
+			doc.setDrawColor(207, 218, 230);
+			doc.line(margin, 35, pageWidth - margin, 35);
+		};
+
+		const drawTableHeader = (y) => {
+			doc.setFont("helvetica", "bold");
+			doc.setFontSize(8.5);
+			doc.setFillColor(24, 91, 163);
+			doc.setTextColor(255, 255, 255);
+			let x = margin;
+			headers.forEach((header, index) => {
+				doc.rect(x, y, columnWidths[index], 8, "F");
+				doc.text(header, x + columnWidths[index] / 2, y + 5.2, { align: "center" });
+				x += columnWidths[index];
+			});
+			return y + 8;
+		};
+
+		drawReportHeader();
+		let yPosition = drawTableHeader(40);
 		let isEvenRow = false;
-		
+
 		tableData.forEach((rowData) => {
-			// Check if we need a new page
-			if (yPosition + rowHeight > pageHeight - 10) {
+			doc.setFont("helvetica", "normal");
+			doc.setFontSize(8.5);
+			const cellLines = rowData.map((cell, index) => doc.splitTextToSize(String(cell || "-"), columnWidths[index] - 4));
+			const rowHeight = Math.max(8, Math.max(...cellLines.map((lines) => lines.length)) * 4.2 + 3);
+
+			if (yPosition + rowHeight > pageHeight - 16) {
 				doc.addPage();
-				yPosition = 10;
-				
-				// Redraw headers on new page
-				doc.setFontSize(10);
-				doc.setFont(undefined, "bold");
-				doc.setFillColor(41, 128, 185);
-				doc.setTextColor(255, 255, 255);
-				
-				headers.forEach((header, index) => {
-					const x = 10 + index * columnWidth;
-					doc.rect(x, yPosition, columnWidth, lineHeight, "F");
-					doc.text(header, x + columnWidth / 2, yPosition + 5, { align: "center", maxWidth: columnWidth - 2 });
-				});
-				
-				yPosition += lineHeight;
-				doc.setFont(undefined, "normal");
-				doc.setTextColor(0, 0, 0);
+				drawReportHeader();
+				yPosition = drawTableHeader(40);
 				isEvenRow = false;
 			}
-			
-			// Draw row background
+
 			if (isEvenRow) {
-				doc.setFillColor(240, 240, 240);
-				doc.rect(10, yPosition, pageWidth - 20, rowHeight, "F");
+				doc.setFillColor(244, 247, 250);
+				doc.rect(margin, yPosition, columnWidths.reduce((sum, width) => sum + width, 0), rowHeight, "F");
 			}
-			
-			// Draw cells
-			rowData.forEach((cell, index) => {
-				const x = 10 + index * columnWidth;
-				doc.text(String(cell), x + 2, yPosition + 4, { maxWidth: columnWidth - 4 });
+
+			doc.setTextColor(36, 52, 71);
+			let x = margin;
+			cellLines.forEach((lines, index) => {
+				const centered = [0, 4, 5, 6, 7].includes(index) && reportType !== "cuti";
+				doc.text(lines, centered ? x + columnWidths[index] / 2 : x + 2, yPosition + 5, { align: centered ? "center" : "left" });
+				x += columnWidths[index];
 			});
-			
+
 			yPosition += rowHeight;
 			isEvenRow = !isEvenRow;
 		});
-		
+
+		const totalPages = doc.getNumberOfPages();
+		for (let page = 1; page <= totalPages; page += 1) {
+			doc.setPage(page);
+			doc.setFont("helvetica", "normal");
+			doc.setFontSize(8);
+			doc.setTextColor(112, 128, 144);
+			doc.text(`Total ${rows.length} data`, margin, pageHeight - 8);
+			doc.text(`Halaman ${page} dari ${totalPages}`, pageWidth - margin, pageHeight - 8, { align: "right" });
+		}
+
 		// Save PDF with period and unit info
-		const periodShort = period.replace("bulan-", "").replace("tahun-", "");
+		const periodShort = period === "bulan-pilihan" ? selectedMonth : period.replace("bulan-", "").replace("tahun-", "");
 		const unitShort = unit === "Semua Unit" ? "semua" : unit.toLowerCase().replace(/\s+/g, "-");
 		const fileName = `rekap-${reportType}-${periodShort}-${unitShort}-${new Date().toISOString().slice(0, 10)}.pdf`;
 		doc.save(fileName);
@@ -306,7 +299,7 @@ function LaporanKehadiran() {
 		const url = URL.createObjectURL(blob);
 		const link = document.createElement("a");
 		link.href = url;
-		const periodShort = period.replace("bulan-", "").replace("tahun-", "");
+		const periodShort = period === "bulan-pilihan" ? selectedMonth : period.replace("bulan-", "").replace("tahun-", "");
 		const unitShort = unit === "Semua Unit" ? "semua" : unit.toLowerCase().replace(/\s+/g, "-");
 		link.download = `rekap-${reportType}-${periodShort}-${unitShort}-${new Date().toISOString().slice(0, 10)}.csv`;
 		link.click();
@@ -318,12 +311,13 @@ function LaporanKehadiran() {
 			<div className="report-page">
 				<div className="page-heading">
 					<div><h2>Rekap & Ekspor</h2><p>Rekapitulasi kehadiran dan pengajuan pegawai</p></div>
-					<button className="primary-button" onClick={downloadPdf} disabled={loading || rows.length === 0}>Ekspor PDF</button>
+					<button className="primary-button" onClick={downloadPdf} disabled={loading}>Ekspor PDF</button>
 				</div>
 
 				<section className="report-toolbar">
-					<label>Periode<select value={period} onChange={(event) => setPeriod(event.target.value)}><option value="bulan-ini">Bulan Ini</option><option value="bulan-lalu">Bulan Lalu</option><option value="tahun-ini">Tahun Ini</option></select></label>
-				<label>Unit Kerja<select value={unit} onChange={(event) => setUnit(event.target.value)} disabled={isRestrictedUser}>{units.map((item) => <option key={item}>{item}</option>)}</select>{isRestrictedUser && <span style={{ marginLeft: "8px", fontSize: "12px", color: "#666" }}>(Hanya unit Anda)</span>}</label>
+					<label className="report-filter"><span>Periode Laporan</span><select value={period} onChange={(event) => setPeriod(event.target.value)}><option value="bulan-ini">Bulan Ini</option><option value="bulan-lalu">Bulan Lalu</option><option value="bulan-pilihan">Pilih Bulan</option><option value="tahun-ini">Tahun Ini</option></select></label>
+					{period === "bulan-pilihan" && <label className="report-filter"><span>Bulan yang Diekspor</span><input type="month" value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)} /></label>}
+					<label className="report-filter"><span>Unit Kerja</span><select value={unit} onChange={(event) => setUnit(event.target.value)} disabled={isRestrictedUser}>{units.map((item) => <option key={item}>{item}</option>)}</select>{isRestrictedUser && <small>Hanya unit Anda</small>}</label>
 				</section>
 
 				<section className="data-panel report-panel">

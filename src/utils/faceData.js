@@ -54,3 +54,15 @@ export const getFaceSampleCount = (employee = {}) => {
 };
 
 export const hasFaceEnrollment = (employee) => getFaceSampleCount(employee) > 0;
+
+// Hanya URL foto referensi yang diekspos; embedding wajah tidak pernah dipakai di UI.
+export const getFaceReferencePhoto = (employee = {}) => {
+  const faceData = Array.isArray(employee.face_data)
+    ? employee.face_data
+    : Array.isArray(employee.faceData)
+      ? employee.faceData
+      : [];
+  const activeSample = faceData.find((sample) => sample?.is_active !== false) || faceData[0] || {};
+
+  return employee.reference_photo || employee.face_reference_photo || activeSample.reference_photo || activeSample.photo_url || "";
+};

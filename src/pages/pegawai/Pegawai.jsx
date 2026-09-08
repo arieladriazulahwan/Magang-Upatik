@@ -486,6 +486,16 @@ function Pegawai() {
                           {canEdit ? (
                             <>
                               <button
+                                className={`face-status action-face-status ${
+                                  face === "Terdaftar" ? "registered" : "unregistered"
+                                }`}
+                                title="Lihat status data wajah"
+                                onClick={() => navigate(`/pegawai/${employee.id}`)}
+                              >
+                                {face === "Terdaftar" ? "Wajah terdaftar" : "Wajah belum terdaftar"}
+                              </button>
+
+                              <button
                                 className="action-button"
                                 onClick={() =>
                                   navigate(

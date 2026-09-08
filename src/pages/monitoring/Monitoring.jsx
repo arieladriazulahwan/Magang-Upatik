@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import AdminLayout from "../../components/layout/AdminLayout";
 import { apiRequest } from "../../services/api";
+import { getEmployees, getWorkUnits } from "../../services/pegawaiService";
 
 const APP_TIME_ZONE = "Asia/Makassar";
 
@@ -24,8 +25,33 @@ const formatAttendanceTime = (value) => {
 
 const getEmployeeId = (item) => item.employee_id ?? item.employee?.id ?? item.pegawai?.id;
 
-const enrichAttendance = (attendance, employees) => {
+const getUnitName = (item, employee, unitsById) => {
+  const name = [
+    item.unit,
+    item.unit_kerja,
+    item.unit_name,
+    item.work_unit_name,
+    item.work_unit?.name,
+    employee.unit,
+    employee.unit_kerja,
+    employee.unit_name,
+    employee.work_unit_name,
+    employee.work_unit?.name,
+  ].find((value) => typeof value === "string" && value.trim());
+
+  if (name) return name;
+
+  const unitId = item.work_unit_id ?? item.workUnitId ?? item.work_unit?.id
+    ?? employee.work_unit_id ?? employee.workUnitId ?? employee.work_unit?.id;
+  return unitsById.get(String(unitId)) || "-";
+};
+
+const enrichAttendance = (attendance, employees, workUnits = []) => {
   const employeesById = new Map(employees.map((employee) => [String(employee.id), employee]));
+  const unitsById = new Map(workUnits.map((workUnit) => [
+    String(workUnit.id),
+    workUnit.name || workUnit.nama || workUnit.unit_name,
+  ]));
 
   return attendance.map((item) => {
     const employee = item.employee || item.pegawai || employeesById.get(String(getEmployeeId(item))) || {};
@@ -35,7 +61,7 @@ const enrichAttendance = (attendance, employees) => {
       ...item,
       name: item.name || item.nama || employee.name || employee.nama || "-",
       nip: item.nip || employee.nip || employee.nik || "-",
-      unit: item.unit || item.unit_kerja || item.work_unit?.name || employee.work_unit?.name || employee.unit || employee.unit_kerja || "-",
+      unit: getUnitName(item, employee, unitsById),
       masuk: formatAttendanceTime(item.masuk || item.jam_masuk || item.check_in || item.clock_in),
       keluar: formatAttendanceTime(item.keluar || item.jam_keluar || item.check_out || item.clock_out),
       metode: item.metode || item.method || item.type || "-",
@@ -90,6 +116,7 @@ function Monitoring() {
   const [unit, setUnit] = useState("Semua Unit");
   const [status, setStatus] = useState("Semua Status");
   const [selectedDate, setSelectedDate] = useState(today);
+  const [selectedAttendance, setSelectedAttendance] = useState(null);
 
   const [loading, setLoading] = useState(true);
 
@@ -104,9 +131,10 @@ function Monitoring() {
       // Backend menerima filter tanggal agar ringkasan dan data yang dikirim
       // hanya untuk tanggal yang dipilih. Penyaringan ulang di frontend mengantisipasi
       // backend lama yang belum menerapkan query parameter tersebut.
-      const [response, employeesResponse] = await Promise.all([
+      const [response, employeesResponse, workUnitsResponse] = await Promise.all([
         apiRequest(`/attendance?date=${selectedDate}`),
-        apiRequest("/employees").catch(() => []),
+        getEmployees().catch(() => []),
+        getWorkUnits().catch(() => []),
       ]);
 
       console.log(
@@ -131,7 +159,11 @@ function Monitoring() {
 
       const attendance = normalizeArray(response)
         .filter((item) => !getAttendanceDate(item) || getAttendanceDate(item) === selectedDate);
-      const normalizedAttendance = enrichAttendance(attendance, normalizeArray(employeesResponse));
+      const normalizedAttendance = enrichAttendance(
+        attendance,
+        normalizeArray(employeesResponse),
+        normalizeArray(workUnitsResponse)
+      );
       const calculatedSummary = getSummary(normalizedAttendance);
       setData(normalizedAttendance);
 
@@ -217,7 +249,7 @@ function Monitoring() {
           (item) =>
             item.unit
         )
-        .filter(Boolean)
+        .filter((item) => item && item !== "-")
     ),
   ];
 
@@ -660,7 +692,11 @@ function Monitoring() {
 
                         <td>
 
-                          <button className="action-button">
+                          <button
+                            type="button"
+                            className="action-button"
+                            onClick={() => setSelectedAttendance(item)}
+                          >
                             Detail
                           </button>
 
@@ -722,6 +758,53 @@ function Monitoring() {
           </div>
 
         </section>
+
+        {selectedAttendance && (
+          <div className="modal-overlay" onClick={() => setSelectedAttendance(null)}>
+            <section
+              className="employee-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="attendance-detail-title"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="modal-header">
+                <div>
+                  <h3 id="attendance-detail-title">Detail Kehadiran</h3>
+                  <p>Informasi presensi pegawai yang tercatat pada sistem</p>
+                </div>
+                <button type="button" className="modal-close" aria-label="Tutup detail" onClick={() => setSelectedAttendance(null)}>×</button>
+              </div>
+
+              <div className="correction-detail">
+                <div className="correction-detail-person">
+                  <div className="employee-avatar large">
+                    {String(selectedAttendance.name || "P").charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <strong>{selectedAttendance.name || "Pegawai"}</strong>
+                    <span>{selectedAttendance.nip || "-"}</span>
+                    <small>{selectedAttendance.unit || "-"}</small>
+                  </div>
+                </div>
+
+                <div className="correction-detail-grid">
+                  <div className="correction-detail-item"><span>Tanggal</span><strong>{getAttendanceDate(selectedAttendance) || selectedDate}</strong></div>
+                  <div className="correction-detail-item"><span>Status</span><strong>{toLabel(selectedAttendance.status)}</strong></div>
+                  <div className="correction-detail-item"><span>Jam Masuk</span><strong>{selectedAttendance.masuk || "-"}</strong></div>
+                  <div className="correction-detail-item"><span>Jam Pulang</span><strong>{selectedAttendance.keluar || "-"}</strong></div>
+                  <div className="correction-detail-item"><span>Metode Presensi</span><strong>{toLabel(selectedAttendance.metode)}</strong></div>
+                  <div className="correction-detail-item"><span>Verifikasi Wajah</span><strong>{selectedAttendance.face_matched === true || selectedAttendance.face_verified === true ? "Terverifikasi" : "Tidak tersedia"}</strong></div>
+                  <div className="correction-detail-item correction-detail-full-width"><span>Lokasi Presensi</span><strong>{selectedAttendance.location_name || selectedAttendance.work_location?.name || selectedAttendance.location || selectedAttendance.address || "Tidak tersedia"}</strong></div>
+                </div>
+
+                <div className="modal-actions correction-detail-actions">
+                  <button type="button" className="secondary-button" onClick={() => setSelectedAttendance(null)}>Tutup</button>
+                </div>
+              </div>
+            </section>
+          </div>
+        )}
 
       </div>
 

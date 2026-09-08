@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import AdminLayout from "../../components/layout/AdminLayout";
 import { apiRequest } from "../../services/api";
+import { getEmployees } from "../../services/pegawaiService";
 
 const normalizeArray = (payload) => {
   if (Array.isArray(payload)) return payload;
@@ -86,12 +87,12 @@ function Verifikasi() {
 
       const [attendanceResponse, employeesResponse] = await Promise.all([
         apiRequest("/attendance"),
-        apiRequest("/employees"),
+        getEmployees(),
       ]);
       const response = attendanceResponse;
       const normalized = normalizeArray(response).map(normalizeVerificationData);
       setData(normalized);
-      setEmployees(normalizeArray(employeesResponse));
+      setEmployees(employeesResponse);
     } catch (err) {
       console.error("Gagal mengambil data verifikasi:", err);
       setError(err.message || "Gagal mengambil data verifikasi.");

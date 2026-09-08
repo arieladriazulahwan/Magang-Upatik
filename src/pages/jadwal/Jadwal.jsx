@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import AdminLayout from "../../components/layout/AdminLayout";
 import { apiRequest } from "../../services/api";
+import { getEmployees } from "../../services/pegawaiService";
 import { canManageShifts } from "../../utils/access";
 
 const normalizeArray = (payload) => {
@@ -31,11 +32,11 @@ function Jadwal() {
       setError("");
       const [scheduleResponse, employeeResponse, shiftResponse] = await Promise.all([
         apiRequest("/shift-schedules"),
-        apiRequest("/employees"),
+        getEmployees(),
         apiRequest("/shifts"),
       ]);
       setSchedules(normalizeArray(scheduleResponse));
-      setEmployees(normalizeArray(employeeResponse));
+      setEmployees(employeeResponse);
       setShifts(normalizeArray(shiftResponse));
     } catch (err) {
       console.error("Gagal mengambil jadwal shift:", err);

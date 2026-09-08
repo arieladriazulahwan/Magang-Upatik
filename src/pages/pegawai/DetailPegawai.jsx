@@ -2,7 +2,17 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import AdminLayout from "../../components/layout/AdminLayout";
 import { getEmployee } from "../../services/pegawaiService";
-import { getFaceSampleCount } from "../../utils/faceData";
+import { API_URL } from "../../services/api";
+import { getFaceReferencePhoto, getFaceSampleCount } from "../../utils/faceData";
+
+const toFacePhotoUrl = (path) => {
+	if (!path) return "";
+	if (/^(https?:|data:image\/)/i.test(path)) return path;
+
+	const serverUrl = API_URL.replace(/\/api\/?$/, "");
+	const normalizedPath = String(path).replace(/^\/+/, "");
+	return `${serverUrl}/${normalizedPath.startsWith("storage/") ? normalizedPath : `storage/${normalizedPath}`}`;
+};
 
 function DetailPegawai() {
 	const { id } = useParams();
@@ -45,6 +55,7 @@ function DetailPegawai() {
 	const type = employee.employee_type || employee.type || "-";
 	const unit = employee.work_unit?.name || employee.unit || employee.unit_kerja || "-";
 	const faceSamples = getFaceSampleCount(employee);
+	const facePhoto = toFacePhotoUrl(getFaceReferencePhoto(employee));
 
 	return (
 		<AdminLayout>
@@ -77,7 +88,11 @@ function DetailPegawai() {
 						<strong className={faceSamples > 0 ? "detail-success" : "detail-warning"}>
 							{faceSamples > 0 ? `${faceSamples} sampel terdaftar` : "Belum terdaftar"}
 						</strong>
-						<p>Enrollment wajah dilakukan terpisah setelah data pegawai tersimpan.</p>
+						{facePhoto ? (
+							<img className="face-reference-photo" src={facePhoto} alt={`Foto referensi wajah ${name}`} />
+						) : (
+							<p>{faceSamples > 0 ? "Foto referensi belum dikirim oleh API." : "Enrollment wajah dilakukan terpisah setelah data pegawai tersimpan."}</p>
+						)}
 					</div>
 				</section>
 
