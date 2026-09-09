@@ -5485,3 +5485,310 @@ button.action-face-status:hover {
     width: 100%;
   }
 }
+
+.leaflet-map-container {
+  width: 100%;
+  height: 460px;
+  overflow: hidden;
+  border-radius: 12px;
+}
+
+.location-map-panel {
+  position: relative;
+  overflow: hidden;
+}
+
+.location-map-panel .leaflet-container {
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+.map-legend {
+  position: absolute;
+  bottom: 15px;
+  left: 15px;
+  z-index: 500;
+  background: white;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+}
+
+.map-empty {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 600;
+  transform: translate(-50%, -50%);
+  background: white;
+  padding: 15px 20px;
+  border-radius: 8px;
+}
+
+/* ===============================
+   LAYOUT
+================================ */
+
+.location-layout {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+
+/* ===============================
+   MAP
+================================ */
+
+.location-map-panel {
+  padding: 0;
+  overflow: hidden;
+}
+
+.location-map-leaflet {
+  position: relative;
+  width: 100%;
+  height: 550px;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+
+/* ===============================
+   LIST
+================================ */
+
+.location-list-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.location-list-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.location-list-heading h3 {
+  margin: 0;
+}
+
+
+/* ===============================
+   LOCATION CARD
+================================ */
+
+.location-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+
+  background: #ffffff;
+
+  border: 1px solid #e5e7eb;
+
+  border-radius: 10px;
+
+  padding: 16px;
+
+  transition: 0.2s;
+}
+
+.location-card:hover {
+  box-shadow:
+    0 5px 15px
+    rgba(0, 0, 0, 0.06);
+}
+
+
+.location-icon {
+  width: 42px;
+  height: 42px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: #eff6ff;
+
+  border-radius: 10px;
+
+  font-size: 20px;
+}
+
+
+.location-card-main {
+  flex: 1;
+
+  display: flex;
+  flex-direction: column;
+
+  gap: 4px;
+
+  min-width: 0;
+}
+
+.location-card-main strong {
+  font-size: 14px;
+}
+
+.location-card-main span {
+  font-size: 12px;
+
+  color: #6b7280;
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+
+/* ===============================
+   RADIUS
+================================ */
+
+.location-radius {
+  display: flex;
+
+  flex-direction: column;
+
+  align-items: center;
+
+  gap: 4px;
+
+  font-size: 12px;
+}
+
+.location-radius > span {
+  font-weight: 600;
+}
+
+.location-radius small {
+  padding: 3px 8px;
+
+  border-radius: 20px;
+
+  font-size: 10px;
+}
+
+.status-active {
+  background: #dcfce7;
+
+  color: #15803d;
+}
+
+.status-inactive {
+  background: #fee2e2;
+
+  color: #dc2626;
+}
+
+
+/* ===============================
+   DELETE BUTTON
+================================ */
+
+.delete-location-button {
+  border: 1px solid #fecaca;
+
+  background: #ffffff;
+
+  color: #dc2626;
+
+  padding: 7px 12px;
+
+  border-radius: 7px;
+
+  font-size: 12px;
+
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition: 0.2s;
+}
+
+.delete-location-button:hover {
+  background: #fef2f2;
+
+  border-color: #dc2626;
+}
+
+.delete-location-button:disabled {
+  opacity: 0.6;
+
+  cursor: not-allowed;
+}
+
+
+/* ===============================
+   EMPTY MAP
+================================ */
+
+.map-empty-overlay {
+  position: absolute;
+
+  top: 50%;
+  left: 50%;
+
+  transform:
+    translate(-50%, -50%);
+
+  z-index: 500;
+
+  background: white;
+
+  padding: 12px 20px;
+
+  border-radius: 8px;
+
+  box-shadow:
+    0 4px 12px
+    rgba(0, 0, 0, 0.12);
+
+  font-size: 13px;
+
+  color: #64748b;
+}
+
+
+/* ===============================
+   RESPONSIVE
+================================ */
+
+@media (max-width: 1000px) {
+
+  .location-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .location-map-leaflet {
+    height: 450px;
+  }
+
+}
+
+
+@media (max-width: 600px) {
+
+  .location-card {
+    flex-wrap: wrap;
+  }
+
+  .location-radius {
+    align-items: flex-start;
+  }
+
+  .delete-location-button {
+    width: 100%;
+  }
+
+  .location-map-leaflet {
+    height: 350px;
+  }
+
+}

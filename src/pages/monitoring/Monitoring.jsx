@@ -25,6 +25,10 @@ const formatAttendanceTime = (value) => {
 
 const getEmployeeId = (item) => item.employee_id ?? item.employee?.id ?? item.pegawai?.id;
 
+const getWorkUnitLabel = (workUnit) => (
+  workUnit?.name || workUnit?.nama || workUnit?.unit_name || workUnit?.work_unit_name || ""
+).trim();
+
 const getUnitName = (item, employee, unitsById) => {
   const name = [
     item.unit,
@@ -105,6 +109,7 @@ function Monitoring() {
     year: "numeric",
   }).format(new Date());
   const [data, setData] = useState([]);
+  const [workUnits, setWorkUnits] = useState([]);
   const [summary, setSummary] = useState({
     hadir: 0,
     terlambat: 0,
@@ -166,6 +171,7 @@ function Monitoring() {
       );
       const calculatedSummary = getSummary(normalizedAttendance);
       setData(normalizedAttendance);
+      setWorkUnits(normalizeArray(workUnitsResponse));
 
       setSummary({
         hadir: response.summary?.hadir ?? calculatedSummary.hadir,
@@ -242,16 +248,11 @@ function Monitoring() {
   // UNIT DARI DATA BACKEND
   // =========================
 
-  const units = [
-    ...new Set(
-      data
-        .map(
-          (item) =>
-            item.unit
-        )
-        .filter((item) => item && item !== "-")
-    ),
-  ];
+  const units = [...new Set([
+    ...workUnits.map(getWorkUnitLabel),
+    ...data.map((item) => item.unit),
+  ].filter((item) => item && item !== "-"))]
+    .sort((first, second) => first.localeCompare(second, "id"));
 
   // =========================
   // RENDER

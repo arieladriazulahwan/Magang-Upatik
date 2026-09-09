@@ -142,6 +142,13 @@ const DEFAULT_ROLES = [
   { id: "pegawai", name: "Pegawai", is_system: true, description: "Hanya dashboard" },
 ];
 
+const normalizeRoleName = (value) =>
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
 function Role() {
   const [roles, setRoles] = useState(DEFAULT_ROLES);
   const [selectedRole, setSelectedRole] = useState(null);
@@ -249,7 +256,9 @@ function Role() {
       setError("");
       setMessage("");
 
-      if (!formData.name || formData.name.trim() === "") {
+      const normalizedName = normalizeRoleName(formData.name);
+
+      if (!normalizedName) {
         throw new Error("Nama role wajib diisi.");
       }
 
@@ -263,7 +272,7 @@ function Role() {
       await apiRequest(endpoint, {
         method,
         body: JSON.stringify({
-          name: formData.name,
+          name: normalizedName,
           description: formData.description,
           permissions: formData.permissions,
           is_active: formData.is_active,
@@ -437,7 +446,8 @@ function Role() {
                 <div className="form-grid">
                   <div className="form-field">
                     <label>Nama Role*</label>
-                    <input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="Contoh: Admin Monitoring" required />
+                    <input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="Contoh: admin_monitoring" required />
+                    <small className="field-help">Nama akan disimpan sebagai kode huruf kecil, angka, dan underscore.</small>
                   </div>
 
                   <div className="form-field" style={{ gridColumn: "1 / -1" }}>
