@@ -44,7 +44,7 @@ class LeaveRequest extends Model
 
     public function approvalLogs(): HasMany
     {
-        return $this->hasMany(ApprovalLog::class)->orderBy('sequence');
+        return $this->hasMany(ApprovalLog::class, 'request_id')->orderBy('sequence');
     }
 
     public function attachments(): HasMany

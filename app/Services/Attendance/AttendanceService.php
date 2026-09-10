@@ -11,6 +11,8 @@ use App\Models\ShiftSchedule;
 use App\Models\WfhRequest;
 use App\Models\WorkHourSetting;
 use App\Models\WorkLocation;
+use App\Services\Face\FaceRecognitionException;
+use App\Services\Face\FaceRecognitionService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -28,6 +30,8 @@ use Illuminate\Support\Facades\DB;
  */
 class AttendanceService
 {
+    public function __construct(private readonly FaceRecognitionService $faceRecognition) {}
+
     /**
      * @throws AttendanceValidationException
      */
@@ -117,11 +121,12 @@ class AttendanceService
             $workLocationId = $location->id;
         }
 
-        // --- Face recognition: SKIP (lihat docblock kelas ini) ---
-        $faceResult = $this->verifyFace($data['photo'] ?? null);
+        // Face recognition biometrik belum aktif; tahap ini memastikan pegawai
+        // sudah punya data wajah aktif sebelum foto presensi diterima.
+        $faceResult = $this->verifyFace($employee, $data['photo'] ?? null);
 
         return DB::transaction(function () use (
-            $employee, $today, $type, $shift, $workLocationId, $now,
+            $employee, $today, $type, $mode, $shift, $workLocationId, $now,
             $data, $distanceMeters, $withinRadius, $faceResult, $existing,
         ) {
             $attendance = $existing ?? new Attendance([
@@ -200,7 +205,7 @@ class AttendanceService
             }
         }
 
-        $faceResult = $this->verifyFace($data['photo'] ?? null);
+        $faceResult = $this->verifyFace($employee, $data['photo'] ?? null);
 
         $durationMinutes = (int) $attendance->check_in->diffInMinutes($now);
 
@@ -354,7 +359,9 @@ class AttendanceService
      */
     private function resolveNearestLocation(Employee $employee, float $lat, float $lng): array
     {
-        $locations = WorkLocation::where('work_unit_id', $employee->work_unit_id)
+        $locations = WorkLocation::where(fn ($query) => $query
+                ->whereNull('work_unit_id')
+                ->orWhere('work_unit_id', $employee->work_unit_id))
             ->where('is_active', true)
             ->get();
 
@@ -393,17 +400,39 @@ class AttendanceService
      *
      * @return array{proof_photo: string, similarity_score: ?float, face_matched: bool, liveness_passed: ?bool}
      */
-    private function verifyFace(?string $photoPath): array
+    private function verifyFace(Employee $employee, ?string $photoPath): array
     {
         if (! $photoPath) {
             throw new AttendanceValidationException('Foto presensi wajib disertakan.', 'photo_required');
         }
 
+        $registeredFaces = $employee->activeFaceData()->get();
+
+        if ($registeredFaces->isEmpty()) {
+            throw new AttendanceValidationException(
+                'Wajah belum terdaftar. Silakan daftarkan wajah melalui halaman profil sebelum presensi.',
+                'face_not_registered',
+            );
+        }
+
+        try {
+            $result = $this->faceRecognition->verify($photoPath, $registeredFaces);
+        } catch (FaceRecognitionException $e) {
+            throw new AttendanceValidationException($e->getMessage(), $e->errorKey);
+        }
+
+        if (! ($result['matched'] ?? false)) {
+            throw new AttendanceValidationException(
+                'Verifikasi wajah gagal. Pastikan wajah sesuai dengan data terdaftar dan pencahayaan cukup.',
+                'face_not_matched',
+            );
+        }
+
         return [
             'proof_photo' => $photoPath,
-            'similarity_score' => null,
-            'face_matched' => false, // eksplisit false, BUKAN "diasumsikan lolos"
-            'liveness_passed' => null,
+            'similarity_score' => $result['similarity_score'],
+            'face_matched' => $result['matched'],
+            'liveness_passed' => $result['liveness_passed'],
         ];
     }
 

@@ -71,6 +71,35 @@ class WorkUnit extends Model
     {
         $row = DB::table('v_work_unit')->where('id', $this->id)->first();
 
-        return $row?->ancestor_ids ?? [$this->id];
+        return $this->parsePostgresIdArray($row?->ancestor_ids) ?: [$this->id];
+    }
+
+    private function parsePostgresIdArray(mixed $value): array
+    {
+        if (is_array($value)) {
+            return array_values(array_map('intval', $value));
+        }
+
+        if (! is_string($value)) {
+            return [];
+        }
+
+        $value = trim($value);
+
+        if ($value === '' || $value === '{}') {
+            return [];
+        }
+
+        $value = trim($value, '{}');
+
+        if ($value === '') {
+            return [];
+        }
+
+        return collect(explode(',', $value))
+            ->map(fn (string $id) => (int) trim($id, " \t\n\r\0\x0B\""))
+            ->filter(fn (int $id) => $id > 0)
+            ->values()
+            ->all();
     }
 }

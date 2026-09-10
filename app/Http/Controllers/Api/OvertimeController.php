@@ -118,9 +118,10 @@ class OvertimeController extends Controller
         $actingEmployee = $this->resolveActingEmployee($request->user());
 
         $isOwner = $overtimeRequest->employee_id === $actingEmployee->id;
-        $isGlobalAdmin = $request->user()->hasRole(['super_admin', 'admin_kepegawaian']);
+        $isGlobalAdmin = $request->user()->hasGlobalRole(['super_admin', 'admin_kepegawaian']);
+        $isScopedAdmin = $request->user()->hasRole(['pimpinan', 'admin_unit'], $overtimeRequest->employee->work_unit_id);
 
-        if (! $isOwner && ! $isGlobalAdmin) {
+        if (! $isOwner && ! $isGlobalAdmin && ! $isScopedAdmin) {
             abort(403, 'Anda tidak punya izin untuk membatalkan pengajuan ini.');
         }
 
@@ -161,18 +162,17 @@ class OvertimeController extends Controller
 
     private function applyVisibilityScope(Builder $query, User $user): void
     {
-        if ($user->hasRole(['super_admin', 'admin_kepegawaian'])) {
+        if ($user->hasGlobalRole(['super_admin', 'admin_kepegawaian'])) {
             return;
         }
 
-        $scopeUnitIds = $user->unitScopeFor('pimpinan');
+        $unitIds = $user->scopedUnitIds(['pimpinan', 'admin_unit']);
 
-        if ($scopeUnitIds === null) {
+        if ($unitIds === null) {
             return;
         }
 
-        if (! empty($scopeUnitIds)) {
-            $unitIds = $this->descendantUnitIds($scopeUnitIds);
+        if (! empty($unitIds)) {
             $query->whereHas('employee', fn (Builder $q) => $q->whereIn('work_unit_id', $unitIds));
 
             return;

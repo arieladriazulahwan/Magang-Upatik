@@ -33,10 +33,54 @@ class EnsureRole
     {
         $user = $request->user();
 
-        if (! $user || ! $user->hasRole($roles)) {
+        if (! $user || (! $user->hasRole($roles) && ! $user->hasPermission($this->permissionsFor($request)))) {
             abort(403, 'Anda tidak punya izin untuk mengakses sumber daya ini.');
         }
 
         return $next($request);
+    }
+
+    private function permissionsFor(Request $request): array
+    {
+        $method = $request->method();
+        $action = match ($method) {
+            'GET', 'HEAD' => 'view',
+            'POST' => 'create',
+            'PUT', 'PATCH' => 'edit',
+            'DELETE' => 'delete',
+            default => 'view',
+        };
+
+        $pathPermissions = [
+            'api/dashboard*' => ['dashboard'],
+            'api/monitoring*' => ['monitoring'],
+            'api/employees*' => ['pegawai.'.$action],
+            'api/work-units*' => ['unit.'.$action],
+            'api/shifts*' => ['shift.'.$action],
+            'api/shift-schedules*' => ['jadwal.'.($action === 'view' ? 'view' : 'edit')],
+            'api/attendance-locations*' => ['lokasi.'.$action],
+            'api/attendances*' => ['monitoring', 'verifikasi.view'],
+            'api/attendance-corrections*' => ['verifikasi.view', 'verifikasi.approve'],
+            'api/leave-requests*' => ['pengajuan.view', 'persetujuan.view'],
+            'api/wfh-requests*' => ['pengajuan.view', 'persetujuan.view'],
+            'api/overtime-requests*' => ['pengajuan.view', 'persetujuan.view'],
+            'api/official-travel-requests*' => ['pengajuan.view', 'persetujuan.view'],
+            'api/reports*' => ['laporan.view'],
+            'api/holidays*' => ['kalender.'.($action === 'view' ? 'view' : 'edit')],
+            'api/settings*' => ['pengaturan.'.($action === 'view' ? 'view' : 'edit')],
+            'api/app-settings*' => ['pengaturan.'.($action === 'view' ? 'view' : 'edit')],
+            'api/siga8-role-mappings*' => ['siga8.'.($action === 'view' ? 'view' : 'edit')],
+            'api/roles*' => [$action === 'view' ? 'role.view' : 'role.manage'],
+            'api/permissions*' => ['role.view', 'role.manage'],
+            'api/admin-users*' => ['role.manage'],
+        ];
+
+        foreach ($pathPermissions as $pattern => $permissions) {
+            if ($request->is($pattern)) {
+                return $permissions;
+            }
+        }
+
+        return [];
     }
 }

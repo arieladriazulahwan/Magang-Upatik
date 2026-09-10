@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Support\Facades\DB;
 
 class User extends Authenticatable
 {
@@ -61,6 +62,25 @@ class User extends Authenticatable
             ->contains(fn (RoleUser $ru) => $workUnitId === null || $ru->coversUnit($workUnitId));
     }
 
+    public function hasPermission(array|string $permissionNames): bool
+    {
+        $permissionNames = (array) $permissionNames;
+
+        return $this->roleUsers()
+            ->whereHas('role.permissions', fn ($q) => $q->whereIn('name', $permissionNames))
+            ->exists();
+    }
+
+    public function hasGlobalRole(array|string $roleNames): bool
+    {
+        $roleNames = (array) $roleNames;
+
+        return $this->roleUsers()
+            ->whereNull('work_unit_id')
+            ->whereHas('role', fn ($q) => $q->whereIn('name', $roleNames))
+            ->exists();
+    }
+
     /** Daftar unit_id yang menjadi cakupan peran tertentu user ini (null = global/semua). */
     public function unitScopeFor(string $roleName): ?array
     {
@@ -73,5 +93,36 @@ class User extends Authenticatable
         }
 
         return $rows->pluck('work_unit_id')->filter()->unique()->values()->all();
+    }
+
+    public function scopedUnitIds(array $roleNames = ['pimpinan', 'admin_unit']): ?array
+    {
+        if ($this->hasGlobalRole(['super_admin', 'admin_kepegawaian'])) {
+            return null;
+        }
+
+        $roots = [];
+
+        foreach ($roleNames as $roleName) {
+            $scope = $this->unitScopeFor($roleName);
+
+            if ($scope === null) {
+                return null;
+            }
+
+            $roots = array_merge($roots, $scope);
+        }
+
+        if (empty($roots)) {
+            return $this->employee?->work_unit_id ? [$this->employee->work_unit_id] : [];
+        }
+
+        $arrayLiteral = '{'.implode(',', array_map('intval', array_unique($roots))).'}';
+
+        return DB::table('v_work_unit')
+            ->whereRaw('ancestor_ids && ?::bigint[]', [$arrayLiteral])
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
     }
 }

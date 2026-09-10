@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\ShiftController;
 use App\Http\Controllers\Api\ShiftScheduleController;
 use App\Http\Controllers\Api\StructuralPositionController;
 use App\Http\Controllers\Api\WorkHourSettingController;
+use App\Http\Controllers\Api\WorkLocationController;
 use App\Http\Controllers\Api\WorkUnitController;
 use App\Http\Controllers\Api\LeaveRequestController;
 use App\Http\Controllers\Api\WfhController;
@@ -16,7 +17,13 @@ use App\Http\Controllers\Api\OvertimeController;
 use App\Http\Controllers\Api\Siga8RoleMappingController;
 use App\Http\Controllers\Api\AppSettingController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\FaceController;
+use App\Http\Controllers\Api\PermissionController;
 use App\Http\Controllers\Api\ReportController;
+use App\Http\Controllers\Api\RoleController;
+use App\Http\Controllers\Api\UserRoleController;
+use App\Models\User;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Route;
 
 
@@ -53,9 +60,12 @@ Route::middleware('auth:sanctum')->group(function () {
     // store/update/destroy/link-user: HANYA admin (tidak ada scoping
     // per-baris yang masuk akal untuk operasi tulis ini, jadi middleware
     // role: di route sudah cukup, tidak perlu duplikasi cek di controller).
-    Route::middleware('role:super_admin,admin_kepegawaian')->group(function () {
+    Route::middleware('role:super_admin,admin_kepegawaian,admin_unit')->group(function () {
         Route::post('/employees', [EmployeeController::class, 'store']);
         Route::patch('/employees/{employee}', [EmployeeController::class, 'update']);
+    });
+
+    Route::middleware('role:super_admin,admin_kepegawaian')->group(function () {
         Route::delete('/employees/{employee}', [EmployeeController::class, 'destroy']);
         Route::post('/employees/{employee}/link-user', [EmployeeController::class, 'linkUser']);
     });
@@ -67,6 +77,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // ---- Jam kerja, shift, hari libur (PRD 5.2-5.3, 5.6, 5.10) ----
     Route::get('/work-hour-settings', [WorkHourSettingController::class, 'index']);
+    Route::get('/work-locations', [WorkLocationController::class, 'index']);
     Route::get('/shifts', [ShiftController::class, 'index']);
     Route::get('/shift-schedules', [ShiftScheduleController::class, 'index']);
     Route::get('/holidays', [HolidayController::class, 'index']);
@@ -75,6 +86,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/work-hour-settings', [WorkHourSettingController::class, 'store']);
         Route::patch('/work-hour-settings/{workHourSetting}', [WorkHourSettingController::class, 'update']);
         Route::post('/holidays', [HolidayController::class, 'store']);
+        Route::post('/holidays/sync-from-google', [HolidayController::class, 'syncFromGoogle']);
+        Route::post('/holidays/sync-to-google', [HolidayController::class, 'syncToGoogle']);
         Route::delete('/holidays/{holiday}', [HolidayController::class, 'destroy']);
     });
 
@@ -83,9 +96,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('role:super_admin,admin_unit')->group(function () {
         Route::post('/shifts', [ShiftController::class, 'store']);
         Route::patch('/shifts/{shift}', [ShiftController::class, 'update']);
+        Route::post('/work-locations', [WorkLocationController::class, 'store']);
+        Route::patch('/work-locations/{workLocation}', [WorkLocationController::class, 'update']);
+        Route::delete('/work-locations/{workLocation}', [WorkLocationController::class, 'destroy']);
     });
 
-    Route::middleware('role:super_admin,admin_unit,admin_kepegawaian')->group(function () {
+    Route::middleware('role:super_admin,admin_unit')->group(function () {
         Route::post('/shift-schedules', [ShiftScheduleController::class, 'store']);
         Route::post('/shift-schedules/bulk', [ShiftScheduleController::class, 'bulkStore']);
         Route::delete('/shift-schedules/{shiftSchedule}', [ShiftScheduleController::class, 'destroy']);
@@ -102,6 +118,11 @@ Route::middleware('auth:sanctum')->group(function () {
     // ditangani di controller, sama alasannya dg EmployeeController@index).
     Route::patch('/attendance/{attendance}/correct', [AttendanceController::class, 'correct']);
     Route::post('/attendance/{employee}/mark-present', [AttendanceController::class, 'markPresent']);
+
+    // ---- Face enrollment/verifikasi awal ----
+    Route::get('/face/status', [FaceController::class, 'status']);
+    Route::post('/face/enroll', [FaceController::class, 'enroll']);
+    Route::post('/face/verify', [FaceController::class, 'verify']);
 
 
         // ---- WFH (PRD 5.5) ----
@@ -129,6 +150,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // docblock NotificationService) — baru pengajuan baru & hasil keputusan
     // (Cuti + WFH) yang sudah aktif mengirim notifikasi.
     Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::post('/notifications', [NotificationController::class, 'store']);
     Route::patch('/notifications/{notification}/read', [NotificationController::class, 'markRead']);
     Route::patch('/notifications/read-all', [NotificationController::class, 'markAllRead']);
 
@@ -147,8 +169,19 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('/siga8-role-mappings/{siga8RoleMapping}', [Siga8RoleMappingController::class, 'update']);
         Route::delete('/siga8-role-mappings/{siga8RoleMapping}', [Siga8RoleMappingController::class, 'destroy']);
 
+        Route::get('/roles', [RoleController::class, 'index']);
+        Route::post('/roles', [RoleController::class, 'store']);
+        Route::put('/roles/{role}', [RoleController::class, 'update']);
+        Route::patch('/roles/{role}', [RoleController::class, 'update']);
+        Route::delete('/roles/{role}', [RoleController::class, 'destroy']);
+        Route::get('/permissions', [PermissionController::class, 'index']);
+        Route::get('/admin-users', [UserRoleController::class, 'index']);
+        Route::put('/admin-users/{user}/roles', [UserRoleController::class, 'sync']);
+
         Route::get('/app-settings', [AppSettingController::class, 'index']);
         Route::post('/app-settings', [AppSettingController::class, 'upsert']);
+        Route::get('/settings', [AppSettingController::class, 'index']);
+        Route::patch('/settings/{key}', [AppSettingController::class, 'updateByKey']);
     });
 
         // ---- Dashboard (PRD 5.13) ----
@@ -203,14 +236,78 @@ if (app()->environment('local')) {
                     'level' => 1,
                 ],
             ],
+
+            'kepegawaian-test' => [
+                'password' => 'dummy-password',
+                'user_id' => 'mock-kepegawaian-001',
+                'full_name' => 'Test Admin Kepegawaian',
+                'level' => 1,
+                'role' => [
+                    'id' => 'mock-role-admin-kepegawaian',
+                    'name' => 'Admin Kepegawaian',
+                    'level' => 1,
+                ],
+            ],
+
+            'unit-test' => [
+                'password' => 'dummy-password',
+                'user_id' => 'mock-unit-001',
+                'full_name' => 'Test Admin Unit',
+                'level' => 1,
+                'role' => [
+                    'id' => 'mock-role-admin-unit',
+                    'name' => 'Admin Unit',
+                    'level' => 1,
+                ],
+            ],
+
+            'pimpinan-test' => [
+                'password' => 'dummy-password',
+                'user_id' => 'mock-pimpinan-001',
+                'full_name' => 'Test Pimpinan',
+                'level' => 1,
+                'role' => [
+                    'id' => 'mock-role-pimpinan',
+                    'name' => 'Pimpinan',
+                    'level' => 1,
+                ],
+            ],
         ];
 
-        // Username tidak ditemukan
         if (! isset($accounts[$username])) {
+            $user = User::with(['employee.workUnit', 'roleUsers.role', 'roleUsers.workUnit'])
+                ->where('username', $username)
+                ->where('is_active', true)
+                ->first();
+
+            if (! $user || ! $user->password || ! Hash::check($password, $user->password)) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Username atau password salah.',
+                ], 401);
+            }
+
             return response()->json([
-                'status' => false,
-                'message' => 'Username atau password salah.',
-            ], 401);
+                'status' => true,
+                'message' => 'Login berhasil',
+                'data' => [
+                    'token' => 'mock-siga8-token-' . ($user->siga8_user_id ?: 'db-user-' . $user->id),
+                    'user' => [
+                        'user_id' => $user->siga8_user_id ?: 'db-user-' . $user->id,
+                        'username' => $user->username,
+                        'full_name' => $user->full_name ?: $user->employee?->name,
+                        'level' => $user->level ?? 1,
+                        'faculty_code' => $user->faculty_code ?: $user->employee?->workUnit?->code,
+                        'faculty_name' => $user->faculty_name ?: $user->employee?->workUnit?->name,
+                        'study_programs_code' => $user->study_programs_code,
+                        'roles' => $user->roleUsers->map(fn ($roleUser) => [
+                            'id' => $roleUser->siga8_role_id ?: 'local-role-' . $roleUser->role->name,
+                            'name' => $roleUser->role->name,
+                            'level' => $roleUser->role->name === 'employee' ? 1 : 2,
+                        ])->values()->all(),
+                    ],
+                ],
+            ]);
         }
 
         $account = $accounts[$username];

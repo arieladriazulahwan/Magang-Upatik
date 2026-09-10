@@ -114,7 +114,7 @@ class AuthController extends Controller
 
     private function serializeUser(\App\Models\User $user): array
     {
-        $user->load(['employee.workUnit', 'roleUsers.role', 'roleUsers.workUnit']);
+        $user->load(['employee.workUnit', 'roleUsers.role.permissions', 'roleUsers.workUnit']);
 
         return [
             'id' => $user->id,
@@ -133,7 +133,12 @@ class AuthController extends Controller
                 'work_unit_id' => $ru->work_unit_id,
                 'work_unit_name' => $ru->workUnit?->name,
                 'source' => $ru->source,
+                'permissions' => $ru->role?->permissions?->pluck('name')->values()->all() ?? [],
             ])->values(),
+            'permissions' => $user->roleUsers
+                ->flatMap(fn ($ru) => $ru->role?->permissions?->pluck('name') ?? collect())
+                ->unique()
+                ->values(),
         ];
     }
 }

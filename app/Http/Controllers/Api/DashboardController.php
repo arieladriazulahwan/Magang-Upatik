@@ -168,7 +168,7 @@ class DashboardController extends Controller
      */
     private function resolveViewableUnitIds(Request $request, User $user): array
     {
-        if ($user->hasRole(['super_admin', 'admin_kepegawaian'])) {
+        if ($user->hasGlobalRole(['super_admin', 'admin_kepegawaian'])) {
             $workUnitId = $request->validate(['work_unit_id' => ['required', 'integer']])['work_unit_id'];
 
             return $this->descendantUnitIds([$workUnitId]);

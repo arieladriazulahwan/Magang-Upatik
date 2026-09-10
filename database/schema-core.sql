@@ -98,7 +98,7 @@ SELECT * FROM tree;
 
 CREATE TABLE work_location (
     id              BIGSERIAL PRIMARY KEY,
-    work_unit_id   BIGINT NOT NULL REFERENCES work_unit(id) ON DELETE CASCADE,
+    work_unit_id   BIGINT REFERENCES work_unit(id) ON DELETE CASCADE,
     name            VARCHAR(150) NOT NULL,           -- mis. "Gedung Utama FATEK"
     address          TEXT,
     latitude        DECIMAL(10,7) NOT NULL,          -- titik pusat geofence
@@ -108,7 +108,7 @@ CREATE TABLE work_location (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-COMMENT ON TABLE work_location IS 'Satu unit kerja dapat memiliki banyak titik lokasi presensi (geofence)';
+COMMENT ON TABLE work_location IS 'Titik lokasi presensi (geofence). work_unit_id NULL berarti lokasi global untuk semua unit';
 
 CREATE TABLE structural_position (
     id              BIGSERIAL PRIMARY KEY,
@@ -599,9 +599,9 @@ INSERT INTO roles (name, description) VALUES
  ('employee','Pegawai biasa');
 
 INSERT INTO work_hour_setting (work_unit_id, category, min_minutes, standard_check_in, late_threshold, standard_check_out) VALUES
- (NULL,'dosen',120,'07:30','08:00','16:00'),
- (NULL,'dosen_tugas_tambahan',240,'07:30','08:00','16:00'),
- (NULL,'tenaga_kependidikan',480,'07:30','08:00','16:00');
+ (NULL,'dosen',120,NULL,NULL,NULL),
+ (NULL,'dosen_tugas_tambahan',240,NULL,NULL,NULL),
+ (NULL,'tenaga_kependidikan',480,'08:00','08:30','16:00');
 
 INSERT INTO leave_type (code,name,category,for_pns,for_pppk,min_service_months,max_days,max_accumulated_days,expires_after_years,reduces_annual_leave,requires_attachment,requires_doctor_letter,is_paid,counts_as_service,description) VALUES
  ('cuti_tahunan','Cuti Tahunan','cuti',TRUE,TRUE,12,12,18,2,FALSE,FALSE,FALSE,TRUE,TRUE,'Hak 12 hari; akumulasi maks 18; hangus jika 2 thn tak dipakai'),

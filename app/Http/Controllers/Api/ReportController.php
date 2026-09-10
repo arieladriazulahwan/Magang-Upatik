@@ -96,6 +96,11 @@ class ReportController extends Controller
             $query->whereIn('employee.work_unit_id', $unitIds);
         }
 
+        $allowedUnitIds = $request->user()?->scopedUnitIds();
+        if ($allowedUnitIds !== null) {
+            $query->whereIn('employee.work_unit_id', $allowedUnitIds);
+        }
+
         $recap = $query
             ->selectRaw("
                 employee.id as employee_id, employee.name as employee_name, employee.nip,
@@ -131,6 +136,11 @@ class ReportController extends Controller
         if (isset($filters['work_unit_id'])) {
             $unitIds = $this->descendantUnitIds([$filters['work_unit_id']]);
             $query->whereIn('employee.work_unit_id', $unitIds);
+        }
+
+        $allowedUnitIds = $request->user()?->scopedUnitIds();
+        if ($allowedUnitIds !== null) {
+            $query->whereIn('employee.work_unit_id', $allowedUnitIds);
         }
 
         $recap = $query

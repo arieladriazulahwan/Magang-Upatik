@@ -33,6 +33,7 @@ class RoleSyncService
             $siga8RoleIds = array_column($siga8Roles, 'id');
 
             $mappings = Siga8RoleMapping::query()
+                ->with('role:id,name')
                 ->whereIn('siga8_role_id', $siga8RoleIds)
                 ->where('is_active', true)
                 ->get();
@@ -46,7 +47,7 @@ class RoleSyncService
                         'role_id' => $mapping->role_id,
                         // work_unit_id ikut kunci unik composite di DB (lihat
                         // uq_role_user); NULL dianggap "global" oleh index itu.
-                        'work_unit_id' => $mapping->work_unit_id,
+                        'work_unit_id' => $this->roleUsesScopedUnit($mapping->role?->name) ? $mapping->work_unit_id : null,
                     ],
                     [
                         'source' => 'siga8',
@@ -65,5 +66,10 @@ class RoleSyncService
                 ->whereNotIn('siga8_role_id', $matchedSiga8RoleIds ?: ['__none__'])
                 ->delete();
         });
+    }
+
+    private function roleUsesScopedUnit(?string $roleName): bool
+    {
+        return in_array($roleName, ['pimpinan', 'admin_unit'], true);
     }
 }

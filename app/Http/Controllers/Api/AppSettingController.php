@@ -7,6 +7,7 @@ use App\Http\Requests\UpsertAppSettingRequest;
 use App\Models\ActivityLog;
 use App\Models\AppSetting;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class AppSettingController extends Controller
 {
@@ -21,6 +22,24 @@ class AppSettingController extends Controller
     {
         $data = $request->validated();
 
+        return $this->saveSetting($data);
+    }
+
+    public function updateByKey(Request $request, string $key): JsonResponse
+    {
+        $data = $request->validate([
+            'value' => ['nullable', 'string'],
+            'data_type' => ['sometimes', 'in:string,boolean,int,float'],
+            'description' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $data['key'] = $key;
+
+        return $this->saveSetting($data);
+    }
+
+    private function saveSetting(array $data): JsonResponse
+    {
         $setting = AppSetting::updateOrCreate(
             ['key' => $data['key']],
             [

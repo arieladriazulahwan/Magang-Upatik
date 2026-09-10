@@ -151,7 +151,7 @@ class LeaveRequestService
 
         return match ($approverRole) {
             'atasan_langsung' => $user->hasRole(['pimpinan'], $requestingEmployee->work_unit_id),
-            'admin_kepegawaian' => $user->hasRole(['admin_kepegawaian']),
+            'admin_kepegawaian' => $user->hasGlobalRole(['admin_kepegawaian']),
             default => false,
         };
     }
@@ -235,6 +235,19 @@ class LeaveRequestService
 
         if ($steps->isEmpty()) {
             $steps = ApprovalFlow::whereNull('leave_type_id')->orderBy('sequence')->get();
+        }
+
+        if ($steps->isEmpty()) {
+            $steps = collect([
+                (object) [
+                    'sequence' => 1,
+                    'approver_role' => 'atasan_langsung',
+                ],
+                (object) [
+                    'sequence' => 2,
+                    'approver_role' => 'admin_kepegawaian',
+                ],
+            ]);
         }
 
         foreach ($steps as $step) {

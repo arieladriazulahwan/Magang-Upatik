@@ -73,7 +73,12 @@ class AttendanceController extends Controller
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
         ]);
 
-        $query = Attendance::query()->with(['employee:id,name,nip,work_unit_id', 'shift:id,name', 'workLocation:id,name']);
+        $query = Attendance::query()->with([
+            'employee:id,name,nip,work_unit_id',
+            'employee.workUnit:id,name,code',
+            'shift:id,name',
+            'workLocation:id,name',
+        ]);
 
         $this->applyVisibilityScope($query, $request->user());
 
@@ -114,7 +119,13 @@ class AttendanceController extends Controller
 
     public function show(Request $request, Attendance $attendance): JsonResponse
     {
-        $attendance->load(['employee:id,name,nip,work_unit_id', 'shift:id,name', 'workLocation:id,name', 'verifiedBy:id,username,full_name']);
+        $attendance->load([
+            'employee:id,name,nip,work_unit_id',
+            'employee.workUnit:id,name,code',
+            'shift:id,name',
+            'workLocation:id,name',
+            'verifiedBy:id,username,full_name',
+        ]);
 
         $this->assertCanView($request->user(), $attendance->employee);
 
@@ -178,7 +189,7 @@ class AttendanceController extends Controller
 
     private function assertCanView(User $user, Employee $employee): void
     {
-        if ($user->hasRole(['super_admin', 'admin_kepegawaian'])) {
+        if ($user->hasGlobalRole(['super_admin', 'admin_kepegawaian'])) {
             return;
         }
 
@@ -195,7 +206,7 @@ class AttendanceController extends Controller
 
     private function assertCanCorrect(User $user, Employee $employee): void
     {
-        if ($user->hasRole(['super_admin', 'admin_kepegawaian'])) {
+        if ($user->hasGlobalRole(['super_admin', 'admin_kepegawaian'])) {
             return;
         }
 
@@ -208,7 +219,7 @@ class AttendanceController extends Controller
 
     private function applyVisibilityScope(Builder $query, User $user): void
     {
-        if ($user->hasRole(['super_admin', 'admin_kepegawaian'])) {
+        if ($user->hasGlobalRole(['super_admin', 'admin_kepegawaian'])) {
             return;
         }
 
@@ -273,6 +284,8 @@ class AttendanceController extends Controller
                 'id' => $attendance->employee->id,
                 'name' => $attendance->employee->name,
                 'nip' => $attendance->employee->nip,
+                'work_unit_id' => $attendance->employee->work_unit_id,
+                'work_unit' => $attendance->employee->workUnit?->only(['id', 'name', 'code']),
             ] : null,
             'date' => $attendance->date?->toDateString(),
             'type' => $attendance->type,

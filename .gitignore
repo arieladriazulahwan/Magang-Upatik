@@ -3,6 +3,11 @@
 .env
 .env.backup
 .env.production
+tes-api-*.json
+google-calendar-service-account*.json
+database/data pegawai/
+scripts/__pycache__/
+*.pyc
 .phpactor.json
 .phpunit.result.cache
 /.codex

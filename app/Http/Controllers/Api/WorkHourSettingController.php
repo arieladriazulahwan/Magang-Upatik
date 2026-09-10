@@ -25,6 +25,12 @@ class WorkHourSettingController extends Controller
         if (array_key_exists('work_unit_id', $filters)) {
             $query->where('work_unit_id', $filters['work_unit_id']);
         }
+
+        $allowedUnitIds = $request->user()?->scopedUnitIds();
+        if ($allowedUnitIds !== null) {
+            $query->where(fn ($q) => $q->whereNull('work_unit_id')->orWhereIn('work_unit_id', $allowedUnitIds));
+        }
+
         if (isset($filters['category'])) {
             $query->where('category', $filters['category']);
         }
@@ -41,20 +47,42 @@ class WorkHourSettingController extends Controller
 
     public function store(StoreWorkHourSettingRequest $request): JsonResponse
     {
-        $setting = WorkHourSetting::create($request->validated());
+        $data = $request->validated();
+        $this->assertUnitInScope($request, $data['work_unit_id'] ?? null);
 
-        ActivityLog::record('work_hour_setting.create', $setting, $request->validated());
+        $setting = WorkHourSetting::create($data);
+
+        ActivityLog::record('work_hour_setting.create', $setting, $data);
 
         return response()->json(['data' => $this->serialize($setting)], 201);
     }
 
     public function update(UpdateWorkHourSettingRequest $request, WorkHourSetting $workHourSetting): JsonResponse
     {
-        $workHourSetting->update($request->validated());
+        $data = $request->validated();
+        $this->assertUnitInScope($request, $workHourSetting->work_unit_id);
 
-        ActivityLog::record('work_hour_setting.update', $workHourSetting, $request->validated());
+        if (array_key_exists('work_unit_id', $data)) {
+            $this->assertUnitInScope($request, $data['work_unit_id']);
+        }
+
+        $workHourSetting->update($data);
+
+        ActivityLog::record('work_hour_setting.update', $workHourSetting, $data);
 
         return response()->json(['data' => $this->serialize($workHourSetting)]);
+    }
+
+    private function assertUnitInScope(Request $request, ?int $workUnitId): void
+    {
+        if ($workUnitId === null) {
+            return;
+        }
+
+        $allowedUnitIds = $request->user()?->scopedUnitIds();
+        if ($allowedUnitIds !== null && ! in_array($workUnitId, $allowedUnitIds, true)) {
+            abort(403, 'Anda tidak punya izin mengelola aturan jam kerja unit lain.');
+        }
     }
 
     private function serialize(WorkHourSetting $setting): array

@@ -18,6 +18,7 @@ class FaceData extends Model
     protected $casts = [
         'is_active' => 'boolean',
         'quality' => 'float',
+        'created_at' => 'datetime',
     ];
 
     public function employee(): BelongsTo

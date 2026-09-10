@@ -39,6 +39,32 @@ class NotificationController extends Controller
         ]);
     }
 
+    public function store(Request $request): JsonResponse
+    {
+        $employee = $this->resolveActingEmployee($request);
+
+        $data = $request->validate([
+            'title' => ['required', 'string', 'max:150'],
+            'message' => ['nullable', 'string', 'max:1000'],
+            'type' => ['nullable', 'string', 'max:50'],
+            'target_url' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $notification = AppNotification::create([
+            'employee_id' => $employee->id,
+            'title' => $data['title'],
+            'message' => $data['message'] ?? null,
+            'type' => $data['type'] ?? 'aktivitas',
+            'target_url' => $data['target_url'] ?? null,
+        ]);
+
+        ActivityLog::record('notification.create', $notification, [
+            'type' => $notification->type,
+        ]);
+
+        return response()->json(['data' => $this->serialize($notification)], 201);
+    }
+
     public function markRead(Request $request, AppNotification $notification): JsonResponse
     {
         $employee = $this->resolveActingEmployee($request);

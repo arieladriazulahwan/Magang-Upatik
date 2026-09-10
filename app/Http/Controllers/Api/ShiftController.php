@@ -24,6 +24,12 @@ class ShiftController extends Controller
         if (isset($filters['work_unit_id'])) {
             $query->where('work_unit_id', $filters['work_unit_id']);
         }
+
+        $allowedUnitIds = $request->user()?->scopedUnitIds();
+        if ($allowedUnitIds !== null) {
+            $query->whereIn('work_unit_id', $allowedUnitIds);
+        }
+
         if (isset($filters['is_active'])) {
             $query->where('is_active', $filters['is_active']);
         }
@@ -37,20 +43,42 @@ class ShiftController extends Controller
 
     public function store(StoreShiftRequest $request): JsonResponse
     {
-        $shift = Shift::create($request->validated());
+        $data = $request->validated();
+        $this->assertUnitInScope($request, $data['work_unit_id']);
 
-        ActivityLog::record('shift.create', $shift, $request->validated());
+        $shift = Shift::create($data);
+
+        ActivityLog::record('shift.create', $shift, $data);
 
         return response()->json(['data' => $this->serialize($shift)], 201);
     }
 
     public function update(UpdateShiftRequest $request, Shift $shift): JsonResponse
     {
-        $shift->update($request->validated());
+        $data = $request->validated();
+        $this->assertUnitInScope($request, $shift->work_unit_id);
 
-        ActivityLog::record('shift.update', $shift, $request->validated());
+        if (isset($data['work_unit_id'])) {
+            $this->assertUnitInScope($request, $data['work_unit_id']);
+        }
+
+        $shift->update($data);
+
+        ActivityLog::record('shift.update', $shift, $data);
 
         return response()->json(['data' => $this->serialize($shift)]);
+    }
+
+    private function assertUnitInScope(Request $request, ?int $workUnitId): void
+    {
+        if ($workUnitId === null) {
+            return;
+        }
+
+        $allowedUnitIds = $request->user()?->scopedUnitIds();
+        if ($allowedUnitIds !== null && ! in_array($workUnitId, $allowedUnitIds, true)) {
+            abort(403, 'Anda tidak punya izin mengelola shift unit lain.');
+        }
     }
 
     private function serialize(Shift $shift): array

@@ -129,9 +129,10 @@ class WfhController extends Controller
         $actingEmployee = $this->resolveActingEmployee($request->user());
 
         $isOwner = $wfhRequest->employee_id === $actingEmployee->id;
-        $isGlobalAdmin = $request->user()->hasRole(['super_admin', 'admin_kepegawaian']);
+        $isGlobalAdmin = $request->user()->hasGlobalRole(['super_admin', 'admin_kepegawaian']);
+        $isScopedAdmin = $request->user()->hasRole(['pimpinan', 'admin_unit'], $wfhRequest->employee->work_unit_id);
 
-        if (! $isOwner && ! $isGlobalAdmin) {
+        if (! $isOwner && ! $isGlobalAdmin && ! $isScopedAdmin) {
             abort(403, 'Anda tidak punya izin untuk membatalkan pengajuan ini.');
         }
 
@@ -196,7 +197,7 @@ class WfhController extends Controller
 
     private function assertCanView(User $user, Employee $employee): void
     {
-        if ($user->hasRole(['super_admin', 'admin_kepegawaian'])) {
+        if ($user->hasGlobalRole(['super_admin', 'admin_kepegawaian'])) {
             return;
         }
         if ($user->hasRole(['pimpinan', 'admin_unit'], $employee->work_unit_id)) {
@@ -211,7 +212,7 @@ class WfhController extends Controller
 
     private function assertCanDecide(User $user, Employee $employee): void
     {
-        if ($user->hasRole(['super_admin', 'admin_kepegawaian'])) {
+        if ($user->hasGlobalRole(['super_admin', 'admin_kepegawaian'])) {
             return;
         }
         if ($user->hasRole(['pimpinan', 'admin_unit'], $employee->work_unit_id)) {
@@ -223,7 +224,7 @@ class WfhController extends Controller
 
     private function applyVisibilityScope(Builder $query, User $user): void
     {
-        if ($user->hasRole(['super_admin', 'admin_kepegawaian'])) {
+        if ($user->hasGlobalRole(['super_admin', 'admin_kepegawaian'])) {
             return;
         }
 

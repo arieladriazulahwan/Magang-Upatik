@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\WorkUnit;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -16,15 +17,28 @@ use Illuminate\Support\Facades\DB;
 class WorkUnitController extends Controller
 {
     /** Pohon lengkap via v_work_unit (breadcrumb, level, ancestor_ids sudah dihitung DB). */
-    public function tree(): JsonResponse
+    public function tree(Request $request): JsonResponse
     {
-        $rows = DB::table('v_work_unit')->orderBy('path')->get();
+        $query = DB::table('v_work_unit')->orderBy('path');
+        $unitIds = $request->user()?->scopedUnitIds();
+
+        if ($unitIds !== null) {
+            $query->whereIn('id', $unitIds);
+        }
+
+        $rows = $query->get();
 
         return response()->json(['data' => $rows]);
     }
 
-    public function show(WorkUnit $workUnit): JsonResponse
+    public function show(Request $request, WorkUnit $workUnit): JsonResponse
     {
+        $unitIds = $request->user()?->scopedUnitIds();
+
+        if ($unitIds !== null && ! in_array($workUnit->id, $unitIds, true)) {
+            abort(403, 'Anda tidak punya izin untuk melihat unit kerja ini.');
+        }
+
         $workUnit->load('locations');
 
         return response()->json([

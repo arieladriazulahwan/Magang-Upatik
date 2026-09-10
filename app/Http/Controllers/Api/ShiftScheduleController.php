@@ -23,7 +23,12 @@ class ShiftScheduleController extends Controller
             'date_to' => ['sometimes', 'date', 'after_or_equal:date_from'],
         ]);
 
-        $query = ShiftSchedule::query()->with(['employee:id,name,nip', 'shift:id,name,work_unit_id']);
+        $query = ShiftSchedule::query()->with(['employee:id,name,nip,work_unit_id', 'shift:id,name,work_unit_id']);
+
+        $allowedUnitIds = $request->user()?->scopedUnitIds();
+        if ($allowedUnitIds !== null) {
+            $query->whereHas('employee', fn ($q) => $q->whereIn('work_unit_id', $allowedUnitIds));
+        }
 
         if (isset($filters['employee_id'])) {
             $query->where('employee_id', $filters['employee_id']);
@@ -48,6 +53,8 @@ class ShiftScheduleController extends Controller
     public function store(StoreShiftScheduleRequest $request): JsonResponse
     {
         $data = $request->validated();
+        $this->assertEmployeeInScope($request, $data['employee_id']);
+        $this->assertShiftInScope($request, $data['shift_id']);
 
         $this->assertNoExistingScheduleOtherShift($data['employee_id'], $data['date'], $data['shift_id']);
 
@@ -64,6 +71,11 @@ class ShiftScheduleController extends Controller
     {
         $data = $request->validated();
         $shift = Shift::findOrFail($data['shift_id']);
+        $this->assertShiftInScope($request, $shift->id);
+
+        foreach ($data['employee_ids'] as $employeeId) {
+            $this->assertEmployeeInScope($request, $employeeId);
+        }
 
         $created = [];
         $skipped = [];
@@ -116,10 +128,49 @@ class ShiftScheduleController extends Controller
 
     public function destroy(Request $request, ShiftSchedule $shiftSchedule): JsonResponse
     {
+        $shiftSchedule->loadMissing('employee:id,work_unit_id');
+        $allowedUnitIds = $request->user()?->scopedUnitIds();
+        if ($allowedUnitIds !== null && ! in_array($shiftSchedule->employee?->work_unit_id, $allowedUnitIds, true)) {
+            abort(403, 'Anda tidak punya izin menghapus jadwal shift unit lain.');
+        }
+
         ActivityLog::record('shift_schedule.delete', $shiftSchedule);
         $shiftSchedule->delete();
 
         return response()->json(['message' => 'Jadwal shift berhasil dihapus.']);
+    }
+
+    private function assertEmployeeInScope(Request $request, int $employeeId): void
+    {
+        $allowedUnitIds = $request->user()?->scopedUnitIds();
+        if ($allowedUnitIds === null) {
+            return;
+        }
+
+        $exists = DB::table('employee')
+            ->where('id', $employeeId)
+            ->whereIn('work_unit_id', $allowedUnitIds)
+            ->exists();
+
+        if (! $exists) {
+            abort(403, 'Anda tidak punya izin mengatur jadwal pegawai unit lain.');
+        }
+    }
+
+    private function assertShiftInScope(Request $request, int $shiftId): void
+    {
+        $allowedUnitIds = $request->user()?->scopedUnitIds();
+        if ($allowedUnitIds === null) {
+            return;
+        }
+
+        $exists = Shift::where('id', $shiftId)
+            ->whereIn('work_unit_id', $allowedUnitIds)
+            ->exists();
+
+        if (! $exists) {
+            abort(403, 'Anda tidak punya izin memakai shift unit lain.');
+        }
     }
 
     private function assertNoExistingScheduleOtherShift(int $employeeId, string $date, int $shiftId): void

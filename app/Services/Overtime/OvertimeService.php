@@ -138,7 +138,7 @@ class OvertimeService
 
     public function canDecide(User $user, Employee $employee): bool
     {
-        if ($user->hasRole(['super_admin', 'admin_kepegawaian'])) {
+        if ($user->hasGlobalRole(['super_admin', 'admin_kepegawaian'])) {
             return true;
         }
 

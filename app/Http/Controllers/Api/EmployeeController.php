@@ -47,7 +47,9 @@ class EmployeeController extends Controller
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
         ]);
 
-        $query = Employee::query()->with(['workUnit:id,name,code', 'structuralPosition:id,name', 'user:id,employee_id,username']);
+        $query = Employee::query()
+            ->with(['workUnit:id,name,code', 'structuralPosition:id,name', 'user:id,employee_id,username'])
+            ->withCount(['activeFaceData as face_data_count']);
 
         $this->applyVisibilityScope($query, $request->user());
 
@@ -88,13 +90,16 @@ class EmployeeController extends Controller
     {
         $this->assertCanView($request->user(), $employee);
 
-        $employee->load(['workUnit:id,name,code', 'structuralPosition:id,name', 'user:id,employee_id,username']);
+        $employee->load(['workUnit:id,name,code', 'structuralPosition:id,name', 'user:id,employee_id,username'])
+            ->loadCount(['activeFaceData as face_data_count']);
 
         return response()->json(['data' => $this->serialize($employee)]);
     }
 
     public function store(StoreEmployeeRequest $request): JsonResponse
     {
+        $this->assertUnitInScope($request, $request->validated('work_unit_id'));
+
         $employee = DB::transaction(function () use ($request) {
             $employee = Employee::create($request->validated());
 
@@ -103,20 +108,28 @@ class EmployeeController extends Controller
             return $employee;
         });
 
-        $employee->load(['workUnit:id,name,code', 'structuralPosition:id,name']);
+        $employee->load(['workUnit:id,name,code', 'structuralPosition:id,name'])
+            ->loadCount(['activeFaceData as face_data_count']);
 
         return response()->json(['data' => $this->serialize($employee)], 201);
     }
 
     public function update(UpdateEmployeeRequest $request, Employee $employee): JsonResponse
     {
+        $this->assertCanView($request->user(), $employee);
+
+        if ($request->has('work_unit_id')) {
+            $this->assertUnitInScope($request, $request->validated('work_unit_id'));
+        }
+
         DB::transaction(function () use ($request, $employee) {
             $employee->update($request->validated());
 
             ActivityLog::record('employee.update', $employee, $request->validated());
         });
 
-        $employee->load(['workUnit:id,name,code', 'structuralPosition:id,name', 'user:id,employee_id,username']);
+        $employee->load(['workUnit:id,name,code', 'structuralPosition:id,name', 'user:id,employee_id,username'])
+            ->loadCount(['activeFaceData as face_data_count']);
 
         return response()->json(['data' => $this->serialize($employee)]);
     }
@@ -156,6 +169,8 @@ class EmployeeController extends Controller
      */
     public function linkUser(LinkEmployeeUserRequest $request, Employee $employee): JsonResponse
     {
+        $this->assertCanView($request->user(), $employee);
+
         $targetUser = User::findOrFail($request->validated('user_id'));
 
         if ($targetUser->employee_id !== null && $targetUser->employee_id !== $employee->id) {
@@ -177,7 +192,8 @@ class EmployeeController extends Controller
             ActivityLog::record('employee.link_user', $employee, ['user_id' => $targetUser->id]);
         });
 
-        $employee->load(['workUnit:id,name,code', 'structuralPosition:id,name', 'user:id,employee_id,username']);
+        $employee->load(['workUnit:id,name,code', 'structuralPosition:id,name', 'user:id,employee_id,username'])
+            ->loadCount(['activeFaceData as face_data_count']);
 
         return response()->json(['data' => $this->serialize($employee)]);
     }
@@ -187,7 +203,7 @@ class EmployeeController extends Controller
      */
     private function assertCanView(User $user, Employee $employee): void
     {
-        if ($user->hasRole(['super_admin', 'admin_kepegawaian'])) {
+        if ($user->hasGlobalRole(['super_admin', 'admin_kepegawaian'])) {
             return;
         }
 
@@ -204,7 +220,7 @@ class EmployeeController extends Controller
 
     private function applyVisibilityScope(\Illuminate\Database\Eloquent\Builder $query, User $user): void
     {
-        if ($user->hasRole(['super_admin', 'admin_kepegawaian'])) {
+        if ($user->hasGlobalRole(['super_admin', 'admin_kepegawaian'])) {
             return; // global, tanpa filter
         }
 
@@ -270,6 +286,18 @@ class EmployeeController extends Controller
             ->all();
     }
 
+    private function assertUnitInScope(Request $request, ?int $workUnitId): void
+    {
+        if ($workUnitId === null) {
+            return;
+        }
+
+        $allowedUnitIds = $request->user()?->scopedUnitIds();
+        if ($allowedUnitIds !== null && ! in_array($workUnitId, $allowedUnitIds, true)) {
+            abort(403, 'Anda tidak punya izin mengelola pegawai unit lain.');
+        }
+    }
+
     private function serialize(Employee $employee): array
     {
         return [
@@ -288,6 +316,9 @@ class EmployeeController extends Controller
             'grade' => $employee->grade,
             'rank' => $employee->rank,
             'profile_photo' => $employee->profile_photo,
+            'face_data_count' => (int) ($employee->face_data_count ?? 0),
+            'face_samples' => (int) ($employee->face_data_count ?? 0),
+            'face_count' => (int) ($employee->face_data_count ?? 0),
             'is_active' => $employee->is_active,
             'linked_user' => $employee->user ? [
                 'id' => $employee->user->id,

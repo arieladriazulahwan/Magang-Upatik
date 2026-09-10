@@ -10,6 +10,7 @@ use App\Models\ActivityLog;
 use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Models\User;
+use App\Services\Calendar\GoogleCalendarService;
 use App\Services\Leave\LeaveRequestService;
 use App\Services\Leave\LeaveValidationException;
 use App\Services\Notification\NotificationService;
@@ -23,6 +24,7 @@ class LeaveRequestController extends Controller
     public function __construct(
         private readonly LeaveRequestService $service,
         private readonly NotificationService $notifications,
+        private readonly GoogleCalendarService $calendar,
     ) {}
 
     public function store(StoreLeaveRequestRequest $request): JsonResponse
@@ -59,7 +61,11 @@ class LeaveRequestController extends Controller
             'status' => ['sometimes', 'string'],
         ]);
 
-        $query = LeaveRequest::query()->with(['employee:id,name,nip,work_unit_id', 'leaveType:id,name,category']);
+        $query = LeaveRequest::query()->with([
+            'employee:id,name,nip,work_unit_id',
+            'leaveType:id,name,category',
+            'approvalLogs.approver:id,name',
+        ]);
 
         $this->applyVisibilityScope($query, $request->user());
 
@@ -102,9 +108,10 @@ class LeaveRequestController extends Controller
         $actingEmployee = $this->resolveActingEmployee($request->user());
 
         $isOwner = $leaveRequest->employee_id === $actingEmployee->id;
-        $isGlobalAdmin = $request->user()->hasRole(['super_admin', 'admin_kepegawaian']);
+        $isGlobalAdmin = $request->user()->hasGlobalRole(['super_admin', 'admin_kepegawaian']);
+        $isScopedAdmin = $request->user()->hasRole(['pimpinan', 'admin_unit'], $leaveRequest->employee->work_unit_id);
 
-        if (! $isOwner && ! $isGlobalAdmin) {
+        if (! $isOwner && ! $isGlobalAdmin && ! $isScopedAdmin) {
             abort(403, 'Anda tidak punya izin untuk membatalkan pengajuan ini.');
         }
 
@@ -115,6 +122,7 @@ class LeaveRequestController extends Controller
         }
 
         ActivityLog::record('leave_request.cancel', $leaveRequest);
+        $this->calendar->syncLeaveRequest($leaveRequest, 'hapus');
 
         return response()->json(['data' => $this->serialize($leaveRequest)]);
     }
@@ -154,6 +162,10 @@ class LeaveRequestController extends Controller
 
         $this->notifications->leaveRequestDecided($leaveRequest, $nextStep?->approver_role);
 
+        if ($leaveRequest->status === 'disetujui') {
+            $this->calendar->syncLeaveRequest($leaveRequest);
+        }
+
         $leaveRequest->load(['leaveType:id,name,category', 'approvalLogs.approver:id,name']);
 
         return response()->json(['data' => $this->serialize($leaveRequest)]);
@@ -180,7 +192,7 @@ class LeaveRequestController extends Controller
 
     private function assertCanView(User $user, Employee $employee): void
     {
-        if ($user->hasRole(['super_admin', 'admin_kepegawaian'])) {
+        if ($user->hasGlobalRole(['super_admin', 'admin_kepegawaian'])) {
             return;
         }
         if ($user->hasRole(['pimpinan', 'admin_unit'], $employee->work_unit_id)) {
@@ -195,7 +207,7 @@ class LeaveRequestController extends Controller
 
     private function applyVisibilityScope(Builder $query, User $user): void
     {
-        if ($user->hasRole(['super_admin', 'admin_kepegawaian'])) {
+        if ($user->hasGlobalRole(['super_admin', 'admin_kepegawaian'])) {
             return;
         }
 
@@ -275,6 +287,9 @@ class LeaveRequestController extends Controller
             'doctor_letter_number' => $leaveRequest->doctor_letter_number,
             'sub_category' => $leaveRequest->sub_category,
             'status' => $leaveRequest->status,
+            'gcal_event_id' => $leaveRequest->gcal_event_id,
+            'gcal_status' => $leaveRequest->gcal_status,
+            'gcal_synced_at' => $leaveRequest->gcal_synced_at?->toIso8601String(),
             'approval_steps' => $leaveRequest->relationLoaded('approvalLogs')
                 ? $leaveRequest->approvalLogs->map(fn ($log) => [
                     'sequence' => $log->sequence,
