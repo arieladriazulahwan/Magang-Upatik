@@ -3,6 +3,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useCallback,
   useState,
 } from "react";
 
@@ -215,6 +216,10 @@ interface PrototypeContextValue {
 
   markNotificationRead: (
     id: string
+  ) => void;
+
+  refreshData: (
+    showLoading?: boolean
   ) => void;
 
   pushNotification: (
@@ -1363,6 +1368,22 @@ export function PrototypeProvider({
     useState<string | null>(
       null
     );
+  const [
+    refreshTick,
+    setRefreshTick,
+  ] =
+    useState(0);
+
+  const refreshData =
+    useCallback(
+      () => {
+        setRefreshTick(
+          (current) =>
+            current + 1
+        );
+      },
+      []
+    );
 
   /* ===================================================
      BACKEND SYNC
@@ -1865,7 +1886,7 @@ export function PrototypeProvider({
       clearInterval(intervalId);
       unsubscribe();
     };
-  }, []);
+  }, [refreshTick]);
 
   /* ===================================================
      CONTEXT VALUE
@@ -2915,9 +2936,11 @@ export function PrototypeProvider({
                             false,
                         }
                       : item
-                  )
-                );
+              )
+            );
           },
+
+          refreshData,
 
           pushNotification(
             item
@@ -3010,6 +3033,7 @@ export function PrototypeProvider({
         toast,
         loadingRequest,
         loadingApprovalId,
+        refreshData,
       ]
     );
 

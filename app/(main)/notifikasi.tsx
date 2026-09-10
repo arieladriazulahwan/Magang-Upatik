@@ -1,4 +1,5 @@
 import React, {
+  useCallback,
   useMemo,
   useState,
 } from "react";
@@ -8,7 +9,10 @@ import {
   Text,
   View,
 } from "react-native";
-import { router } from "expo-router";
+import {
+  router,
+  useFocusEffect,
+} from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import Badge from "../../components/Badge";
 import MainScreen from "../../components/MainScreen";
@@ -735,6 +739,7 @@ export default function NotifikasiScreen() {
   const {
     notifications,
     markNotificationRead,
+    refreshData,
     syncing,
   } = usePrototype();
   const [
@@ -775,6 +780,15 @@ export default function NotifikasiScreen() {
   const showLoading =
     syncing &&
     notifications.length === 0;
+
+  useFocusEffect(
+    useCallback(
+      () => {
+        refreshData();
+      },
+      [refreshData]
+    )
+  );
 
   return (
     <MainScreen>

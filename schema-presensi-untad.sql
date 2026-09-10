@@ -99,7 +99,7 @@ SELECT * FROM tree;
 
 CREATE TABLE work_location (
     id              BIGSERIAL PRIMARY KEY,
-    work_unit_id   BIGINT NOT NULL REFERENCES work_unit(id) ON DELETE CASCADE,
+    work_unit_id   BIGINT REFERENCES work_unit(id) ON DELETE CASCADE,
     name            VARCHAR(150) NOT NULL,           -- mis. "Gedung Utama FATEK"
     address          TEXT,
     latitude        DECIMAL(10,7) NOT NULL,          -- titik pusat geofence
@@ -109,7 +109,7 @@ CREATE TABLE work_location (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-COMMENT ON TABLE work_location IS 'Satu unit kerja dapat memiliki banyak titik lokasi presensi (geofence)';
+COMMENT ON TABLE work_location IS 'Titik lokasi presensi (geofence). work_unit_id NULL berarti lokasi global untuk semua unit';
 
 CREATE TABLE structural_position (
     id              BIGSERIAL PRIMARY KEY,

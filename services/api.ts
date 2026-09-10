@@ -18,7 +18,7 @@ import * as SecureStore from "expo-secure-store";
 
 const DEFAULT_API_URL =
   Platform.OS === "android"
-    ? "http://192.168.110.68:8000/api"
+    ? "http://10.10.16.251:8000/api"
     : "http://127.0.0.1:8000/api";
 
 export const API_URL =
@@ -838,6 +838,7 @@ export type PhotoPayload =
       uri: string;
       name: string;
       type: string;
+      pose?: string;
     };
 
 /**
@@ -951,6 +952,14 @@ export async function enrollFace(payload: {
 
   payload.photos.forEach((photo) => {
     body.append("photos[]", photo as Blob);
+
+    if (
+      typeof photo === "object" &&
+      "pose" in photo &&
+      photo.pose
+    ) {
+      body.append("poses[]", photo.pose);
+    }
   });
 
   body.append("replace", payload.replace === false ? "0" : "1");

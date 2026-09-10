@@ -29,22 +29,27 @@ import {
 
 const FACE_STEPS = [
   {
+    pose: "front",
     title: "Hadap depan",
     instruction: "Tatap kamera lurus dengan wajah berada di tengah bingkai.",
   },
   {
+    pose: "left",
     title: "Miring kiri",
     instruction: "Putar wajah sedikit ke kiri, mata tetap terlihat jelas.",
   },
   {
+    pose: "right",
     title: "Miring kanan",
     instruction: "Putar wajah sedikit ke kanan tanpa keluar dari bingkai.",
   },
   {
+    pose: "up",
     title: "Sedikit ke atas",
     instruction: "Angkat dagu sedikit agar bagian bawah wajah ikut terbaca.",
   },
   {
+    pose: "down",
     title: "Sedikit ke bawah",
     instruction: "Tundukkan wajah sedikit agar area dahi dan mata terbaca.",
   },
@@ -82,6 +87,11 @@ export default function DaftarWajahScreen() {
     captureIndex,
     setCaptureIndex,
   ] = useState(0);
+
+  const [
+    capturedPhotos,
+    setCapturedPhotos,
+  ] = useState<PhotoPayload[]>([]);
 
   useEffect(() => {
     if (
@@ -123,7 +133,32 @@ export default function DaftarWajahScreen() {
     };
   }, []);
 
-  const handleCapture = async () => {
+  const submitEnrollment = async (
+    photos: PhotoPayload[]
+  ) => {
+    const response = await enrollFace({
+      replace: true,
+      photos,
+    });
+
+    setStatus(
+      response.data
+    );
+
+    Alert.alert(
+      "Wajah terdaftar",
+      `${photos.length} sampel wajah berhasil disimpan untuk verifikasi presensi.`,
+      [
+        {
+          text: "OK",
+          onPress: () =>
+            router.back(),
+        },
+      ]
+    );
+  };
+
+  const handleCaptureStep = async () => {
     if (
       saving ||
       !cameraRef.current ||
@@ -134,57 +169,48 @@ export default function DaftarWajahScreen() {
 
     try {
       setSaving(true);
-      const photos: PhotoPayload[] = [];
 
-      for (let index = 0; index < FACE_STEPS.length; index += 1) {
-        setCaptureIndex(index);
-        await wait(index === 0 ? 600 : 1100);
-
-        if (!cameraRef.current) {
-          throw new Error(
-            "Kamera belum siap mengambil data wajah."
-          );
-        }
-
-        const photo =
-          await cameraRef.current.takePictureAsync({
-            quality: 0.82,
-            base64: false,
-          });
-
-        if (!photo?.uri) {
-          throw new Error(
-            "Foto wajah tidak berhasil diambil."
-          );
-        }
-
-        photos.push({
-          uri: photo.uri,
-          name: `wajah-${index + 1}-${Date.now()}.jpg`,
-          type: "image/jpeg",
-        });
+      if (capturedPhotos.length >= FACE_STEPS.length) {
+        await submitEnrollment(capturedPhotos);
+        return;
       }
 
-      const response = await enrollFace({
-        replace: true,
-        photos,
-      });
+      await wait(450);
 
-      setStatus(
-        response.data
-      );
+      const step =
+        FACE_STEPS[captureIndex];
 
-      Alert.alert(
-        "Wajah terdaftar",
-        `${photos.length} sampel wajah berhasil disimpan untuk verifikasi presensi.`,
-        [
-          {
-            text: "OK",
-            onPress: () =>
-              router.back(),
-          },
-        ]
-      );
+      const photo =
+        await cameraRef.current.takePictureAsync({
+          quality: 0.92,
+          base64: false,
+          skipProcessing: false,
+        });
+
+      if (!photo?.uri) {
+        throw new Error(
+          "Foto wajah tidak berhasil diambil."
+        );
+      }
+
+      const nextPhotos = [
+        ...capturedPhotos,
+        {
+          uri: photo.uri,
+          name: `wajah-${step.pose}-${Date.now()}.jpg`,
+          type: "image/jpeg",
+          pose: step.pose,
+        },
+      ];
+
+      setCapturedPhotos(nextPhotos);
+
+      if (nextPhotos.length < FACE_STEPS.length) {
+        setCaptureIndex(nextPhotos.length);
+        return;
+      }
+
+      await submitEnrollment(nextPhotos);
     } catch (error) {
       console.error(
         "FACE ENROLL ERROR:",
@@ -198,9 +224,17 @@ export default function DaftarWajahScreen() {
           : "Data wajah gagal didaftarkan."
       );
     } finally {
-      setCaptureIndex(0);
       setSaving(false);
     }
+  };
+
+  const handleResetCapture = () => {
+    if (saving) {
+      return;
+    }
+
+    setCapturedPhotos([]);
+    setCaptureIndex(0);
   };
 
   if (
@@ -287,8 +321,8 @@ export default function DaftarWajahScreen() {
           <View style={styles.stepBadge}>
             <Text style={styles.stepBadgeText}>
               {saving
-                ? `Mengambil ${captureIndex + 1}/${FACE_STEPS.length}`
-                : `${FACE_STEPS.length} sampel otomatis`}
+                ? "Menangkap foto..."
+                : `${capturedPhotos.length}/${FACE_STEPS.length} sampel`}
             </Text>
           </View>
           <View style={styles.faceFrame}>
@@ -312,12 +346,12 @@ export default function DaftarWajahScreen() {
           <Text style={styles.instructionTitle}>
             {saving
               ? FACE_STEPS[captureIndex].title
-              : "Siapkan wajah"}
+              : FACE_STEPS[captureIndex].title}
           </Text>
           <Text style={styles.instructionSubtitle}>
             {saving
-              ? FACE_STEPS[captureIndex].instruction
-              : "Tekan tombol sekali, lalu ikuti arahan wajah sampai semua sampel selesai diambil."}
+              ? "Tahan posisi sebentar, jangan bergerak sampai foto selesai diambil."
+              : FACE_STEPS[captureIndex].instruction}
           </Text>
         </View>
       </View>
@@ -325,9 +359,10 @@ export default function DaftarWajahScreen() {
       <View style={styles.progressRow}>
         {FACE_STEPS.map((step, index) => {
           const done =
-            saving && index < captureIndex;
+            index < capturedPhotos.length;
           const active =
-            saving && index === captureIndex;
+            index === captureIndex &&
+            capturedPhotos.length < FACE_STEPS.length;
 
           return (
             <View
@@ -364,13 +399,39 @@ export default function DaftarWajahScreen() {
         </Text>
       </View>
 
+      {capturedPhotos.length > 0 && !saving ? (
+        <Pressable
+          style={styles.resetButton}
+          onPress={handleResetCapture}
+        >
+          <Ionicons
+            name="refresh-outline"
+            size={16}
+            color={Colors.primary}
+          />
+          <Text style={styles.resetText}>
+            Ulangi dari awal
+          </Text>
+        </Pressable>
+      ) : null}
+
       <Button
         title={
           saving
-            ? "Mengambil Data Wajah..."
+            ? "Mengambil Foto..."
+            : capturedPhotos.length >= FACE_STEPS.length
+            ? "Simpan Data Wajah"
             : status?.registered
-            ? "Mulai Perbarui Data Wajah"
-            : "Mulai Daftarkan Wajah"
+            ? capturedPhotos.length === FACE_STEPS.length - 1
+              ? "Simpan Data Wajah"
+              : capturedPhotos.length === 0
+              ? "Mulai Perbarui Data Wajah"
+              : "Ambil Foto Berikutnya"
+            : capturedPhotos.length === FACE_STEPS.length - 1
+            ? "Simpan Data Wajah"
+            : capturedPhotos.length === 0
+            ? "Mulai Daftarkan Wajah"
+            : "Ambil Foto Berikutnya"
         }
         loading={saving}
         disabled={
@@ -386,7 +447,7 @@ export default function DaftarWajahScreen() {
             />
           )
         }
-        onPress={handleCapture}
+        onPress={handleCaptureStep}
       />
 
       {!cameraReady ? (

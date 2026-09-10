@@ -1,4 +1,5 @@
 import React, {
+  useCallback,
   useState,
 } from "react";
 
@@ -14,6 +15,7 @@ import {
 
 import {
   router,
+  useFocusEffect,
   useLocalSearchParams,
 } from "expo-router";
 
@@ -404,6 +406,7 @@ export default function PengajuanBaruScreen() {
   const {
     submitRequest,
     loadingRequest,
+    refreshData,
   } =
     usePrototype();
 
@@ -416,6 +419,15 @@ export default function PengajuanBaruScreen() {
         params.type
       )
     );
+
+  useFocusEffect(
+    useCallback(
+      () => {
+        refreshData();
+      },
+      [refreshData]
+    )
+  );
 
   const [
     startDate,

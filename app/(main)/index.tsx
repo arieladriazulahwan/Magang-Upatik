@@ -8,7 +8,6 @@ import React, {
 import {
   ActivityIndicator,
   Pressable,
-  RefreshControl,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -569,12 +568,6 @@ export default function DashboardScreen() {
     setLeaveRemaining,
   ] =
     useState<string>("--");
-
-  const [
-    refreshing,
-    setRefreshing,
-  ] =
-    useState(false);
 
   const [
     loading,
@@ -1148,26 +1141,6 @@ export default function DashboardScreen() {
   ]);
 
   /* ==========================================================
-     REFRESH
-  ========================================================== */
-
-  const onRefresh =
-    useCallback(
-      async () => {
-        setRefreshing(
-          true
-        );
-
-        await loadDashboard();
-
-        setRefreshing(
-          false
-        );
-      },
-      [loadDashboard]
-    );
-
-  /* ==========================================================
      ATTENDANCE STATE
   ========================================================== */
 
@@ -1418,19 +1391,6 @@ export default function DashboardScreen() {
           }
           contentContainerStyle={
             styles.scrollContent
-          }
-          refreshControl={
-            <RefreshControl
-              refreshing={
-                refreshing
-              }
-              onRefresh={
-                onRefresh
-              }
-              tintColor={
-                COLORS.blue
-              }
-            />
           }
         >
 
