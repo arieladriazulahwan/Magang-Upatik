@@ -108,12 +108,21 @@ function Sidebar() {
   });
   const user = getStoredUser();
   const role = String(localStorage.getItem("role") || "").toLowerCase();
+  const allowedPaths = getAllowedPaths(role);
 
   useEffect(() => {
     const fetchPendingCounts = async () => {
+      const canViewVerification = allowedPaths.includes("/verifikasi");
+      const canViewApproval = allowedPaths.includes("/persetujuan");
+
+      if (!canViewVerification && !canViewApproval) {
+        setPendingCounts({ verifikasi: 0, persetujuan: 0 });
+        return;
+      }
+
       const [attendanceResult, leaveResult] = await Promise.allSettled([
-        apiRequest("/attendance"),
-        apiRequest("/leave-requests"),
+        canViewVerification ? apiRequest("/attendance?per_page=100") : Promise.resolve([]),
+        canViewApproval ? apiRequest("/leave-requests") : Promise.resolve([]),
       ]);
       const getItems = (result) => {
         if (result.status !== "fulfilled") return [];
@@ -125,21 +134,30 @@ function Sidebar() {
       };
       const attendance = getItems(attendanceResult);
       const leaveRequests = getItems(leaveResult);
-      const isPending = (item) => {
+      const isPendingApproval = (item) => {
         const status = String(
           item.status || item.verification_status || item.approval_status || ""
         ).toLowerCase();
         return ["menunggu", "diajukan", "diproses", "pending"].includes(status);
       };
+      const needsAttendanceVerification = (item) => {
+        const status = String(
+          item.status || item.verification_status || item.attendance_status || ""
+        ).toLowerCase();
+
+        if (item.is_manual || item.verified_at || item.verified_by) return false;
+
+        return ["alpha", "tidak_lengkap", "tak_lengkap", "menunggu", "pending"].includes(status);
+      };
 
       setPendingCounts({
-        verifikasi: attendance.filter(isPending).length,
-        persetujuan: leaveRequests.filter(isPending).length,
+        verifikasi: attendance.filter(needsAttendanceVerification).length,
+        persetujuan: leaveRequests.filter(isPendingApproval).length,
       });
     };
 
     fetchPendingCounts();
-  }, []);
+  }, [role]);
 
   const displayName = user.name || user.full_name || "Administrator";
   const roleLabel =
@@ -157,11 +175,15 @@ function Sidebar() {
       ? "Developer"
       : "Pengguna";
 
-  const allowedPaths = getAllowedPaths(role);
-
   const filteredGroups = navGroups.map((group) => ({
     ...group,
-    items: group.items.filter((item) => allowedPaths.includes(item.path)),
+    items: group.items
+      .map((item) =>
+        role === "admin_kepegawaian" && item.path === "/pegawai"
+          ? { ...item, path: "/pegawai/tambah", label: "Tambah Pegawai" }
+          : item
+      )
+      .filter((item) => allowedPaths.includes(item.path)),
   }));
 
   return (

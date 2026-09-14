@@ -25,6 +25,27 @@ const formatAttendanceTime = (value) => {
   return match?.[1] || match?.[2] || String(value);
 };
 
+const toDateTimeValue = (date, time) => {
+  if (!date || !time) return null;
+  return `${date} ${time}:00`;
+};
+
+const normalizeVerificationStatus = (item) => {
+  const rawStatus = String(
+    getNestedValue(item, ["status", "verification_status", "attendance_status"]) || ""
+  ).toLowerCase();
+
+  if (item.is_manual || item.verified_at || item.verified_by) {
+    return "Disetujui";
+  }
+
+  if (["alpha", "tidak_lengkap", "tak_lengkap", "pending", "menunggu"].includes(rawStatus)) {
+    return "Menunggu";
+  }
+
+  return "Tercatat";
+};
+
 const normalizeVerificationData = (item, index) => {
   const employee = item.employee || item.user || item.pegawai || {};
   const name =
@@ -38,6 +59,7 @@ const normalizeVerificationData = (item, index) => {
   const unit =
     getNestedValue(item, ["unit", "unit_kerja", "unit_name"]) ||
     getNestedValue(employee, ["unit", "unit_kerja", "unit_name"]) ||
+    employee.work_unit?.name ||
     "-";
   const tanggal =
     getNestedValue(item, ["date", "tanggal", "attendance_date"]) ||
@@ -48,11 +70,12 @@ const normalizeVerificationData = (item, index) => {
   const rawJamPulang =
     getNestedValue(item, ["check_out", "clock_out", "jam_pulang", "pulang", "out_time"]) ||
     "-";
-  const status =
+  const attendanceStatus =
     getNestedValue(item, ["status", "verification_status", "attendance_status"]) ||
-    (item.is_verified ? "Disetujui" : item.is_rejected ? "Ditolak" : "Menunggu");
+    "-";
+  const status = normalizeVerificationStatus(item);
   const keterangan =
-    getNestedValue(item, ["reason", "keterangan", "notes", "description"]) ||
+    getNestedValue(item, ["correction_reason", "reason", "keterangan", "notes", "description"]) ||
     "-";
 
   return {
@@ -64,6 +87,7 @@ const normalizeVerificationData = (item, index) => {
     jamMasuk: formatAttendanceTime(rawJamMasuk),
     jamPulang: formatAttendanceTime(rawJamPulang),
     status,
+    attendanceStatus,
     keterangan,
   };
 };
@@ -86,7 +110,7 @@ function Verifikasi() {
       setError("");
 
       const [attendanceResponse, employeesResponse] = await Promise.all([
-        apiRequest("/attendance"),
+        apiRequest("/attendance?per_page=100"),
         getEmployees(),
       ]);
       const response = attendanceResponse;
@@ -109,15 +133,17 @@ function Verifikasi() {
     try {
       setCorrecting(true);
       setError("");
-      await apiRequest("/attendance/manual", {
+      const employeeId = Number(form.get("employee_id"));
+      const date = form.get("date");
+
+      await apiRequest(`/attendance/${employeeId}/mark-present`, {
         method: "POST",
         body: JSON.stringify({
-          employee_id: Number(form.get("employee_id")),
-          date: form.get("date"),
-          check_in: form.get("check_in") || null,
-          check_out: form.get("check_out") || null,
+          date,
+          check_in: toDateTimeValue(date, form.get("check_in")),
+          check_out: toDateTimeValue(date, form.get("check_out")),
+          status: form.get("status"),
           correction_reason: form.get("correction_reason"),
-          is_manual: true,
         }),
       });
       setShowAddModal(false);
@@ -144,9 +170,10 @@ function Verifikasi() {
       await apiRequest(`/attendance/${selectedData.id}/correct`, {
         method: "PATCH",
         body: JSON.stringify({
-          check_in: form.get("check_in") || null,
-          check_out: form.get("check_out") || null,
-          note: form.get("note") || null,
+          check_in: toDateTimeValue(selectedData.tanggal, form.get("check_in")),
+          check_out: toDateTimeValue(selectedData.tanggal, form.get("check_out")),
+          status: form.get("status") || null,
+          correction_reason: form.get("correction_reason"),
         }),
       });
 
@@ -180,7 +207,7 @@ function Verifikasi() {
   const totalPengajuan = data.length;
   const waiting = data.filter((item) => item.status === "Menunggu").length;
   const approved = data.filter((item) => item.status === "Disetujui").length;
-  const rejected = data.filter((item) => item.status === "Ditolak").length;
+  const recorded = data.filter((item) => item.status === "Tercatat").length;
 
   return (
     <AdminLayout>
@@ -213,8 +240,8 @@ function Verifikasi() {
           </div>
 
           <div className="verification-card rejected">
-            <span>Ditolak</span>
-            <strong>{rejected}</strong>
+            <span>Tercatat</span>
+            <strong>{recorded}</strong>
           </div>
         </div>
 
@@ -239,7 +266,7 @@ function Verifikasi() {
                 <option>Semua Status</option>
                 <option>Menunggu</option>
                 <option>Disetujui</option>
-                <option>Ditolak</option>
+                <option>Tercatat</option>
               </select>
 
               <select
@@ -397,7 +424,7 @@ function Verifikasi() {
 
                   <div className="correction-detail-item">
                     <span>Status</span>
-                    <strong>{selectedData.status}</strong>
+                    <strong>{selectedData.status} ({selectedData.attendanceStatus})</strong>
                   </div>
 
                   <div className="correction-detail-item">
@@ -409,15 +436,26 @@ function Verifikasi() {
                     <span>Jam Pulang</span>
                     <input name="check_out" type="time" defaultValue={selectedData.jamPulang === "-" ? "" : selectedData.jamPulang} />
                   </div>
+                  <div className="correction-detail-item">
+                    <span>Status Koreksi</span>
+                    <select name="status" defaultValue={selectedData.attendanceStatus === "-" ? "hadir" : selectedData.attendanceStatus}>
+                      <option value="hadir">Hadir</option>
+                      <option value="terlambat">Terlambat</option>
+                      <option value="pulang_cepat">Pulang Cepat</option>
+                      <option value="tidak_lengkap">Tidak Lengkap</option>
+                      <option value="alpha">Alpha</option>
+                      <option value="dinas">Dinas</option>
+                    </select>
+                  </div>
                   <div className="correction-detail-item correction-detail-full-width">
                     <span>Keterangan koreksi</span>
-                    <textarea name="note" defaultValue={selectedData.keterangan === "-" ? "" : selectedData.keterangan} rows="3" required />
+                    <textarea name="correction_reason" defaultValue={selectedData.keterangan === "-" ? "" : selectedData.keterangan} rows="3" required />
                   </div>
                   <div className="modal-actions correction-detail-actions">
                     <button type="button" className="secondary-button" onClick={() => setSelectedData(null)}>
                       Batal
                     </button>
-                    <button type="submit" className="approve-submit" disabled={correcting || selectedData.status !== "Menunggu"}>
+                    <button type="submit" className="approve-submit" disabled={correcting}>
                       {correcting ? "Menyimpan..." : "Simpan Koreksi"}
                     </button>
                   </div>
@@ -463,6 +501,17 @@ function Verifikasi() {
                   <div className="form-field">
                     <label>Jam Pulang</label>
                     <input name="check_out" type="time" />
+                  </div>
+                  <div className="form-field">
+                    <label>Status</label>
+                    <select name="status" required defaultValue="hadir">
+                      <option value="hadir">Hadir</option>
+                      <option value="terlambat">Terlambat</option>
+                      <option value="pulang_cepat">Pulang Cepat</option>
+                      <option value="tidak_lengkap">Tidak Lengkap</option>
+                      <option value="alpha">Alpha</option>
+                      <option value="dinas">Dinas</option>
+                    </select>
                   </div>
                   <div className="form-field full-width">
                     <label>Alasan Koreksi</label>

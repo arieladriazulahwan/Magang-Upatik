@@ -10,16 +10,13 @@ export const ROLE_ACCESS = {
     "/kalender", "/pengaturan",
   ],
   admin_kepegawaian: [
-    "/dashboard", "/monitoring", "/pegawai", "/unit", "/jadwal", "/shift",
-    "/pegawai/tambah", "/pengajuan", "/pengajuan/detail", "/verifikasi", "/persetujuan", "/laporan",
+    "/dashboard","/monitoring","/pegawai","/pegawai/:id","/pegawai/tambah",
   ],
   admin_unit: [
-    "/dashboard", "/monitoring", "/pegawai", "/unit", "/jadwal", "/shift",
-    "/pegawai/:id", "/pengajuan", "/pengajuan/detail", "/verifikasi", "/laporan",
+    "/dashboard", "/monitoring", "/pegawai", "/pegawai/tambah", "/pegawai/:id","/laporan",
   ],
   pimpinan: [
-    "/dashboard", "/monitoring", "/pegawai", "/pegawai/:id", "/verifikasi",
-    "/pengajuan", "/pengajuan/detail", "/persetujuan", "/laporan",
+    "/dashboard", "/monitoring", "/pengajuan/detail", "/persetujuan", "/laporan"
   ],
   pegawai: ["/dashboard"],
 };
@@ -37,16 +34,16 @@ export const hasAnyRole = (roles) => {
 };
 
 export const canManageEmployees = () =>
-  hasAnyRole(["super_admin", "admin_kepegawaian", "developer"]);
+  hasAnyRole(["super_admin", "admin_kepegawaian", "admin_unit", "developer"]);
 
 export const canManageShifts = () =>
-  hasAnyRole(["super_admin", "admin_kepegawaian", "admin_unit", "developer"]);
+  hasAnyRole(["super_admin", "developer"]);
 
 export const canManageUnits = () =>
   hasAnyRole(["super_admin", "developer"]);
 
 export const canManageLocations = () =>
-  hasAnyRole(["super_admin", "admin_kepegawaian", "admin_unit", "developer"]);
+  hasAnyRole(["super_admin", "developer"]);
 
 export const isAdminUnitOrLeader = () =>
   hasAnyRole(["admin_unit", "pimpinan"]);
@@ -61,7 +58,7 @@ export const canDeleteEmployee = () =>
   hasAnyRole(["super_admin", "developer"]);
 
 export const canAddEmployee = () =>
-  hasAnyRole(["super_admin", "admin_kepegawaian", "developer"]);
+  hasAnyRole(["super_admin", "admin_kepegawaian", "admin_unit", "developer"]);
 
 export const canApproveRequests = () =>
   hasAnyRole(["super_admin", "pimpinan", "developer"]);

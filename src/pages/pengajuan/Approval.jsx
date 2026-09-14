@@ -30,6 +30,16 @@ const normalizeApprovalStatus = (value) => {
   return "Menunggu";
 };
 
+const normalizeCalendarStatus = (value) => {
+  const lower = String(value || "").trim().toLowerCase();
+
+  if (["terkirim", "synced"].includes(lower)) return "Tersinkron";
+  if (["gagal", "failed"].includes(lower)) return "Gagal";
+  if (["dihapus", "deleted"].includes(lower)) return "Dihapus";
+
+  return "Menunggu sinkronisasi";
+};
+
 const normalizeType = (value) => {
   const type = String(value || "izin").trim().toLowerCase();
   if (type.includes("cuti")) return "Cuti";
@@ -88,6 +98,8 @@ const normalizeApprovalData = (item, index) => {
     reason,
     submitted,
     status,
+    calendarStatus: normalizeCalendarStatus(item.gcal_status),
+    calendarSyncedAt: item.gcal_synced_at || "",
   };
 };
 
@@ -164,6 +176,9 @@ function Approval() {
 
       await apiRequest(`/leave-requests/${id}/approve`, {
         method: "POST",
+        body: JSON.stringify({
+          note: "Disetujui melalui web admin.",
+        }),
       });
 
       setData((prev) =>
@@ -199,6 +214,9 @@ function Approval() {
 
       await apiRequest(`/leave-requests/${id}/reject`, {
         method: "POST",
+        body: JSON.stringify({
+          note: "Ditolak melalui web admin.",
+        }),
       });
 
       setData((prev) =>
@@ -300,6 +318,9 @@ function Approval() {
                     </div>
                   </div>
                   <span className={`approval-status-badge ${item.status.toLowerCase()}`}>{item.status}</span>
+                  <span className={`sync-status ${item.calendarStatus.toLowerCase().replace(/\s+/g, "-")}`}>
+                    {item.calendarStatus}
+                  </span>
                   <span className="approval-submitted">{item.submitted}</span>
                   <span className="approval-chevron">›</span>
                 </button>
@@ -326,6 +347,9 @@ function Approval() {
                 <div className="approval-detail-badges">
                   <span className={`approval-type-badge ${selectedApproval.type.toLowerCase()}`}>{selectedApproval.type}</span>
                   <span className={`approval-status-badge ${selectedApproval.status.toLowerCase()}`}>{selectedApproval.status}</span>
+                  <span className={`sync-status ${selectedApproval.calendarStatus.toLowerCase().replace(/\s+/g, "-")}`}>
+                    Google Calendar: {selectedApproval.calendarStatus}
+                  </span>
                 </div>
                 <div className="approval-detail-fields">
                   <div><span>Mulai</span><strong>{selectedApproval.startDate}</strong></div>

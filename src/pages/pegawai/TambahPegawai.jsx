@@ -5,6 +5,8 @@ import { createEmployee, getStructuralPositions, getWorkUnits } from "../../serv
 
 function TambahPegawai() {
 	const navigate = useNavigate();
+	const role = String(localStorage.getItem("role") || "").toLowerCase();
+	const backPath = role === "admin_kepegawaian" ? "/dashboard" : "/pegawai";
 	const [units, setUnits] = useState([]);
 	const [positions, setPositions] = useState([]);
 	const [loadingUnits, setLoadingUnits] = useState(true);
@@ -57,7 +59,7 @@ function TambahPegawai() {
 					is_active: true,
 			});
 
-			navigate("/pegawai");
+			navigate(backPath);
 		} catch (err) {
 			setError(err.message || "Gagal menyimpan data pegawai.");
 		} finally {
@@ -169,7 +171,7 @@ function TambahPegawai() {
 					</div>
 
 					<div className="modal-actions">
-						<button type="button" className="secondary-button" onClick={() => navigate("/pegawai")}>
+						<button type="button" className="secondary-button" onClick={() => navigate(backPath)}>
 							Batal
 						</button>
 						<button type="submit" className="primary-button" disabled={saving || loadingUnits}>
