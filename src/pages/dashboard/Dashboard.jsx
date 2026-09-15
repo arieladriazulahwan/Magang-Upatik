@@ -17,9 +17,28 @@ const getStatus = (item) =>
     .trim()
     .toLowerCase();
 
+const toDateKey = (date) => {
+  const value = date instanceof Date ? date : new Date(date);
+
+  if (Number.isNaN(value.getTime())) return "";
+
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
+};
+
+const getRecordDateKey = (record) =>
+  String(record.date || record.attendance_date || record.created_at || "").slice(0, 10);
+
 function Dashboard() {
   const [statistics, setStatistics] = useState([]);
   const [attendance, setAttendance] = useState([]);
+  const [dailyTrend, setDailyTrend] = useState([]);
+  const [statusSummary, setStatusSummary] = useState({
+    hadir: 0,
+    terlambat: 0,
+    alpha: 0,
+    izin: 0,
+    total: 0,
+  });
   const [activities, setActivities] = useState([]);
   const [unitBars, setUnitBars] = useState([]);
   const [pendingApprovals, setPendingApprovals] = useState([]);
@@ -56,16 +75,59 @@ function Dashboard() {
         const employees = normalizeArray(employeesResponse);
         const units = normalizeArray(unitsResponse);
         const leaveRequests = normalizeArray(leaveResponse);
+        const todayKey = toDateKey(new Date());
+        const todayRecords = records.filter((record) => getRecordDateKey(record) === todayKey);
         const presentStatuses = ["hadir", "terlambat", "pulang_cepat"];
-        const presentCount = records.filter((item) =>
+        const presentCount = todayRecords.filter((item) =>
           presentStatuses.includes(getStatus(item))
         ).length;
-        const lateCount = records.filter(
+        const lateCount = todayRecords.filter(
           (item) => getStatus(item) === "terlambat"
         ).length;
-        const absentCount = records.filter((item) =>
+        const absentCount = todayRecords.filter((item) =>
           ["alpha", "belum_absen"].includes(getStatus(item))
         ).length;
+        const izinCount = todayRecords.filter((item) =>
+          ["izin", "sakit", "wfa", "wfh"].includes(getStatus(item))
+        ).length;
+
+        const lastSevenDays = Array.from({ length: 7 }, (_, index) => {
+          const date = new Date();
+          date.setHours(0, 0, 0, 0);
+          date.setDate(date.getDate() - (6 - index));
+          const key = toDateKey(date);
+
+          return {
+            key,
+            label: date.toLocaleDateString("id-ID", { day: "2-digit", month: "short" }),
+            hadir: 0,
+            terlambat: 0,
+            alpha: 0,
+            izin: 0,
+            total: 0,
+            value: 0,
+          };
+        });
+        const trendMap = new Map(lastSevenDays.map((day) => [day.key, day]));
+
+        records.forEach((record) => {
+          const key = getRecordDateKey(record);
+          const bucket = trendMap.get(key);
+          if (!bucket) return;
+
+          const status = getStatus(record);
+          bucket.total += 1;
+
+          if (status === "terlambat") bucket.terlambat += 1;
+          else if (["alpha", "belum_absen"].includes(status)) bucket.alpha += 1;
+          else if (["izin", "sakit", "wfa", "wfh"].includes(status)) bucket.izin += 1;
+          else if (presentStatuses.includes(status)) bucket.hadir += 1;
+        });
+
+        const trendRows = lastSevenDays.map((day) => ({
+          ...day,
+          value: day.total ? Math.round(((day.hadir + day.terlambat) / day.total) * 100) : 0,
+        }));
 
         // Sebagian API mengirim relasi face_data/flag enrollment, bukan field
         // face_data_count. Presensi yang lolos verifikasi wajah juga menjadi
@@ -89,6 +151,14 @@ function Dashboard() {
             )
           ).slice(0, 5)
         );
+        setDailyTrend(trendRows);
+        setStatusSummary({
+          hadir: presentCount,
+          terlambat: lateCount,
+          alpha: absentCount,
+          izin: izinCount,
+          total: todayRecords.length,
+        });
 
         const unitMap = new Map();
         units.forEach((unit) => unitMap.set(String(unit.id), { name: unit.name, total: 0, hadir: 0, terlambat: 0, alpha: 0 }));
@@ -98,7 +168,7 @@ function Dashboard() {
           if (!unitMap.has(key)) unitMap.set(key, { name: employee.unit || employee.unit_kerja || "Unit lain", total: 0, hadir: 0, terlambat: 0, alpha: 0 });
           unitMap.get(key).total += 1;
         });
-        records.forEach((record) => {
+        todayRecords.forEach((record) => {
           const employee = record.employee || {};
           const unitId = record.work_unit_id || employee.work_unit_id || employee.work_unit?.id;
           const unit = unitMap.get(String(unitId));
@@ -150,13 +220,20 @@ function Dashboard() {
         ]);
 
         setAttendance(
-          records.slice(-6).map((item, index) => ({
-            day: item.date || item.attendance_date || `Data ${index + 1}`,
-            value: presentStatuses.includes(getStatus(item)) ? 100 : 0,
+          trendRows.map((item) => ({
+            day: item.label,
+            value: item.value,
           }))
         );
         setActivities(
-          records.slice(0, 6).map((item, index) => ({
+          [...records]
+            .sort((a, b) => {
+              const aTime = new Date(a.check_in || a.clock_in || a.created_at || a.date || 0).getTime();
+              const bTime = new Date(b.check_in || b.clock_in || b.created_at || b.date || 0).getTime();
+              return bTime - aTime;
+            })
+            .slice(0, 6)
+            .map((item, index) => ({
             name:
               item.employee?.name ||
               item.employee_name ||
@@ -174,6 +251,8 @@ function Dashboard() {
         // Tetap kosong kalau backend belum mempunyai data
         setStatistics([]);
         setAttendance([]);
+        setDailyTrend([]);
+        setStatusSummary({ hadir: 0, terlambat: 0, alpha: 0, izin: 0, total: 0 });
         setActivities([]);
         setUnitBars([]);
         setPendingApprovals([]);
@@ -185,6 +264,28 @@ function Dashboard() {
 
     fetchDashboard();
   }, []);
+
+  const trendPoints = dailyTrend
+    .map((item, index) => {
+      const x = 18 + index * 44;
+      const y = 112 - (item.value / 100) * 86;
+      return `${x},${y}`;
+    })
+    .join(" ");
+  const trendAreaPoints = trendPoints ? `18,112 ${trendPoints} ${18 + (dailyTrend.length - 1) * 44},112` : "";
+  const latestTrend = dailyTrend.at(-1)?.value || 0;
+  const statusTotal = Math.max(statusSummary.total, 1);
+  const statusPercents = {
+    hadir: Math.round((statusSummary.hadir / statusTotal) * 100),
+    terlambat: Math.round((statusSummary.terlambat / statusTotal) * 100),
+    alpha: Math.round((statusSummary.alpha / statusTotal) * 100),
+    izin: Math.round((statusSummary.izin / statusTotal) * 100),
+  };
+  const donutStyle = {
+    "--hadir": `${statusPercents.hadir}%`,
+    "--terlambat": `${statusPercents.hadir + statusPercents.terlambat}%`,
+    "--alpha": `${statusPercents.hadir + statusPercents.terlambat + statusPercents.alpha}%`,
+  };
 
   return (
     <AdminLayout>
@@ -237,6 +338,76 @@ function Dashboard() {
             </div>
           )}
 
+        </div>
+
+        <div className="dashboard-insights">
+          <section className="dashboard-panel dashboard-trend-card">
+            <div className="panel-header">
+              <div>
+                <h3>Grafik Kehadiran 7 Hari</h3>
+                <p>Persentase hadir dan terlambat dari data presensi</p>
+              </div>
+              <strong className="dashboard-big-metric">{latestTrend}%</strong>
+            </div>
+
+            <div className="dashboard-line-chart">
+              {loading ? (
+                <div className="dashboard-empty">Memuat grafik...</div>
+              ) : dailyTrend.length > 0 ? (
+                <>
+                  <svg viewBox="0 0 300 130" role="img" aria-label="Grafik tren kehadiran">
+                    <defs>
+                      <linearGradient id="attendanceFill" x1="0" x2="0" y1="0" y2="1">
+                        <stop offset="0%" stopColor="#2563eb" stopOpacity="0.24" />
+                        <stop offset="100%" stopColor="#2563eb" stopOpacity="0.02" />
+                      </linearGradient>
+                    </defs>
+                    <line x1="18" y1="26" x2="286" y2="26" />
+                    <line x1="18" y1="69" x2="286" y2="69" />
+                    <line x1="18" y1="112" x2="286" y2="112" />
+                    {trendAreaPoints && <polygon points={trendAreaPoints} fill="url(#attendanceFill)" />}
+                    {trendPoints && <polyline points={trendPoints} />}
+                    {dailyTrend.map((item, index) => {
+                      const x = 18 + index * 44;
+                      const y = 112 - (item.value / 100) * 86;
+                      return <circle key={item.key} cx={x} cy={y} r="3.6" />;
+                    })}
+                  </svg>
+
+                  <div className="dashboard-chart-labels">
+                    {dailyTrend.map((item) => (
+                      <span key={item.key}>{item.label}</span>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="dashboard-empty">Belum ada data grafik.</div>
+              )}
+            </div>
+          </section>
+
+          <section className="dashboard-panel dashboard-status-card">
+            <div className="panel-header">
+              <div>
+                <h3>Komposisi Status</h3>
+                <p>Distribusi status presensi yang sedang tercatat</p>
+              </div>
+            </div>
+
+            <div className="dashboard-donut-wrap">
+              <div className="dashboard-donut" style={donutStyle}>
+                <strong>{statusSummary.total}</strong>
+                <span>data</span>
+              </div>
+
+              <div className="dashboard-status-legend">
+                <span><i className="legend-hadir" /> Hadir <b>{statusSummary.hadir}</b></span>
+                <span><i className="legend-terlambat" /> Terlambat <b>{statusSummary.terlambat}</b></span>
+                <span><i className="legend-alpha" /> Alpha <b>{statusSummary.alpha}</b></span>
+                <span><i className="legend-izin" /> Izin/WFA <b>{statusSummary.izin}</b></span>
+              </div>
+            </div>
+          </section>
         </div>
 
         <div className="dashboard-prototype-row">

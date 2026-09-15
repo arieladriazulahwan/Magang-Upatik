@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import AdminLayout from "../../components/layout/AdminLayout";
 import { apiRequest } from "../../services/api";
+import { getEmployees } from "../../services/pegawaiService";
 import { canManageShifts } from "../../utils/access";
 
 const normalizeShifts = (payload) => {
@@ -25,10 +26,59 @@ const formatRestTime = (value) => {
   return `${value} jam`;
 };
 
+const getUnitName = (item = {}) =>
+  item.unit ||
+  item.unit_kerja ||
+  item.unitName ||
+  item.unit_name ||
+  item.work_unit?.name ||
+  "";
+
+const isHospitalUnit = (unit = {}) => {
+  const text = `${unit.type || ""} ${unit.name || unit.nama || ""} ${unit.code || ""}`.toLowerCase();
+  return (
+    text.includes("rumah_sakit") ||
+    text.includes("rumah sakit") ||
+    text.includes("rs pendidikan tadulako") ||
+    (text.includes("tadulako") && text.includes("rs")) ||
+    text.includes("zs")
+  );
+};
+
+const getEmployeeName = (employee = {}) =>
+  employee.name || employee.nama || employee.full_name || "Pegawai";
+
+const toDateKey = (date) => date.toISOString().slice(0, 10);
+
+const getDatesBetween = (startDate, endDate) => {
+  const start = new Date(`${startDate}T00:00:00`);
+  const end = new Date(`${(endDate || startDate)}T00:00:00`);
+  const dates = [];
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) {
+    return dates;
+  }
+
+  const cursor = new Date(start);
+  while (cursor <= end) {
+    dates.push(toDateKey(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return dates;
+};
+
 function Shift() {
   const canCreateShift = canManageShifts();
   const [shifts, setShifts] = useState([]);
   const [units, setUnits] = useState([]);
+  const [employees, setEmployees] = useState([]);
+  const [selectedUnitId, setSelectedUnitId] = useState("");
+  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState([]);
+  const [employeeSearch, setEmployeeSearch] = useState("");
+  const [editingShift, setEditingShift] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
   const [search, setSearch] = useState("");
   const [unitFilter, setUnitFilter] = useState("Semua Unit");
   const [showModal, setShowModal] = useState(false);
@@ -57,13 +107,37 @@ function Shift() {
     apiRequest("/work-units")
       .then((response) => setUnits(normalizeUnits(response)))
       .catch((err) => console.error("Gagal mengambil unit kerja:", err));
+
+    getEmployees()
+      .then((response) => setEmployees(normalizeUnits(response)))
+      .catch((err) => console.error("Gagal mengambil pegawai:", err));
   }, []);
+
+  const hospitalUnits = units.filter(isHospitalUnit);
+  const hospitalUnitIds = new Set(hospitalUnits.map((unit) => String(unit.id)));
+  const hospitalEmployees = employees.filter((employee) => {
+    const employeeUnitId = employee.work_unit_id || employee.workUnitId || employee.work_unit?.id;
+    return hospitalUnitIds.has(String(employeeUnitId));
+  });
+  const selectableEmployees = selectedUnitId
+    ? hospitalEmployees.filter((employee) => String(employee.work_unit_id || employee.work_unit?.id) === String(selectedUnitId))
+    : hospitalEmployees;
+  const filteredEmployees = selectableEmployees.filter((employee) => {
+    const keyword = employeeSearch.trim().toLowerCase();
+    if (!keyword) return true;
+
+    return [
+      getEmployeeName(employee),
+      employee.nip,
+      employee.work_unit?.name,
+    ].filter(Boolean).join(" ").toLowerCase().includes(keyword);
+  });
 
   const filteredShifts = shifts.filter((item) => {
     const keyword = search.toLowerCase();
     const name = String(item.name || item.nama || item.shift_name || "").toLowerCase();
     const code = String(item.code || item.kode || item.shift_code || "").toLowerCase();
-    const unit = String(item.unit || item.unit_kerja || item.unitName || item.unit_name || "").toLowerCase();
+    const unit = String(getUnitName(item)).toLowerCase();
 
     const matchSearch =
       name.includes(keyword) ||
@@ -72,48 +146,125 @@ function Shift() {
 
     const matchUnit =
       unitFilter === "Semua Unit" ||
-      String(item.unit || item.unit_kerja || item.unitName || item.unit_name || "") === unitFilter ||
-      String(item.unit || item.unit_kerja || item.unitName || item.unit_name || "") === "Semua Unit";
+      String(getUnitName(item)) === unitFilter ||
+      String(getUnitName(item)) === "Semua Unit";
 
     return matchSearch && matchUnit;
   });
 
-  const handleAddShift = async (e) => {
+  const openCreateModal = () => {
+    setEditingShift(null);
+    setSelectedUnitId("");
+    setSelectedEmployeeIds([]);
+    setEmployeeSearch("");
+    setError("");
+    setShowModal(true);
+  };
+
+  const openEditModal = (shift) => {
+    setEditingShift(shift);
+    setSelectedUnitId(String(shift.work_unit?.id || shift.work_unit_id || ""));
+    setSelectedEmployeeIds([]);
+    setEmployeeSearch("");
+    setError("");
+    setShowModal(true);
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setEditingShift(null);
+    setSelectedUnitId("");
+    setSelectedEmployeeIds([]);
+    setEmployeeSearch("");
+  };
+
+  const toggleEmployee = (employeeId) => {
+    setSelectedEmployeeIds((current) =>
+      current.includes(employeeId)
+        ? current.filter((id) => id !== employeeId)
+        : [...current, employeeId]
+    );
+  };
+
+  const handleSubmitShift = async (e) => {
     e.preventDefault();
 
     const form = new FormData(e.target);
 
     try {
-      setLoading(true);
+      setSaving(true);
       setError("");
 
-      const workUnitId = form.get("work_unit_id");
+      const workUnitId = editingShift ? selectedUnitId : form.get("work_unit_id");
       if (!workUnitId) {
         throw new Error("Unit kerja wajib dipilih.");
+      }
+
+      const employeeIds = selectedEmployeeIds.map(Number).filter(Boolean);
+      const scheduleStart = form.get("schedule_start");
+      const scheduleEnd = form.get("schedule_end") || scheduleStart;
+      const dates = getDatesBetween(scheduleStart, scheduleEnd);
+
+      if (!editingShift && employeeIds.length === 0) {
+        throw new Error("Pilih minimal satu pegawai untuk jadwal shift.");
+      }
+
+      if (employeeIds.length > 0 && dates.length === 0) {
+        throw new Error("Tanggal jadwal shift tidak valid.");
       }
 
       const startTime = form.get("masuk") || "07:00";
       const endTime = form.get("pulang") || "15:00";
 
-      await apiRequest("/shifts", {
-        method: "POST",
+      const shiftResponse = await apiRequest(editingShift ? `/shifts/${editingShift.id}` : "/shifts", {
+        method: editingShift ? "PATCH" : "POST",
         body: JSON.stringify({
           name: form.get("name") || "Shift Baru",
-          work_unit_id: Number(workUnitId),
+          ...(editingShift ? {} : { work_unit_id: Number(workUnitId) }),
           start_time: startTime,
           end_time: endTime,
           is_overnight: endTime < startTime,
           tolerance_minutes: Number(form.get("tolerance_minutes") || 0),
-          is_active: true,
+          is_active: form.get("is_active") !== "false",
         }),
       });
+      const shift = shiftResponse?.data || shiftResponse;
 
-      setShowModal(false);
+      if (employeeIds.length > 0) {
+        await apiRequest("/shift-schedules/bulk", {
+          method: "POST",
+          body: JSON.stringify({
+            employee_ids: employeeIds,
+            shift_id: shift.id,
+            dates,
+            description: form.get("description") || null,
+          }),
+        });
+      }
+
+      closeModal();
       await fetchShifts();
     } catch (err) {
-      console.error("Gagal menambahkan shift:", err);
-      setError(err.message || "Gagal menambahkan shift.");
-      setLoading(false);
+      console.error("Gagal menyimpan shift:", err);
+      setError(err.message || "Gagal menyimpan shift.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteShift = async (shift) => {
+    if (!confirm(`Hapus shift "${shift.name || shift.nama || "Shift"}"?`)) return;
+
+    try {
+      setDeletingId(shift.id);
+      setError("");
+      await apiRequest(`/shifts/${shift.id}`, { method: "DELETE" });
+      await fetchShifts();
+    } catch (err) {
+      console.error("Gagal menghapus shift:", err);
+      setError(err.message || "Gagal menghapus shift.");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -123,12 +274,12 @@ function Shift() {
         <div className="page-heading">
           <div>
             <h2>Shift Kerja</h2>
-            <p>Kelola jadwal kerja dan pola dinas pegawai</p>
+            <p>Khusus pengaturan shift pegawai unit Rumah Sakit Tadulako</p>
           </div>
 
           {canCreateShift && <button
             className="primary-button"
-            onClick={() => setShowModal(true)}
+            onClick={openCreateModal}
           >
             + Tambah Shift
           </button>}
@@ -168,7 +319,7 @@ function Shift() {
           <div className="schedule-panel-header">
             <div>
               <h3>Daftar Shift</h3>
-              <p>Informasi pola kerja yang berlaku di setiap unit</p>
+              <p>Informasi pola kerja untuk layanan Rumah Sakit Tadulako</p>
             </div>
           </div>
 
@@ -189,11 +340,11 @@ function Shift() {
               onChange={(e) => setUnitFilter(e.target.value)}
             >
               <option>Semua Unit</option>
-              <option>Fakultas Teknik</option>
-              <option>Fakultas Ekonomi</option>
-              <option>Fakultas Hukum</option>
-              <option>UPT Teknologi Informasi</option>
-              <option>Instalasi Rawat Inap</option>
+              {hospitalUnits.map((unit) => (
+                <option key={unit.id || unit.code || unit.name}>
+                  {unit.name || unit.nama || "Unit Rumah Sakit"}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -231,7 +382,7 @@ function Shift() {
                   {filteredShifts.map((item) => {
                     const code = item.code || item.kode || item.shift_code || "SHIFT";
                     const name = item.name || item.nama || item.shift_name || "Shift";
-                    const unit = item.unit || item.unit_kerja || item.unitName || item.unit_name || "-";
+                    const unit = getUnitName(item) || "-";
                     const masuk = item.masuk || item.jam_masuk || item.start_time || item.startTime || "00:00";
                     const pulang = item.pulang || item.jam_pulang || item.end_time || item.endTime || "00:00";
                     const istirahat = formatRestTime(item.istirahat || item.rest_time || item.break_minutes || item.breakTime || 1);
@@ -267,7 +418,16 @@ function Shift() {
                         </td>
 
                         <td>
-                          {canCreateShift && <button className="action-button">Edit</button>}
+                          {canCreateShift && <button className="action-button" onClick={() => openEditModal(item)}>Edit</button>}
+                          {canCreateShift && (
+                            <button
+                              className="action-button danger-action"
+                              onClick={() => handleDeleteShift(item)}
+                              disabled={deletingId === item.id}
+                            >
+                              {deletingId === item.id ? "..." : "Hapus"}
+                            </button>
+                          )}
                           <button className="action-button">Detail</button>
                         </td>
                       </tr>
@@ -297,7 +457,7 @@ function Shift() {
       {showModal && (
         <div
           className="modal-overlay"
-          onClick={() => setShowModal(false)}
+          onClick={closeModal}
         >
           <div
             className="employee-modal"
@@ -305,30 +465,41 @@ function Shift() {
           >
             <div className="modal-header">
               <div>
-                <h3>Tambah Shift Kerja</h3>
-                <p>Buat pola kerja baru untuk unit terkait</p>
+                <h3>{editingShift ? "Edit Shift Kerja" : "Tambah Shift Kerja"}</h3>
+                <p>{editingShift ? "Perbarui pola kerja shift rumah sakit" : "Buat pola kerja dan langsung tetapkan ke pegawai rumah sakit"}</p>
               </div>
 
               <button
                 className="modal-close"
-                onClick={() => setShowModal(false)}
+                onClick={closeModal}
               >
                 ×
               </button>
             </div>
 
-            <form onSubmit={handleAddShift}>
+            <form onSubmit={handleSubmitShift}>
               <div className="form-grid">
                 <div className="form-field">
                   <label>Nama Shift</label>
-                  <input name="name" required placeholder="Nama shift" />
+                  <input
+                    name="name"
+                    required
+                    placeholder="Nama shift"
+                    defaultValue={editingShift?.name || editingShift?.nama || ""}
+                  />
                 </div>
 
                 <div className="form-field">
                   <label>Unit Kerja</label>
-                  <select name="work_unit_id" required defaultValue="">
+                  <select
+                    name="work_unit_id"
+                    required
+                    value={selectedUnitId}
+                    onChange={(event) => setSelectedUnitId(event.target.value)}
+                    disabled={Boolean(editingShift)}
+                  >
                     <option value="" disabled>Pilih unit kerja</option>
-                    {units.map((unit) => (
+                    {hospitalUnits.map((unit) => (
                       <option key={unit.id} value={unit.id}>
                         {unit.name || unit.nama || unit.nama_unit || "Unit kerja"}
                       </option>
@@ -338,12 +509,12 @@ function Shift() {
 
                 <div className="form-field">
                   <label>Jam Masuk</label>
-                  <input name="masuk" type="time" defaultValue="07:00" required />
+                  <input name="masuk" type="time" defaultValue={editingShift?.start_time || "07:00"} required />
                 </div>
 
                 <div className="form-field">
                   <label>Jam Pulang</label>
-                  <input name="pulang" type="time" defaultValue="15:00" required />
+                  <input name="pulang" type="time" defaultValue={editingShift?.end_time || "15:00"} required />
                 </div>
 
                 <div className="form-field">
@@ -352,9 +523,69 @@ function Shift() {
                     name="tolerance_minutes"
                     type="number"
                     min="0"
-                    defaultValue="0"
+                    defaultValue={editingShift?.tolerance_minutes ?? 0}
                     required
                   />
+                </div>
+
+                {editingShift && (
+                  <div className="form-field">
+                    <label>Status Shift</label>
+                    <select name="is_active" defaultValue={editingShift.is_active === false ? "false" : "true"}>
+                      <option value="true">Aktif</option>
+                      <option value="false">Nonaktif</option>
+                    </select>
+                  </div>
+                )}
+
+                <div className="form-field full-width">
+                  <label>Pegawai Shift</label>
+                  <div className="employee-picker">
+                    <input
+                      type="search"
+                      placeholder="Ketik nama atau NIP pegawai..."
+                      value={employeeSearch}
+                      onChange={(event) => setEmployeeSearch(event.target.value)}
+                    />
+
+                    <div className="employee-picker-list">
+                      {filteredEmployees.length > 0 ? filteredEmployees.map((employee) => (
+                        <label className="employee-picker-item" key={employee.id}>
+                          <input
+                            type="checkbox"
+                            checked={selectedEmployeeIds.includes(employee.id)}
+                            onChange={() => toggleEmployee(employee.id)}
+                          />
+                          <span>
+                            <strong>{getEmployeeName(employee)}</strong>
+                            <small>{employee.nip || "NIP belum tersedia"}</small>
+                          </span>
+                        </label>
+                      )) : (
+                        <div className="employee-picker-empty">Pegawai tidak ditemukan.</div>
+                      )}
+                    </div>
+                  </div>
+                  <small>
+                    {editingShift
+                      ? "Opsional: pilih pegawai jika ingin menambahkan jadwal baru untuk shift ini."
+                      : "Pilih satu atau beberapa pegawai yang wajib mengikuti shift ini."}
+                  </small>
+                </div>
+
+                <div className="form-field">
+                  <label>Tanggal Mulai</label>
+                  <input name="schedule_start" type="date" required defaultValue={toDateKey(new Date())} />
+                </div>
+
+                <div className="form-field">
+                  <label>Tanggal Selesai</label>
+                  <input name="schedule_end" type="date" defaultValue={toDateKey(new Date())} />
+                </div>
+
+                <div className="form-field full-width">
+                  <label>Keterangan Jadwal</label>
+                  <input name="description" placeholder="Opsional" />
                 </div>
               </div>
 
@@ -362,13 +593,14 @@ function Shift() {
                 <button
                   type="button"
                   className="secondary-button"
-                  onClick={() => setShowModal(false)}
+                  onClick={closeModal}
+                  disabled={saving}
                 >
                   Batal
                 </button>
 
-                <button type="submit" className="primary-button">
-                  Simpan Shift
+                <button type="submit" className="primary-button" disabled={saving}>
+                  {saving ? "Menyimpan..." : editingShift ? "Simpan Perubahan" : "Simpan Shift"}
                 </button>
               </div>
             </form>

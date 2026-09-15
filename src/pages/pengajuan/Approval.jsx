@@ -10,6 +10,16 @@ const normalizeArray = (payload) => {
   return [];
 };
 
+const TYPE_FILTERS = [
+  { label: "Semua Jenis", icon: "All" },
+  { label: "Cuti", icon: "C" },
+  { label: "Izin", icon: "I" },
+  { label: "Sakit", icon: "+" },
+  { label: "WFA", icon: "W" },
+  { label: "Lembur", icon: "L" },
+  { label: "Perjadin", icon: "P" },
+];
+
 const getNestedValue = (obj, keys) => {
   for (const key of keys) {
     const value = obj?.[key];
@@ -26,17 +36,72 @@ const normalizeApprovalStatus = (value) => {
   if (["ditolak", "rejected", "reject", "tolak"].includes(lower)) {
     return "Ditolak";
   }
-  return "Menunggu";
+  return "Menunggu Persetujuan";
+};
+
+const approvalStatusClass = (status) =>
+  String(status || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-");
+
+const approvalTypeClass = (type) =>
+  String(type || "")
+    .trim()
+    .toLowerCase()
+    .replace("perjadin", "dinas")
+    .replace(/\s+/g, "-");
+
+const formatSubmitted = (value) => {
+  if (!value || value === "-") {
+    return { date: "-", time: "" };
+  }
+
+  const parsed = new Date(value);
+
+  if (!Number.isNaN(parsed.getTime())) {
+    return {
+      date: parsed.toLocaleDateString("id-ID", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }),
+      time: parsed.toLocaleTimeString("id-ID", {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    };
+  }
+
+  const [date = value, time = ""] = String(value).split(/[T\s]/);
+
+  return {
+    date,
+    time: time.slice(0, 5),
+  };
 };
 
 const normalizeCalendarStatus = (value) => {
   const lower = String(value || "").trim().toLowerCase();
 
+  if (!lower) return "";
+  if (["menunggu", "pending", "tertunda", "menunggu sinkronisasi"].includes(lower)) return "Menunggu sinkronisasi";
+
   if (["terkirim", "synced"].includes(lower)) return "Tersinkron";
   if (["gagal", "failed"].includes(lower)) return "Gagal";
   if (["dihapus", "deleted"].includes(lower)) return "Dihapus";
 
-  return "Menunggu sinkronisasi";
+  return "";
+};
+
+const calendarStatusForApproval = (item, status, source) => {
+  if (source !== "leave") {
+    return "";
+  }
+
+  const calendarStatus = normalizeCalendarStatus(item.gcal_status);
+
+  return calendarStatus || "Menunggu sinkronisasi";
 };
 
 const normalizeType = (value) => {
@@ -49,7 +114,7 @@ const normalizeType = (value) => {
   if (type.includes("sakit")) return "Sakit";
   if (type.includes("wfh") || type.includes("wfa")) return "WFA";
   if (type.includes("lembur")) return "Lembur";
-  if (type.includes("dinas")) return "Dinas";
+  if (type.includes("dinas")) return "Perjadin";
   return "Izin";
 };
 
@@ -91,7 +156,7 @@ const openAttachment = async (attachment) => {
   setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
 };
 
-const normalizeApprovalData = (item, index) => {
+const normalizeApprovalData = (item, index, source = "leave") => {
   const employee = item.employee || item.user || item.pegawai || {};
   const name =
     getNestedValue(item, ["name", "employee_name", "nama"]) ||
@@ -106,21 +171,26 @@ const normalizeApprovalData = (item, index) => {
     getNestedValue(employee, ["unit", "unit_kerja", "unit_name"]) ||
     employee.work_unit?.name ||
     "-";
-  const type = normalizeType(
-    getNestedValue(item, ["type", "jenis", "leave_type", "category"])
-  );
+  const type =
+    source === "wfh"
+      ? "WFA"
+      : source === "overtime"
+      ? "Lembur"
+      : normalizeType(
+          getNestedValue(item, ["type", "jenis", "leave_type", "category"])
+        );
   const startDate =
-    getNestedValue(item, ["start_date", "tanggal_mulai", "startDate"]) || "-";
+    getNestedValue(item, ["start_date", "tanggal_mulai", "startDate", "date"]) || "-";
   const endDate =
     getNestedValue(item, ["end_date", "tanggal_selesai", "endDate"]) || startDate;
   const reason =
-    getNestedValue(item, ["reason", "alasan", "notes", "keterangan"]) || "-";
+    getNestedValue(item, ["reason", "alasan", "notes", "keterangan", "work_description"]) || "-";
   const submitted =
     getNestedValue(item, ["submitted_at", "created_at", "submitted", "tanggal_pengajuan"]) || "-";
   const statusRaw =
     getNestedValue(item, ["status", "approval_status", "state", "status_pengajuan"]) || "";
 
-  let status = "Menunggu";
+  let status = "Menunggu Persetujuan";
   if (typeof item.is_approved === "boolean") {
     status = item.is_approved ? "Disetujui" : "Ditolak";
   } else if (typeof item.isRejected === "boolean") {
@@ -130,7 +200,9 @@ const normalizeApprovalData = (item, index) => {
   }
 
   return {
-    id: item.id ?? index + 1,
+    id: `${source}-${item.id ?? index + 1}`,
+    rawId: item.id ?? index + 1,
+    source,
     name,
     nip,
     unit,
@@ -140,7 +212,7 @@ const normalizeApprovalData = (item, index) => {
     reason,
     submitted,
     status,
-    calendarStatus: normalizeCalendarStatus(item.gcal_status),
+    calendarStatus: calendarStatusForApproval(item, status, source),
     calendarSyncedAt: item.gcal_synced_at || "",
     attachments: normalizeAttachments(item),
   };
@@ -149,7 +221,7 @@ const normalizeApprovalData = (item, index) => {
 function Approval() {
   const [data, setData] = useState([]);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("Menunggu");
+  const [statusFilter, setStatusFilter] = useState("Semua Status");
   const [typeFilter, setTypeFilter] = useState("Semua Jenis");
   const [selectedApproval, setSelectedApproval] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -162,8 +234,23 @@ function Approval() {
       setLoading(true);
       setError("");
 
-      const response = await apiRequest("/leave-requests");
-      const normalized = normalizeArray(response).map(normalizeApprovalData);
+      const [leaveResponse, wfhResponse, overtimeResponse] = await Promise.all([
+        apiRequest("/leave-requests"),
+        apiRequest("/wfh-requests"),
+        apiRequest("/overtime-requests"),
+      ]);
+
+      const normalized = [
+        ...normalizeArray(leaveResponse).map((item, index) =>
+          normalizeApprovalData(item, index, "leave")
+        ),
+        ...normalizeArray(wfhResponse).map((item, index) =>
+          normalizeApprovalData(item, index, "wfh")
+        ),
+        ...normalizeArray(overtimeResponse).map((item, index) =>
+          normalizeApprovalData(item, index, "overtime")
+        ),
+      ];
       setData(normalized);
     } catch (err) {
       console.error("Gagal mengambil data persetujuan:", err);
@@ -200,17 +287,26 @@ function Approval() {
     setError("");
     setMessage("");
     try {
-      const latestResponse = await apiRequest(`/leave-requests/${id}`);
+      const selected = data.find((item) => item.id === id);
+      const source = selected?.source || "leave";
+      const basePath =
+        source === "wfh"
+          ? "wfh-requests"
+          : source === "overtime"
+          ? "overtime-requests"
+          : "leave-requests";
+
+      const latestResponse = await apiRequest(`/${basePath}/${selected?.rawId || id}`);
       const latestItems = normalizeArray(latestResponse);
       const latestItem = latestItems[0] || latestResponse?.data || latestResponse;
       const latestStatus = normalizeApprovalStatus(
         latestItem?.status || latestItem?.approval_status || latestItem?.state
       );
-      if (latestStatus !== "Menunggu") {
+      if (latestStatus !== "Menunggu Persetujuan") {
         throw new Error(`Pengajuan ini sudah berstatus ${latestStatus.toLowerCase()}. Muat ulang daftar pengajuan.`);
       }
 
-      await apiRequest(`/leave-requests/${id}/approve`, {
+      await apiRequest(`/${basePath}/${selected?.rawId || id}/approve`, {
         method: "POST",
         body: JSON.stringify({
           note: "Disetujui melalui web admin.",
@@ -225,6 +321,7 @@ function Approval() {
       setStatusFilter("Semua Status");
       setMessage("Pengajuan berhasil disetujui.");
       setSelectedApproval(null);
+      await fetchApprovals();
     } catch (err) {
       console.error("Gagal menyetujui pengajuan:", err);
       setError(err.message || "Gagal menyetujui pengajuan.");
@@ -238,17 +335,26 @@ function Approval() {
     setError("");
     setMessage("");
     try {
-      const latestResponse = await apiRequest(`/leave-requests/${id}`);
+      const selected = data.find((item) => item.id === id);
+      const source = selected?.source || "leave";
+      const basePath =
+        source === "wfh"
+          ? "wfh-requests"
+          : source === "overtime"
+          ? "overtime-requests"
+          : "leave-requests";
+
+      const latestResponse = await apiRequest(`/${basePath}/${selected?.rawId || id}`);
       const latestItems = normalizeArray(latestResponse);
       const latestItem = latestItems[0] || latestResponse?.data || latestResponse;
       const latestStatus = normalizeApprovalStatus(
         latestItem?.status || latestItem?.approval_status || latestItem?.state
       );
-      if (latestStatus !== "Menunggu") {
+      if (latestStatus !== "Menunggu Persetujuan") {
         throw new Error(`Pengajuan ini sudah berstatus ${latestStatus.toLowerCase()}. Muat ulang daftar pengajuan.`);
       }
 
-      await apiRequest(`/leave-requests/${id}/reject`, {
+      await apiRequest(`/${basePath}/${selected?.rawId || id}/reject`, {
         method: "POST",
         body: JSON.stringify({
           note: "Ditolak melalui web admin.",
@@ -287,15 +393,16 @@ function Approval() {
         <section className="data-panel">
           <div className="approval-toolbar">
             <div className="approval-chips">
-              {["Semua Jenis", "Cuti", "Izin", "Sakit", "WFA", "Lembur", "Dinas"].map((type) => {
+              {TYPE_FILTERS.map(({ label, icon }) => {
                 return (
                   <button
-                    key={type}
-                    className={typeFilter === type ? "approval-chip active" : "approval-chip"}
-                    onClick={() => setTypeFilter(type)}
+                    key={label}
+                    className={typeFilter === label ? "approval-chip active" : "approval-chip"}
+                    onClick={() => setTypeFilter(label)}
                   >
-                    {type}
-                    <span>{type === "Semua Jenis" ? data.length : data.filter((item) => item.type === type).length}</span>
+                    <i>{icon}</i>
+                    <strong>{label}</strong>
+                    <span>{label === "Semua Jenis" ? data.length : data.filter((item) => item.type === label).length}</span>
                   </button>
                 );
               })}
@@ -306,7 +413,7 @@ function Approval() {
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
             >
-              <option>Menunggu</option>
+              <option>Menunggu Persetujuan</option>
               <option>Disetujui</option>
               <option>Ditolak</option>
               <option>Semua Status</option>
@@ -338,26 +445,41 @@ function Approval() {
 
           {!loading && !error && (
             <div className="approval-list">
-              {filteredData.map((item) => (
-                <button className="approval-row" key={item.id} onClick={() => setSelectedApproval(item)}>
-                  <div className="approval-avatar">{item.name.charAt(0)}</div>
-                  <div className="approval-row-main">
-                    <div className="approval-row-title">
+              {filteredData.map((item) => {
+                const submitted = formatSubmitted(item.submitted);
+
+                return (
+                  <button className="approval-row" key={item.id} onClick={() => setSelectedApproval(item)}>
+                    <div className="approval-avatar">{item.name.charAt(0)}</div>
+                    <div className="approval-person">
                       <strong>{item.name}</strong>
-                      <span className={`approval-type-badge ${item.type.toLowerCase()}`}>{item.type}</span>
+                      <span>NIP. {item.nip}</span>
                     </div>
-                    <div className="approval-row-meta">
-                      {item.unit} · {item.startDate}{item.startDate !== item.endDate ? ` - ${item.endDate}` : ""} · {item.reason}
+                    <div className="approval-row-main">
+                      <div className="approval-row-title">
+                        <span className={`approval-type-badge ${approvalTypeClass(item.type)}`}>{item.type}</span>
+                        <strong>{item.startDate}{item.startDate !== item.endDate ? ` - ${item.endDate}` : ""}</strong>
+                      </div>
+                      <div className="approval-row-meta">
+                        {item.reason}
+                      </div>
                     </div>
-                  </div>
-                  <span className={`approval-status-badge ${item.status.toLowerCase()}`}>{item.status}</span>
-                  <span className={`sync-status ${item.calendarStatus.toLowerCase().replace(/\s+/g, "-")}`}>
-                    {item.calendarStatus}
-                  </span>
-                  <span className="approval-submitted">{item.submitted}</span>
-                  <span className="approval-chevron">›</span>
-                </button>
-              ))}
+                    <div className="approval-row-state">
+                      <span className={`approval-status-badge ${approvalStatusClass(item.status)}`}>{item.status}</span>
+                      {item.calendarStatus && (
+                        <span className={`sync-status ${item.calendarStatus.toLowerCase().replace(/\s+/g, "-")}`}>
+                          {item.calendarStatus}
+                        </span>
+                      )}
+                    </div>
+                    <span className="approval-submitted">
+                      <strong>{submitted.date}</strong>
+                      <small>{submitted.time}</small>
+                    </span>
+                    <span className="approval-chevron">⋮</span>
+                  </button>
+                );
+              })}
 
               {filteredData.length === 0 && (
                 <div className="empty-state">Tidak ada pengajuan yang ditemukan.</div>
@@ -378,11 +500,13 @@ function Approval() {
               </div>
               <div className="approval-detail-body">
                 <div className="approval-detail-badges">
-                  <span className={`approval-type-badge ${selectedApproval.type.toLowerCase()}`}>{selectedApproval.type}</span>
-                  <span className={`approval-status-badge ${selectedApproval.status.toLowerCase()}`}>{selectedApproval.status}</span>
-                  <span className={`sync-status ${selectedApproval.calendarStatus.toLowerCase().replace(/\s+/g, "-")}`}>
-                    Google Calendar: {selectedApproval.calendarStatus}
-                  </span>
+                  <span className={`approval-type-badge ${approvalTypeClass(selectedApproval.type)}`}>{selectedApproval.type}</span>
+                  <span className={`approval-status-badge ${approvalStatusClass(selectedApproval.status)}`}>{selectedApproval.status}</span>
+                  {selectedApproval.calendarStatus && (
+                    <span className={`sync-status ${selectedApproval.calendarStatus.toLowerCase().replace(/\s+/g, "-")}`}>
+                      Google Calendar: {selectedApproval.calendarStatus}
+                    </span>
+                  )}
                 </div>
                 <div className="approval-detail-fields">
                   <div><span>Mulai</span><strong>{selectedApproval.startDate}</strong></div>
@@ -421,7 +545,7 @@ function Approval() {
                   )}
                 </div>
               </div>
-              {selectedApproval.status === "Menunggu" && (
+              {selectedApproval.status === "Menunggu Persetujuan" && (
                 <div className="modal-actions">
                   <button className="reject-submit" onClick={() => handleReject(selectedApproval.id)} disabled={actionLoading}>
                     {actionLoading ? "Memproses..." : "Tolak"}

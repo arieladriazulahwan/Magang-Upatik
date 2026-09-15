@@ -14,6 +14,34 @@ const normalizeArray = (payload) => {
 
 const getEmployeeName = (employee) => employee.name || employee.nama || employee.full_name || "Pegawai";
 const getShiftName = (shift) => shift.name || shift.nama || shift.shift_name || "Shift";
+const getUnitName = (item = {}) =>
+  item.unit ||
+  item.unit_name ||
+  item.unit_kerja ||
+  item.work_unit?.name ||
+  "";
+
+const isHospitalUnit = (unit = {}) => {
+  const text = `${unit.type || ""} ${unit.name || unit.nama || ""} ${unit.code || ""}`.toLowerCase();
+  return (
+    text.includes("rumah_sakit") ||
+    text.includes("rumah sakit") ||
+    text.includes("rs pendidikan tadulako") ||
+    (text.includes("tadulako") && text.includes("rs")) ||
+    text.includes("zs")
+  );
+};
+
+const isDoctorOrNurse = (employee = {}) => {
+  const position = employee.structural_position?.name || employee.position || employee.jabatan || "";
+  const searchable = `${employee.name || ""} ${employee.employee_type || ""} ${position}`.toLowerCase();
+  return searchable.includes("dokter") || searchable.includes("dr.") || searchable.includes("perawat");
+};
+
+const isHospitalDoctorOrNurse = (employee = {}) =>
+  isHospitalUnit(employee.work_unit || {}) || getUnitName(employee).toLowerCase().includes("rumah sakit")
+    ? isDoctorOrNurse(employee)
+    : false;
 
 function Jadwal() {
   const canCreateSchedule = canManageShifts();
@@ -36,7 +64,7 @@ function Jadwal() {
         apiRequest("/shifts"),
       ]);
       setSchedules(normalizeArray(scheduleResponse));
-      setEmployees(employeeResponse);
+      setEmployees(employeeResponse.filter(isHospitalDoctorOrNurse));
       setShifts(normalizeArray(shiftResponse));
     } catch (err) {
       console.error("Gagal mengambil jadwal shift:", err);
@@ -91,13 +119,13 @@ function Jadwal() {
     <AdminLayout>
       <div className="schedule-page">
         <div className="page-heading">
-          <div><h2>Jadwal Shift</h2><p>Atur penempatan shift pegawai berdasarkan tanggal</p></div>
+          <div><h2>Jadwal Shift</h2><p>Atur shift dokter dan perawat Rumah Sakit Tadulako</p></div>
           {canCreateSchedule && <button className="primary-button" onClick={() => setShowModal(true)}>+ Atur Jadwal</button>}
         </div>
 
         <section className="data-panel schedule-assignment-panel">
           <div className="data-toolbar schedule-assignment-toolbar">
-            <div><h3>Penjadwalan Pegawai</h3><p>Daftar shift yang sudah ditetapkan pada kalender kerja</p></div>
+            <div><h3>Penjadwalan Dokter & Perawat</h3><p>Daftar shift layanan Rumah Sakit Tadulako</p></div>
             <div className="search-box"><span>⌕</span><input type="search" placeholder="Cari pegawai, shift, atau tanggal..." value={search} onChange={(event) => setSearch(event.target.value)} /></div>
           </div>
 
