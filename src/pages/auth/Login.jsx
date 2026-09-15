@@ -18,16 +18,62 @@ const normalizeRole = (user, payload) => {
   const allowedRoles = new Set([
     "super_admin", "admin_kepegawaian", "admin_unit", "pimpinan", "pegawai", "developer",
   ]);
+  const priority = [
+    "super_admin",
+    "developer",
+    "admin_kepegawaian",
+    "admin_unit",
+    "pimpinan",
+    "pegawai",
+  ];
+  const foundRoles = [];
 
   for (const candidate of candidates) {
     const roleName = typeof candidate === "object" ? candidate?.app_role || candidate?.local_role || candidate?.name : candidate;
     const normalized = String(roleName || "").trim().toLowerCase().replace(/[ -]+/g, "_");
     const mapped = normalized === "superadmin" ? "super_admin" : normalized === "admin" ? "admin_kepegawaian" : normalized;
-    if (allowedRoles.has(mapped)) return mapped;
+    if (allowedRoles.has(mapped)) foundRoles.push(mapped);
+  }
+
+  for (const role of priority) {
+    if (foundRoles.includes(role)) return role;
+  }
+
+  const permissions = [
+    ...(Array.isArray(user?.permissions) ? user.permissions : []),
+    ...(Array.isArray(payload?.permissions) ? payload.permissions : []),
+    ...(Array.isArray(user?.roles)
+      ? user.roles.flatMap((role) => (Array.isArray(role?.permissions) ? role.permissions : []))
+      : []),
+  ];
+
+  if (permissions.some((permission) => ["pegawai.create", "pegawai.edit", "pegawai.delete"].includes(permission))) {
+    return "admin_kepegawaian";
   }
 
   // Role yang tidak dikenal tidak boleh memperoleh akses admin di frontend.
   return "pegawai";
+};
+
+const getRoleName = (role) => {
+  const raw = typeof role === "object" ? role?.app_role || role?.local_role || role?.name : role;
+  const normalized = String(raw || "").trim().toLowerCase().replace(/[ -]+/g, "_");
+  return normalized === "superadmin" ? "super_admin" : normalized === "admin" ? "admin_kepegawaian" : normalized;
+};
+
+const getUnitFromLogin = (user, appRole) => {
+  const scopedRole = Array.isArray(user?.roles)
+    ? user.roles.find((role) => getRoleName(role) === appRole && role?.work_unit_name)
+    : null;
+
+  return (
+    scopedRole?.work_unit_name ||
+    user?.employee?.work_unit?.name ||
+    user?.work_unit?.name ||
+    user?.work_unit_name ||
+    user?.unit ||
+    ""
+  );
 };
 
 const storeLoginSession = (response) => {
@@ -51,7 +97,17 @@ const storeLoginSession = (response) => {
   }
 
   localStorage.setItem("isLoggedIn", "true");
-  localStorage.setItem("role", normalizeRole(user, payload));
+  const role = normalizeRole(user, payload);
+  const userUnit = getUnitFromLogin(user, role);
+  localStorage.setItem("role", role);
+
+  if (userUnit) {
+    localStorage.setItem("userUnit", userUnit);
+    localStorage.setItem("unit", userUnit);
+  } else {
+    localStorage.removeItem("userUnit");
+    localStorage.removeItem("unit");
+  }
 };
 
 function Login() {

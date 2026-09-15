@@ -1,38 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import AdminLayout from "../../components/layout/AdminLayout";
 import { apiRequest } from "../../services/api";
 import { canManageLocations } from "../../utils/access";
 
-import {
-  MapContainer,
-  TileLayer,
-  Marker,
-  Circle,
-  Popup,
-  useMap,
-} from "react-leaflet";
-
-import L from "leaflet";
-
-import "leaflet/dist/leaflet.css";
-
-
-/* =========================================
-   FIX ICON LEAFLET
-========================================= */
-
-delete L.Icon.Default.prototype._getIconUrl;
-
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl:
-    "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-
-  iconUrl:
-    "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-
-  shadowUrl:
-    "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-});
+const GOOGLE_MAPS_API_KEY =
+  import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
+const DEFAULT_MAP_CENTER = {
+  lat: -0.899,
+  lng: 119.870,
+};
+let googleMapsLoader = null;
 
 
 /* =========================================
@@ -104,38 +81,167 @@ const normalizeLocation = (location) => {
 
 
 /* =========================================
-   COMPONENT UNTUK MENGUBAH POSISI MAP
+   GOOGLE MAPS
 ========================================= */
 
-function MapController({ locations }) {
-  const map = useMap();
+const loadGoogleMaps = () => {
+  if (window.google?.maps) {
+    return Promise.resolve(window.google.maps);
+  }
 
-  useEffect(() => {
-
-    const validLocations = locations.filter(
-      (location) =>
-        location.latitude &&
-        location.longitude
+  if (!GOOGLE_MAPS_API_KEY) {
+    return Promise.reject(
+      new Error("API key Google Maps belum dikonfigurasi.")
     );
+  }
 
-    if (validLocations.length > 0) {
+  if (googleMapsLoader) {
+    return googleMapsLoader;
+  }
 
-      const bounds = validLocations.map(
-        (location) => [
-          location.latitude,
-          location.longitude,
-        ]
+  googleMapsLoader = new Promise((resolve, reject) => {
+    const existingScript = document.getElementById("google-maps-script");
+
+    window.__klikPresensiGoogleMapsReady = () => {
+      resolve(window.google.maps);
+    };
+
+    if (existingScript) {
+      existingScript.addEventListener("error", () =>
+        reject(new Error("Google Maps gagal dimuat."))
       );
-
-      map.fitBounds(bounds, {
-        padding: [50, 50],
-      });
-
+      return;
     }
 
-  }, [locations, map]);
+    const script = document.createElement("script");
+    script.id = "google-maps-script";
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&callback=__klikPresensiGoogleMapsReady`;
+    script.async = true;
+    script.defer = true;
+    script.onerror = () =>
+      reject(new Error("Google Maps gagal dimuat."));
 
-  return null;
+    document.head.appendChild(script);
+  });
+
+  return googleMapsLoader;
+};
+
+const escapeHtml = (value) =>
+  String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+
+function GoogleLocationMap({ locations, defaultCenter, loading }) {
+  const mapElementRef = useRef(null);
+  const mapRef = useRef(null);
+  const overlaysRef = useRef([]);
+  const [mapError, setMapError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+
+    loadGoogleMaps()
+      .then((maps) => {
+        if (!active || !mapElementRef.current) return;
+
+        if (!mapRef.current) {
+          mapRef.current = new maps.Map(mapElementRef.current, {
+            center: defaultCenter,
+            zoom: 15,
+            mapTypeControl: false,
+            streetViewControl: false,
+            fullscreenControl: true,
+            clickableIcons: false,
+          });
+        }
+
+        overlaysRef.current.forEach((overlay) => overlay.setMap(null));
+        overlaysRef.current = [];
+
+        if (locations.length === 0) {
+          mapRef.current.setCenter(defaultCenter);
+          mapRef.current.setZoom(15);
+          return;
+        }
+
+        const bounds = new maps.LatLngBounds();
+        const infoWindow = new maps.InfoWindow();
+
+        locations.forEach((location) => {
+          const position = {
+            lat: location.latitude,
+            lng: location.longitude,
+          };
+
+          bounds.extend(position);
+
+          const marker = new maps.Marker({
+            map: mapRef.current,
+            position,
+            title: location.name,
+          });
+
+          marker.addListener("click", () => {
+            infoWindow.setContent(`
+              <div style="min-width:180px">
+                <strong>${escapeHtml(location.name)}</strong>
+                <div style="margin-top:4px;color:#64748b">${escapeHtml(location.address)}</div>
+                <div style="margin-top:6px">Radius: ${escapeHtml(location.radius)} m</div>
+              </div>
+            `);
+            infoWindow.open(mapRef.current, marker);
+          });
+
+          const circle = new maps.Circle({
+            map: mapRef.current,
+            center: position,
+            radius: location.radius,
+            strokeColor: "#2563eb",
+            strokeOpacity: 0.85,
+            strokeWeight: 2,
+            fillColor: "#2563eb",
+            fillOpacity: 0.16,
+          });
+
+          overlaysRef.current.push(marker, circle);
+        });
+
+        mapRef.current.fitBounds(bounds, 56);
+
+        if (locations.length === 1) {
+          maps.event.addListenerOnce(mapRef.current, "bounds_changed", () => {
+            if (mapRef.current.getZoom() > 17) {
+              mapRef.current.setZoom(17);
+            }
+          });
+        }
+      })
+      .catch((error) => {
+        if (active) {
+          setMapError(error.message || "Google Maps gagal dimuat.");
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [defaultCenter, locations]);
+
+  return (
+    <div className="google-map-shell">
+      <div className="google-map-canvas" ref={mapElementRef} />
+
+      {(mapError || (!loading && locations.length === 0)) && (
+        <div className="map-empty-overlay">
+          {mapError || "Belum ada titik lokasi"}
+        </div>
+      )}
+    </div>
+  );
 }
 
 
@@ -175,10 +281,7 @@ function Lokasi() {
      DEFAULT MAP
   ========================================= */
 
-  const defaultPosition = [
-    -0.899,
-    119.870,
-  ];
+  const defaultPosition = DEFAULT_MAP_CENTER;
 
 
   /* =========================================
@@ -546,167 +649,14 @@ function Lokasi() {
 
             <div
               className="
-                location-map-leaflet
+                location-map-google
               "
             >
-
-
-              <MapContainer
-
-                center={
-                  validLocations.length > 0
-                    ? [
-                        validLocations[0]
-                          .latitude,
-
-                        validLocations[0]
-                          .longitude,
-                      ]
-                    : defaultPosition
-                }
-
-                zoom={15}
-
-                scrollWheelZoom={
-                  true
-                }
-
-                style={{
-                  width: "100%",
-                  height: "100%",
-                }}
-
-              >
-
-
-                {/* TILE MAP */}
-
-                <TileLayer
-
-                  attribution="
-                    &copy;
-                    OpenStreetMap contributors
-                  "
-
-                  url="
-                    https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png
-                  "
-
-                />
-
-
-                {/* AUTO ZOOM */}
-
-                <MapController
-                  locations={
-                    validLocations
-                  }
-                />
-
-
-                {/* MARKER */}
-
-                {validLocations.map(
-                  (location) => (
-
-                    <Marker
-
-                      key={
-                        location.id
-                      }
-
-                      position={[
-                        location.latitude,
-
-                        location.longitude,
-                      ]}
-
-                    >
-
-
-                      {/* POPUP */}
-
-                      <Popup>
-
-                        <strong>
-                          {location.name}
-                        </strong>
-
-                        <br />
-
-                        {location.address}
-
-                        <br />
-
-                        Radius:
-
-                        {" "}
-
-                        {
-                          location.radius
-                        }
-
-                        m
-
-                      </Popup>
-
-
-                    </Marker>
-
-                  )
-                )}
-
-
-                {/* GEOFENCE */}
-
-                {validLocations.map(
-                  (location) => (
-
-                    <Circle
-
-                      key={
-                        `circle-${location.id}`
-                      }
-
-                      center={[
-                        location.latitude,
-
-                        location.longitude,
-                      ]}
-
-                      radius={
-                        location.radius
-                      }
-
-                    />
-
-                  )
-                )}
-
-
-              </MapContainer>
-
-
-              {/* EMPTY MAP */}
-
-              {
-                !loading &&
-                validLocations.length === 0 && (
-
-                  <div
-                    className="
-                      map-empty-overlay
-                    "
-                  >
-
-                    Belum ada titik lokasi
-
-                  </div>
-
-                )
-              }
-
-
+              <GoogleLocationMap
+                locations={validLocations}
+                defaultCenter={defaultPosition}
+                loading={loading}
+              />
             </div>
 
           </section>

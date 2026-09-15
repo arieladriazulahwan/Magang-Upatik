@@ -178,11 +178,6 @@ function Sidebar() {
   const filteredGroups = navGroups.map((group) => ({
     ...group,
     items: group.items
-      .map((item) =>
-        role === "admin_kepegawaian" && item.path === "/pegawai"
-          ? { ...item, path: "/pegawai/tambah", label: "Tambah Pegawai" }
-          : item
-      )
       .filter((item) => allowedPaths.includes(item.path)),
   }));
 

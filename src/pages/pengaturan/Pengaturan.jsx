@@ -6,6 +6,7 @@ import { apiRequest } from "../../services/api";
 const settingGroups = [
   {
     title: "Jam Kerja & Toleransi",
+    code: "JK",
     icon: "🕒",
     description: "Atur waktu kerja dan batas keterlambatan pegawai",
     settings: [
@@ -37,6 +38,7 @@ const settingGroups = [
 
   {
     title: "Pengenalan Wajah",
+    code: "FW",
     icon: "◉",
     description:
       "Konfigurasi validasi wajah saat melakukan presensi",
@@ -62,6 +64,7 @@ const settingGroups = [
 
   {
     title: "Geofence & Lokasi",
+    code: "GF",
     icon: "⌖",
     description:
       "Atur validasi lokasi saat pegawai melakukan presensi",
@@ -95,6 +98,7 @@ const settingGroups = [
 
   {
     title: "Keamanan & Integrasi",
+    code: "KI",
     icon: "🔐",
     description:
       "Atur keamanan akun dan integrasi sistem eksternal",
@@ -244,6 +248,23 @@ function Pengaturan() {
   return (
     <AdminLayout>
       <div className="settings-page">
+        <section className="settings-hero">
+          <div>
+            <span className="settings-kicker">Konfigurasi Sistem</span>
+            <h2>Pengaturan</h2>
+            <p>Kelola parameter kerja, validasi presensi, keamanan, dan integrasi backend.</p>
+          </div>
+          <div className="settings-hero-metrics">
+            <div>
+              <strong>{settingGroups.length}</strong>
+              <span>Grup</span>
+            </div>
+            <div>
+              <strong>{settingGroups.reduce((total, group) => total + group.settings.length, 0)}</strong>
+              <span>Parameter</span>
+            </div>
+          </div>
+        </section>
 
         
 
@@ -353,7 +374,7 @@ function Pengaturan() {
                 <div className="settings-card-header">
 
                   <div className="settings-card-icon">
-                    {group.icon}
+                    {group.code}
                   </div>
 
                   <div className="settings-card-title">

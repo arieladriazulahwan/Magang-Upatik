@@ -5,8 +5,7 @@ import { createEmployee, getStructuralPositions, getWorkUnits } from "../../serv
 
 function TambahPegawai() {
 	const navigate = useNavigate();
-	const role = String(localStorage.getItem("role") || "").toLowerCase();
-	const backPath = role === "admin_kepegawaian" ? "/dashboard" : "/pegawai";
+	const backPath = "/pegawai";
 	const [units, setUnits] = useState([]);
 	const [positions, setPositions] = useState([]);
 	const [loadingUnits, setLoadingUnits] = useState(true);
@@ -57,6 +56,8 @@ function TambahPegawai() {
 					grade: form.get("grade") || null,
 					rank: form.get("rank") || null,
 					is_active: true,
+					username: form.get("username") || null,
+					password: form.get("password") || null,
 			});
 
 			navigate(backPath);
@@ -166,8 +167,26 @@ function TambahPegawai() {
 						</div>
 					</div>
 
+					<div className="form-section-title">
+						<div>
+							<strong>Akun Login Pegawai</strong>
+							<span>Opsional. Isi jika pegawai langsung dibuatkan akun mobile.</span>
+						</div>
+					</div>
+
+					<div className="form-grid">
+						<div className="form-field">
+							<label htmlFor="username">Username</label>
+							<input id="username" name="username" placeholder="mis. NIP pegawai" />
+						</div>
+						<div className="form-field">
+							<label htmlFor="password">Password</label>
+							<input id="password" name="password" type="password" placeholder="minimal 6 karakter" />
+						</div>
+					</div>
+
 					<div className="form-note">
-						Kategori jam kerja dihitung otomatis dari jenis pegawai dan jabatan. Data wajah dienroll setelah pegawai tersimpan.
+						Kategori jam kerja dihitung otomatis dari jenis pegawai dan jabatan. Jika username dan password diisi, akun pegawai akan dibuat dengan role employee.
 					</div>
 
 					<div className="modal-actions">

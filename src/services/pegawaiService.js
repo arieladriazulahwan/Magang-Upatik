@@ -43,6 +43,17 @@ export const createEmployee = (employee) =>
     body: JSON.stringify(employee),
   });
 
+export const updateEmployee = (id, employee) =>
+  apiRequest(`/employees/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(employee),
+  });
+
+export const deleteEmployee = (id) =>
+  apiRequest(`/employees/${id}`, {
+    method: "DELETE",
+  });
+
 export const getWorkUnits = async () => normalizeCollection(await apiRequest("/work-units"));
 
 // Jabatan struktural merupakan relasi opsional pada tabel employee.

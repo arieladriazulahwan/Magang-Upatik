@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import AdminLayout from "../../components/layout/AdminLayout";
-import { apiRequest } from "../../services/api";
-import { isRestrictedToUnit, getUserUnit } from "../../utils/access";
+import API_URL, { apiRequest } from "../../services/api";
 
 const normalizeArray = (payload) => {
   if (Array.isArray(payload)) return payload;
@@ -41,13 +40,55 @@ const normalizeCalendarStatus = (value) => {
 };
 
 const normalizeType = (value) => {
+  if (value && typeof value === "object") {
+    return normalizeType(value.name || value.category || value.code);
+  }
+
   const type = String(value || "izin").trim().toLowerCase();
   if (type.includes("cuti")) return "Cuti";
   if (type.includes("sakit")) return "Sakit";
-  if (type.includes("wfh")) return "WFH";
+  if (type.includes("wfh") || type.includes("wfa")) return "WFA";
   if (type.includes("lembur")) return "Lembur";
   if (type.includes("dinas")) return "Dinas";
   return "Izin";
+};
+
+const normalizeAttachments = (item) => {
+  const attachments = item.attachments || item.files || item.documents || item.dokumen || [];
+  return Array.isArray(attachments) ? attachments : [];
+};
+
+const formatFileSize = (bytes) => {
+  const size = Number(bytes || 0);
+  if (!size) return "";
+  if (size < 1024 * 1024) return `${Math.ceil(size / 1024)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+const openAttachment = async (attachment) => {
+  const token = localStorage.getItem("token");
+  const url = attachment.download_url || attachment.url || attachment.path;
+
+  if (!url) {
+    alert("URL dokumen tidak tersedia.");
+    return;
+  }
+
+  const response = await fetch(`${API_URL}${url.startsWith("/") ? url : `/${url}`}`, {
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      Accept: attachment.mime_type || "application/octet-stream",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error("Gagal membuka dokumen lampiran.");
+  }
+
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  window.open(objectUrl, "_blank", "noopener,noreferrer");
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
 };
 
 const normalizeApprovalData = (item, index) => {
@@ -63,6 +104,7 @@ const normalizeApprovalData = (item, index) => {
   const unit =
     getNestedValue(item, ["unit", "unit_kerja", "unit_name"]) ||
     getNestedValue(employee, ["unit", "unit_kerja", "unit_name"]) ||
+    employee.work_unit?.name ||
     "-";
   const type = normalizeType(
     getNestedValue(item, ["type", "jenis", "leave_type", "category"])
@@ -100,6 +142,7 @@ const normalizeApprovalData = (item, index) => {
     status,
     calendarStatus: normalizeCalendarStatus(item.gcal_status),
     calendarSyncedAt: item.gcal_synced_at || "",
+    attachments: normalizeAttachments(item),
   };
 };
 
@@ -113,8 +156,6 @@ function Approval() {
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const userIsRestricted = isRestrictedToUnit();
-  const userUnit = getUserUnit();
 
   const fetchApprovals = async () => {
     try {
@@ -151,12 +192,7 @@ function Approval() {
       typeFilter === "Semua Jenis" ||
       item.type.toLowerCase() === typeFilter.toLowerCase();
 
-    // Filter berdasarkan unit jika user adalah pimpinan
-    const matchUnit = 
-      !userIsRestricted || 
-      item.unit.toLowerCase() === userUnit.toLowerCase();
-
-    return matchSearch && matchStatus && matchType && matchUnit;
+    return matchSearch && matchStatus && matchType;
   });
 
   const handleApprove = async (id) => {
@@ -251,10 +287,7 @@ function Approval() {
         <section className="data-panel">
           <div className="approval-toolbar">
             <div className="approval-chips">
-              {["Semua Jenis", "Cuti", "Izin", "Sakit", "WFH", "Lembur", "Dinas"].map((type) => {
-                const dataToCount = userIsRestricted 
-                  ? data.filter(item => item.unit.toLowerCase() === userUnit.toLowerCase())
-                  : data;
+              {["Semua Jenis", "Cuti", "Izin", "Sakit", "WFA", "Lembur", "Dinas"].map((type) => {
                 return (
                   <button
                     key={type}
@@ -262,7 +295,7 @@ function Approval() {
                     onClick={() => setTypeFilter(type)}
                   >
                     {type}
-                    <span>{type === "Semua Jenis" ? dataToCount.length : dataToCount.filter((item) => item.type === type).length}</span>
+                    <span>{type === "Semua Jenis" ? data.length : data.filter((item) => item.type === type).length}</span>
                   </button>
                 );
               })}
@@ -360,6 +393,32 @@ function Approval() {
                 <div className="approval-reason-box">
                   <span>Alasan Pengajuan</span>
                   <p>{selectedApproval.reason}</p>
+                </div>
+                <div className="approval-attachments-box">
+                  <span>Dokumen Pendukung</span>
+                  {selectedApproval.attachments.length > 0 ? (
+                    <div className="approval-attachment-list">
+                      {selectedApproval.attachments.map((attachment, index) => (
+                        <button
+                          type="button"
+                          className="approval-attachment-item"
+                          key={attachment.id || attachment.file_name || index}
+                          onClick={async () => {
+                            try {
+                              await openAttachment(attachment);
+                            } catch (err) {
+                              setError(err.message || "Gagal membuka dokumen lampiran.");
+                            }
+                          }}
+                        >
+                          <strong>{attachment.file_name || attachment.name || `Lampiran ${index + 1}`}</strong>
+                          <small>{attachment.mime_type || "File"} {formatFileSize(attachment.size_bytes)}</small>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p>Tidak ada dokumen pendukung.</p>
+                  )}
                 </div>
               </div>
               {selectedApproval.status === "Menunggu" && (
