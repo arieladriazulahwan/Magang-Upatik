@@ -9,10 +9,12 @@ import Monitoring from "../pages/monitoring/Monitoring";
 import UnitKerja from "../pages/unit/UnitKerja";
 import Jadwal from "../pages/jadwal/Jadwal";
 import Shift from "../pages/shift/Shift";
+import TambahShift from "../pages/shift/TambahShift";
 import Pengajuan from "../pages/pengajuan/Pengajuan";
 import Approval from "../pages/pengajuan/Approval";
 import DetailPengajuan from "../pages/pengajuan/DetailPengajuan";
 import Verifikasi from "../pages/verifikasi/Verifikasi";
+import TambahKoreksi from "../pages/verifikasi/TambahKoreksi";
 import LaporanKehadiran from "../pages/laporan/LaporanKehadiran";
 import Lokasi from "../pages/lokasi/Lokasi";
 import Kalender from "../pages/kalender/Kalender";
@@ -39,9 +41,11 @@ function AppRoutes() {
       <Route path="/unit" element={guarded("/unit", <UnitKerja />)} />
       <Route path="/jadwal" element={guarded("/jadwal", <Jadwal />)} />
       <Route path="/shift" element={guarded("/shift", <Shift />)} />
+      <Route path="/shift/tambah" element={guarded("/shift/tambah", <TambahShift />)} />
       <Route path="/pengajuan" element={guarded("/pengajuan", <Pengajuan />)} />
       <Route path="/pengajuan/detail" element={guarded("/pengajuan/detail", <DetailPengajuan />)} />
       <Route path="/verifikasi" element={guarded("/verifikasi", <Verifikasi />)} />
+      <Route path="/verifikasi/tambah" element={guarded("/verifikasi/tambah", <TambahKoreksi />)} />
       <Route path="/persetujuan" element={guarded("/persetujuan", <Approval />)} />
       <Route path="/laporan" element={guarded("/laporan", <LaporanKehadiran />)} />
       <Route path="/siga8" element={guarded("/siga8", <PemetaanSIGA8 />)} />

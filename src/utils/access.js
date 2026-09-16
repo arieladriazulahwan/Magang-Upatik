@@ -1,24 +1,28 @@
 export const ROLE_ACCESS = {
   super_admin: [
-    "/dashboard", "/monitoring", "/pegawai", "/unit", "/jadwal", "/shift",
-    "/pegawai/tambah", "/pegawai/:id", "/verifikasi", "/persetujuan", "/laporan", "/siga8", "/geofence",
+    "/dashboard", "/monitoring", "/pegawai", "/unit", "/jadwal", "/shift", "/shift/tambah",
+    "/pegawai/tambah", "/pegawai/:id", "/verifikasi", "/verifikasi/tambah", "/persetujuan", "/laporan", "/siga8", "/geofence",
     "/kalender", "/pengaturan",
   ],
   developer: [
-    "/dashboard", "/monitoring", "/pegawai", "/unit", "/jadwal", "/shift",
-    "/pegawai/tambah", "/pegawai/:id", "/verifikasi", "/persetujuan", "/laporan", "/siga8", "/geofence",
+    "/dashboard", "/monitoring", "/pegawai", "/unit", "/jadwal", "/shift", "/shift/tambah",
+    "/pegawai/tambah", "/pegawai/:id", "/verifikasi", "/verifikasi/tambah", "/persetujuan", "/laporan", "/siga8", "/geofence",
     "/kalender", "/pengaturan",
   ],
   admin_kepegawaian: [
-    "/dashboard", "/pegawai", "/pegawai/tambah", "/pegawai/:id",
+    "/dashboard", "/monitoring", "/pegawai", "/pegawai/tambah", "/pegawai/:id",
+    "/verifikasi", "/verifikasi/tambah", "/persetujuan", "/laporan", "/kalender",
+    "/pengaturan", "/pengaturan/permission",
   ],
   admin_unit: [
     "/dashboard", "/monitoring", "/pegawai", "/pegawai/tambah", "/pegawai/:id",
+    "/shift", "/shift/tambah", "/jadwal", "/geofence", "/laporan",
   ],
   pimpinan: [
-    "/dashboard", "/monitoring", "/pengajuan/detail", "/persetujuan", "/laporan",
+    "/dashboard", "/monitoring", "/pegawai", "/pegawai/:id", "/verifikasi", "/verifikasi/tambah",
+    "/pengajuan/detail", "/persetujuan", "/laporan",
   ],
-  pegawai: ["/dashboard", "/pegawai", "/pegawai/:id"],
+  pegawai: ["/dashboard"],
 };
 
 const getStoredPermissions = () => {
@@ -70,13 +74,16 @@ export const canManageEmployees = () =>
   hasAnyPermission(["pegawai.view", "pegawai.create", "pegawai.edit", "pegawai.delete"]);
 
 export const canManageShifts = () =>
-  hasAnyRole(["super_admin", "developer"]);
+  hasAnyRole(["super_admin", "admin_unit", "developer"]);
+
+export const canManageWorkPolicy = () =>
+  hasAnyRole(["super_admin", "admin_kepegawaian", "developer"]);
 
 export const canManageUnits = () =>
   hasAnyRole(["super_admin", "developer"]);
 
 export const canManageLocations = () =>
-  hasAnyRole(["super_admin", "developer"]);
+  hasAnyRole(["super_admin", "admin_unit", "developer"]);
 
 export const isAdminUnitOrLeader = () =>
   hasAnyRole(["admin_unit", "pimpinan"]);
@@ -97,7 +104,7 @@ export const canAddEmployee = () =>
   hasPermission("pegawai.create");
 
 export const canApproveRequests = () =>
-  hasAnyRole(["super_admin", "pimpinan", "developer"]);
+  hasAnyRole(["super_admin", "admin_kepegawaian", "pimpinan", "developer"]);
 
 export const getUserUnit = () => 
   localStorage.getItem("userUnit") || localStorage.getItem("unit") || "";

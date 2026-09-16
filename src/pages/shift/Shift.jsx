@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import AdminLayout from "../../components/layout/AdminLayout";
 import { apiRequest } from "../../services/api";
 import { getEmployees } from "../../services/pegawaiService";
@@ -69,6 +70,7 @@ const getDatesBetween = (startDate, endDate) => {
 };
 
 function Shift() {
+  const navigate = useNavigate();
   const canCreateShift = canManageShifts();
   const [shifts, setShifts] = useState([]);
   const [units, setUnits] = useState([]);
@@ -151,15 +153,6 @@ function Shift() {
 
     return matchSearch && matchUnit;
   });
-
-  const openCreateModal = () => {
-    setEditingShift(null);
-    setSelectedUnitId("");
-    setSelectedEmployeeIds([]);
-    setEmployeeSearch("");
-    setError("");
-    setShowModal(true);
-  };
 
   const openEditModal = (shift) => {
     setEditingShift(shift);
@@ -279,7 +272,7 @@ function Shift() {
 
           {canCreateShift && <button
             className="primary-button"
-            onClick={openCreateModal}
+            onClick={() => navigate("/shift/tambah")}
           >
             + Tambah Shift
           </button>}

@@ -54,6 +54,7 @@ function DetailPegawai() {
 	const status = employee.employment_status || employee.status || "-";
 	const type = employee.employee_type || employee.type || "-";
 	const unit = employee.work_unit?.name || employee.unit || employee.unit_kerja || "-";
+	const currentUnit = employee.current_unit?.name || employee.currentUnit?.name || unit;
 	const faceSamples = getFaceSampleCount(employee);
 	const facePhoto = toFacePhotoUrl(getFaceReferencePhoto(employee));
 
@@ -111,8 +112,11 @@ function DetailPegawai() {
 				<section className="data-panel">
 					<div className="panel-header"><h3>Penempatan</h3></div>
 					<div className="detail-body">
-						<strong>{unit}</strong>
-						<p>{employee.structural_position?.name || employee.position || employee.jabatan || "Tidak ada jabatan struktural"}</p>
+						<div className="detail-list">
+							<div><span>Unit Kerja Utama</span><strong>{unit}</strong></div>
+							<div><span>Unit Presensi</span><strong>{currentUnit}</strong></div>
+							<div><span>Jabatan</span><strong>{employee.structural_position?.name || employee.position || employee.jabatan || "Tidak ada jabatan struktural"}</strong></div>
+						</div>
 					</div>
 				</section>
 			</div>

@@ -74,6 +74,17 @@ const normalizeLocation = (location) => {
       100
     ),
 
+    work_unit_id:
+      location.work_unit_id ||
+      location.work_unit?.id ||
+      "",
+
+    work_unit_name:
+      location.work_unit?.name ||
+      location.work_unit_name ||
+      location.unit ||
+      "Tanpa unit",
+
     is_active:
       location.is_active !== false,
   };
@@ -261,6 +272,9 @@ function Lokasi() {
   const [locations, setLocations] =
     useState([]);
 
+  const [units, setUnits] =
+    useState([]);
+
   const [loading, setLoading] =
     useState(true);
 
@@ -302,6 +316,11 @@ function Lokasi() {
           "/work-locations"
         );
 
+      const unitResponse =
+        await apiRequest(
+          "/work-units"
+        );
+
 
       const data =
         normalizeArray(response)
@@ -309,6 +328,7 @@ function Lokasi() {
 
 
       setLocations(data);
+      setUnits(normalizeArray(unitResponse));
 
     } catch (err) {
 
@@ -386,6 +406,11 @@ function Lokasi() {
             "radius_meters"
           );
 
+        const workUnitId =
+          form.get(
+            "work_unit_id"
+          );
+
 
         /* VALIDASI */
 
@@ -412,6 +437,12 @@ function Lokasi() {
 
         }
 
+        if (!workUnitId) {
+          throw new Error(
+            "Unit kerja wajib dipilih untuk titik presensi."
+          );
+        }
+
 
         /* REQUEST API */
 
@@ -425,6 +456,9 @@ function Lokasi() {
 
               name:
                 name.trim(),
+
+              work_unit_id:
+                Number(workUnitId),
 
               address:
                 address || "",
@@ -589,8 +623,7 @@ function Lokasi() {
             </h2>
 
             <p>
-              Kelola titik presensi dan radius
-              geofence
+              Kelola titik presensi masuk berdasarkan unit kerja
             </p>
 
           </div>
@@ -788,6 +821,10 @@ function Lokasi() {
                         }
 
                       </span>
+
+                      <small>
+                        Unit presensi: {location.work_unit_name}
+                      </small>
 
                     </div>
 
@@ -1046,6 +1083,37 @@ function Lokasi() {
                         "
 
                       />
+
+                    </div>
+
+                    <div
+                      className="
+                        form-field
+                      "
+                    >
+
+                      <label>
+                        Unit Presensi*
+                      </label>
+
+
+                      <select
+                        name="work_unit_id"
+                        required
+                        defaultValue=""
+                      >
+
+                        <option value="" disabled>
+                          Pilih unit kerja
+                        </option>
+
+                        {units.map((unit) => (
+                          <option key={unit.id} value={unit.id}>
+                            {unit.code ? `${unit.code} - ` : ""}{unit.name}
+                          </option>
+                        ))}
+
+                      </select>
 
                     </div>
 

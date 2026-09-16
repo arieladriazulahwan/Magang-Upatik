@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import AdminLayout from "../../components/layout/AdminLayout";
 import { apiRequest } from "../../services/api";
-import { getEmployees } from "../../services/pegawaiService";
 
 const normalizeArray = (payload) => {
   if (Array.isArray(payload)) return payload;
@@ -37,6 +37,10 @@ const normalizeVerificationStatus = (item) => {
 
   if (item.is_manual || item.verified_at || item.verified_by) {
     return "Disetujui";
+  }
+
+  if (getNestedValue(item, ["correction_reason", "reason", "keterangan", "notes", "description"])) {
+    return "Menunggu";
   }
 
   if (["alpha", "tidak_lengkap", "tak_lengkap", "pending", "menunggu"].includes(rawStatus)) {
@@ -93,9 +97,8 @@ const normalizeVerificationData = (item, index) => {
 };
 
 function Verifikasi() {
+  const navigate = useNavigate();
   const [selectedData, setSelectedData] = useState(null);
-  const [employees, setEmployees] = useState([]);
-  const [showAddModal, setShowAddModal] = useState(false);
   const [data, setData] = useState([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("Semua Status");
@@ -109,49 +112,15 @@ function Verifikasi() {
       setLoading(true);
       setError("");
 
-      const [attendanceResponse, employeesResponse] = await Promise.all([
-        apiRequest("/attendance?per_page=100"),
-        getEmployees(),
-      ]);
-      const response = attendanceResponse;
+      const response = await apiRequest("/attendance?per_page=100");
       const normalized = normalizeArray(response).map(normalizeVerificationData);
       setData(normalized);
-      setEmployees(employeesResponse);
     } catch (err) {
       console.error("Gagal mengambil data verifikasi:", err);
       setError(err.message || "Gagal mengambil data verifikasi.");
       setData([]);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleAddCorrection = async (event) => {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-
-    try {
-      setCorrecting(true);
-      setError("");
-      const employeeId = Number(form.get("employee_id"));
-      const date = form.get("date");
-
-      await apiRequest(`/attendance/${employeeId}/mark-present`, {
-        method: "POST",
-        body: JSON.stringify({
-          date,
-          check_in: toDateTimeValue(date, form.get("check_in")),
-          check_out: toDateTimeValue(date, form.get("check_out")),
-          status: form.get("status"),
-          correction_reason: form.get("correction_reason"),
-        }),
-      });
-      setShowAddModal(false);
-      await fetchVerifications();
-    } catch (err) {
-      setError(err.message || "Gagal menambahkan koreksi presensi.");
-    } finally {
-      setCorrecting(false);
     }
   };
 
@@ -218,7 +187,7 @@ function Verifikasi() {
             <p>Verifikasi pengajuan koreksi presensi pegawai</p>
           </div>
 
-          <button className="primary-button" onClick={() => setShowAddModal(true)}>
+          <button className="primary-button" onClick={() => navigate("/verifikasi/tambah")}>
             + Tambah Koreksi
           </button>
         </div>
@@ -466,7 +435,7 @@ function Verifikasi() {
           </div>
         )}
 
-        {showAddModal && (
+        {false && (
           <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
             <div className="employee-modal" onClick={(event) => event.stopPropagation()}>
               <div className="modal-header">

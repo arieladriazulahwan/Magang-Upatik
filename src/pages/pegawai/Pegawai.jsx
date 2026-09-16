@@ -428,6 +428,10 @@ function Pegawai() {
                   </th>
 
                   <th>
+                    Unit Presensi
+                  </th>
+
+                  <th>
                     Jabatan
                   </th>
 
@@ -459,7 +463,7 @@ function Pegawai() {
                   <tr>
 
                     <td
-                      colSpan="8"
+                      colSpan="9"
                       className="empty-state"
                     >
                       Memuat data pegawai...
@@ -486,6 +490,11 @@ function Pegawai() {
                       employee.unit_kerja ||
                       employee.unitKerja ||
                       "-";
+
+                    const currentUnit =
+                      employee.current_unit?.name ||
+                      employee.currentUnit?.name ||
+                      unit;
 
                     const position =
                       employee.structural_position?.name ||
@@ -564,6 +573,13 @@ function Pegawai() {
 
                         <td>
                           {unit}
+                        </td>
+
+                        <td>
+                          <strong className="schedule-name">{currentUnit}</strong>
+                          {currentUnit !== unit && (
+                            <span className="field-hint">Unit aktif absen masuk</span>
+                          )}
                         </td>
 
 
@@ -679,7 +695,7 @@ function Pegawai() {
                   <tr>
 
                     <td
-                      colSpan="8"
+                      colSpan="9"
                       className="empty-state"
                     >
                       Belum ada data pegawai.
