@@ -259,15 +259,6 @@ function Pegawai() {
 
           </div>
 
-          {canCreateEmployee && <button
-            className="primary-button"
-            onClick={() =>
-              navigate("/pegawai/tambah")
-            }
-          >
-            + Tambah Pegawai
-          </button>}
-
         </div>
 
 
@@ -388,7 +379,24 @@ function Pegawai() {
               </select>
 
               <button
-                className="secondary-button"
+                className="secondary-button employee-refresh-button"
+                onClick={fetchEmployees}
+                disabled={loading}
+              >
+                {loading ? "Memuat..." : "Refresh"}
+              </button>
+
+              {canCreateEmployee && <button
+                className="primary-button"
+                onClick={() =>
+                  navigate("/pegawai/tambah")
+                }
+              >
+                + Tambah Pegawai
+              </button>}
+
+              <button
+                className="secondary-button employee-toolbar-refresh"
                 onClick={fetchEmployees}
                 disabled={loading}
                 style={{

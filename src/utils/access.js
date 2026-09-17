@@ -1,11 +1,11 @@
 export const ROLE_ACCESS = {
   super_admin: [
-    "/dashboard", "/monitoring", "/pegawai", "/unit", "/jadwal", "/shift", "/shift/tambah",
+    "/dashboard", "/monitoring", "/pegawai", "/unit", "/unit/tambah", "/unit/:id", "/jadwal", "/shift", "/shift/tambah",
     "/pegawai/tambah", "/pegawai/:id", "/verifikasi", "/verifikasi/tambah", "/persetujuan", "/laporan", "/siga8", "/geofence",
     "/kalender", "/pengaturan",
   ],
   developer: [
-    "/dashboard", "/monitoring", "/pegawai", "/unit", "/jadwal", "/shift", "/shift/tambah",
+    "/dashboard", "/monitoring", "/pegawai", "/unit", "/unit/tambah", "/unit/:id", "/jadwal", "/shift", "/shift/tambah",
     "/pegawai/tambah", "/pegawai/:id", "/verifikasi", "/verifikasi/tambah", "/persetujuan", "/laporan", "/siga8", "/geofence",
     "/kalender", "/pengaturan",
   ],
@@ -54,6 +54,15 @@ export const getAllowedPaths = (role) => {
 
   if (hasPermission("pegawai.create")) {
     paths.add("/pegawai/tambah");
+  }
+
+  if (hasAnyPermission(["unit.view", "unit.create", "unit.edit", "unit.delete"])) {
+    paths.add("/unit");
+    paths.add("/unit/:id");
+  }
+
+  if (hasPermission("unit.create")) {
+    paths.add("/unit/tambah");
   }
 
   return [...paths];

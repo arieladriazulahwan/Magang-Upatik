@@ -7,6 +7,8 @@ import TambahPegawai from "../pages/pegawai/TambahPegawai";
 import DetailPegawai from "../pages/pegawai/DetailPegawai";
 import Monitoring from "../pages/monitoring/Monitoring";
 import UnitKerja from "../pages/unit/UnitKerja";
+import TambahUnitKerja from "../pages/unit/TambahUnitKerja";
+import DetailUnitKerja from "../pages/unit/DetailUnitKerja";
 import Jadwal from "../pages/jadwal/Jadwal";
 import Shift from "../pages/shift/Shift";
 import TambahShift from "../pages/shift/TambahShift";
@@ -39,6 +41,8 @@ function AppRoutes() {
       <Route path="/pegawai/tambah" element={guarded("/pegawai/tambah", <TambahPegawai />)} />
       <Route path="/pegawai/:id" element={guarded("/pegawai/:id", <DetailPegawai />)} />
       <Route path="/unit" element={guarded("/unit", <UnitKerja />)} />
+      <Route path="/unit/tambah" element={guarded("/unit/tambah", <TambahUnitKerja />)} />
+      <Route path="/unit/:id" element={guarded("/unit/:id", <DetailUnitKerja />)} />
       <Route path="/jadwal" element={guarded("/jadwal", <Jadwal />)} />
       <Route path="/shift" element={guarded("/shift", <Shift />)} />
       <Route path="/shift/tambah" element={guarded("/shift/tambah", <TambahShift />)} />

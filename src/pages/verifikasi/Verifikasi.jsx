@@ -186,10 +186,6 @@ function Verifikasi() {
             <h2>Verifikasi & Koreksi</h2>
             <p>Verifikasi pengajuan koreksi presensi pegawai</p>
           </div>
-
-          <button className="primary-button" onClick={() => navigate("/verifikasi/tambah")}>
-            + Tambah Koreksi
-          </button>
         </div>
 
         <div className="verification-summary">
@@ -248,6 +244,10 @@ function Verifikasi() {
                   <option key={unit} value={unit}>{unit}</option>
                 ))}
               </select>
+
+              <button className="primary-button" onClick={() => navigate("/verifikasi/tambah")}>
+                + Tambah Koreksi
+              </button>
             </div>
           </div>
 

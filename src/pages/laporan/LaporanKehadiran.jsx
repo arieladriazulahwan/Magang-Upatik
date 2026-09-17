@@ -30,7 +30,66 @@ const getUnitName = (item, employee = {}) =>
 	employee.work_unit?.name ||
 	"";
 
-const escapeCsv = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+const getNip = (item, employee = {}) =>
+	item.nip ||
+	item.employee_nip ||
+	item.nik ||
+	employee.nip ||
+	employee.nik ||
+	"-";
+
+const UNTAD_LOGO_PATH = "/logo-untad.svg";
+
+const loadImageAsPngDataUrl = (src, width = 180, height = 180) =>
+	new Promise((resolve) => {
+		const image = new Image();
+		image.crossOrigin = "anonymous";
+		image.onload = () => {
+			try {
+				const canvas = document.createElement("canvas");
+				canvas.width = width;
+				canvas.height = height;
+				const context = canvas.getContext("2d");
+				context.clearRect(0, 0, width, height);
+				context.drawImage(image, 0, 0, width, height);
+				resolve(canvas.toDataURL("image/png"));
+			} catch {
+				resolve("");
+			}
+		};
+		image.onerror = () => resolve("");
+		image.src = src;
+	});
+
+const drawUntadLogoFallback = (doc, x, y, size) => {
+	const centerX = x + size / 2;
+	const shieldTop = y + 1;
+	const shieldBottom = y + size - 1;
+
+	doc.setLineWidth(0.6);
+	doc.setDrawColor(17, 24, 39);
+	doc.setFillColor(229, 30, 37);
+	doc.triangle(centerX, shieldTop, x + size - 1, y + size * 0.24, x + size * 0.9, shieldBottom, "FD");
+	doc.triangle(centerX, shieldTop, x + 1, y + size * 0.24, x + size * 0.1, shieldBottom, "FD");
+	doc.rect(x + size * 0.1, y + size * 0.23, size * 0.8, size * 0.56, "F");
+
+	doc.setFillColor(248, 220, 44);
+	doc.setDrawColor(17, 24, 39);
+	doc.ellipse(centerX, y + size * 0.44, size * 0.13, size * 0.29, "FD");
+	doc.ellipse(x + size * 0.34, y + size * 0.48, size * 0.11, size * 0.26, "FD");
+	doc.ellipse(x + size * 0.66, y + size * 0.48, size * 0.11, size * 0.26, "FD");
+
+	doc.setFillColor(229, 30, 37);
+	doc.ellipse(centerX, y + size * 0.54, size * 0.06, size * 0.11, "FD");
+
+	doc.setDrawColor(248, 220, 44);
+	doc.setLineWidth(1.1);
+	doc.arc(centerX, y + size * 0.72, size * 0.28, size * 0.12, 12, 168, "S");
+	doc.setFont("helvetica", "bold");
+	doc.setFontSize(4.8);
+	doc.setTextColor(255, 255, 255);
+	doc.text("UNTAD", centerX, y + size * 0.9, { align: "center" });
+};
 
 const formatDuration = (minutes) => {
 	const total = Number(minutes || 0);
@@ -42,6 +101,17 @@ const formatDuration = (minutes) => {
 	return `${hours} jam ${remainingMinutes} menit`;
 };
 
+const getInitials = (name) => {
+	const words = String(name || "P")
+		.trim()
+		.split(/\s+/)
+		.filter(Boolean);
+
+	return (words.length > 1 ? `${words[0][0]}${words[1][0]}` : words[0]?.slice(0, 2) || "P").toUpperCase();
+};
+
+const PAGE_SIZE = 10;
+
 function LaporanKehadiran() {
 	const [attendance, setAttendance] = useState([]);
 	const [employees, setEmployees] = useState([]);
@@ -51,6 +121,8 @@ function LaporanKehadiran() {
 	const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));
 	const [unit, setUnit] = useState("Semua Unit");
 	const [reportType, setReportType] = useState("kehadiran");
+	const [search, setSearch] = useState("");
+	const [currentPage, setCurrentPage] = useState(1);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState("");
 
@@ -77,6 +149,10 @@ function LaporanKehadiran() {
 	};
 
 	useEffect(() => { fetchReports(); }, []);
+
+	useEffect(() => {
+		setCurrentPage(1);
+	}, [period, selectedMonth, unit, reportType, search]);
 
 	const units = useMemo(() => {
 		return [
@@ -143,6 +219,7 @@ function LaporanKehadiran() {
 				return {
 					id: item.id || index,
 					name: item.name || item.employee_name || employee.name || "Pegawai",
+					nip: getNip(item, employee),
 					unit: getUnitName(item, employee) || "-",
 					category: item.type || item.category || item.leave_type || "Izin",
 					date: item.start_date || item.tanggal_mulai || "-",
@@ -171,6 +248,7 @@ function LaporanKehadiran() {
 				return {
 					id: item.id || index,
 					name: item.name || item.employee_name || employee.name || matchedEmployee?.name || "Pegawai",
+					nip: getNip(item, matchedEmployee || employee),
 					unit: getUnitName(item, matchedEmployee || employee) || "-",
 					date: item.date || item.tanggal || "-",
 					timeRange: `${startTime} - ${endTime}`,
@@ -181,7 +259,7 @@ function LaporanKehadiran() {
 			});
 		}
 
-		return attendance.filter((item) => {
+		const attendanceRows = attendance.filter((item) => {
 			const employee = item.employee || item.user || {};
 			const itemUnit = getUnitName(item, employee);
 			const dateField = item.date || item.attendance_date || "";
@@ -195,6 +273,7 @@ function LaporanKehadiran() {
 			return {
 				id: item.id || index,
 				name: item.name || item.employee_name || employee.name || "Pegawai",
+				nip: getNip(item, employee),
 				unit: getUnitName(item, employee) || "-",
 				date: item.date || item.attendance_date || "-",
 				hadir: ["hadir", "terlambat", "pulang_cepat"].includes(status) ? 1 : 0,
@@ -204,7 +283,89 @@ function LaporanKehadiran() {
 				status: item.status || item.attendance_status || "-",
 			};
 		});
+
+		const recapMap = new Map();
+
+		attendanceRows.forEach((row) => {
+			const key = `${row.name}-${row.unit}-${row.nip || ""}`;
+			const status = String(row.status || "").toLowerCase();
+			const current = recapMap.get(key) || {
+				...row,
+				id: key,
+				hadir: 0,
+				terlambat: 0,
+				alpha: 0,
+				izin: 0,
+				dinas: 0,
+				cuti: 0,
+				total: 0,
+				status: "Rekap",
+			};
+
+			current.hadir += row.hadir;
+			current.terlambat += row.terlambat;
+			current.alpha += row.alpha;
+			current.izin += row.izin;
+			current.dinas += status.includes("dinas") || status.includes("perjadin") ? 1 : 0;
+			current.cuti += status.includes("cuti") ? 1 : 0;
+			current.total += 1;
+			recapMap.set(key, current);
+		});
+
+		return [...recapMap.values()];
 	}, [attendance, employees, leaveRequests, overtimeRequests, reportType, unit, period, selectedMonth]);
+
+	const filteredRows = useMemo(() => {
+		const keyword = search.trim().toLowerCase();
+		if (!keyword) return rows;
+
+		return rows.filter((row) =>
+			[
+				row.name,
+				row.nip,
+				row.unit,
+				row.date,
+				row.status,
+				row.category,
+				row.timeRange,
+				row.duration,
+				row.detail,
+			]
+				.filter(Boolean)
+				.some((value) => String(value).toLowerCase().includes(keyword))
+		);
+	}, [rows, search]);
+
+	const pagedRows = useMemo(() => {
+		const start = (currentPage - 1) * PAGE_SIZE;
+		return filteredRows.slice(start, start + PAGE_SIZE);
+	}, [filteredRows, currentPage]);
+
+	const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
+
+	const reportSummary = useMemo(() => {
+		const attendanceTotals = rows.reduce(
+			(total, row) => ({
+				hadir: total.hadir + Number(row.hadir || 0),
+				terlambat: total.terlambat + Number(row.terlambat || 0),
+				alpha: total.alpha + Number(row.alpha || 0),
+				izin: total.izin + Number(row.izin || 0),
+				dinas: total.dinas + Number(row.dinas || 0),
+				cuti: total.cuti + Number(row.cuti || 0),
+			}),
+			{ hadir: 0, terlambat: 0, alpha: 0, izin: 0, dinas: 0, cuti: 0 }
+		);
+
+		return [
+			{ label: "Total Pegawai", value: employees.length, detail: "pegawai", tone: "green" },
+			{ label: "Hadir", value: attendanceTotals.hadir, detail: "hari", tone: "mint" },
+			{ label: "Terlambat", value: attendanceTotals.terlambat, detail: "hari", tone: "amber" },
+			{ label: "Izin / Sakit", value: attendanceTotals.izin, detail: "hari", tone: "blue" },
+			{ label: "Dinas", value: attendanceTotals.dinas, detail: "hari", tone: "purple" },
+			{ label: "Cuti", value: reportType === "cuti" ? rows.length : attendanceTotals.cuti, detail: "hari", tone: "pink" },
+			{ label: "Alpha", value: attendanceTotals.alpha, detail: "hari", tone: "red" },
+		];
+	}, [employees.length, reportType, rows]);
 
 	const getPeriodLabel = () => {
 		switch (period) {
@@ -223,7 +384,8 @@ function LaporanKehadiran() {
 		}
 	};
 
-	const downloadPdf = () => {
+	const downloadPdf = async () => {
+		const logoDataUrl = await loadImageAsPngDataUrl(UNTAD_LOGO_PATH);
 		const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
 		const title =
 			reportType === "cuti"
@@ -238,24 +400,24 @@ function LaporanKehadiran() {
 		const margin = 14;
 		const printedAt = new Date().toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" });
 		const headers = reportType === "cuti"
-			? ["No", "Pegawai", "Unit Kerja", "Jenis", "Tanggal", "Status"]
+			? ["No", "Pegawai", "NIP", "Unit Kerja", "Jenis", "Tanggal", "Status"]
 			: reportType === "lembur"
-				? ["No", "Pegawai", "Unit Kerja", "Tanggal", "Jam Rencana", "Durasi", "Status", "Keterangan"]
-				: ["No", "Pegawai", "Unit Kerja", "Tanggal", "Hadir", "Telat", "Alpha", "Izin", "Status"];
+				? ["No", "Pegawai", "NIP", "Unit Kerja", "Tanggal", "Jam Rencana", "Durasi", "Status"]
+				: ["No", "Pegawai", "NIP", "Unit Kerja", "Hadir", "Telat", "Alpha", "Izin", "Dinas", "Cuti", "Total"];
 		const columnWidths = reportType === "cuti"
-			? [10, 62, 52, 34, 32, 60]
+			? [10, 50, 36, 42, 28, 28, 54]
 			: reportType === "lembur"
-				? [10, 50, 42, 26, 30, 28, 30, 62]
-				: [10, 58, 45, 28, 16, 16, 16, 16, 42];
+				? [10, 42, 34, 38, 24, 28, 26, 34]
+				: [10, 42, 34, 38, 17, 17, 17, 17, 17, 17, 20];
 
-		const tableData = rows.map((row, index) => {
+		const tableData = filteredRows.map((row, index) => {
 			if (reportType === "cuti") {
-				return [String(index + 1), row.name, row.unit, row.category, row.date, toLabel(row.status)];
+				return [String(index + 1), row.name, row.nip, row.unit, row.category, row.date, toLabel(row.status)];
 			}
 			if (reportType === "lembur") {
-				return [String(index + 1), row.name, row.unit, row.date, row.timeRange, row.duration, toLabel(row.status), row.detail];
+				return [String(index + 1), row.name, row.nip, row.unit, row.date, row.timeRange, row.duration, toLabel(row.status)];
 			}
-			return [String(index + 1), row.name, row.unit, row.date, String(row.hadir), String(row.terlambat), String(row.alpha), String(row.izin), toLabel(row.status)];
+			return [String(index + 1), row.name, row.nip, row.unit, String(row.hadir), String(row.terlambat), String(row.alpha), String(row.izin), String(row.dinas), String(row.cuti), String(row.total)];
 		});
 
 		const drawReportHeader = () => {
@@ -264,14 +426,11 @@ function LaporanKehadiran() {
 			const logoY = 10;
 			const logoSize = 22;
 
-			doc.setTextColor(18, 24, 38);
-			doc.setDrawColor(180, 35, 30);
-			doc.setLineWidth(0.7);
-			doc.circle(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2, "S");
-			doc.setFont("helvetica", "bold");
-			doc.setFontSize(8);
-			doc.setTextColor(180, 35, 30);
-			doc.text("UNTAD", logoX + logoSize / 2, logoY + 13, { align: "center" });
+			if (logoDataUrl) {
+				doc.addImage(logoDataUrl, "PNG", logoX, logoY, logoSize, logoSize);
+			} else {
+				drawUntadLogoFallback(doc, logoX, logoY, logoSize);
+			}
 
 			doc.setTextColor(18, 24, 38);
 			doc.setFont("helvetica", "bold");
@@ -358,7 +517,7 @@ function LaporanKehadiran() {
 			doc.setFont("helvetica", "normal");
 			doc.setFontSize(8);
 			doc.setTextColor(112, 128, 144);
-			doc.text(`Total ${rows.length} data`, margin, pageHeight - 8);
+			doc.text(`Total ${filteredRows.length} data`, margin, pageHeight - 8);
 			doc.text(`Halaman ${page} dari ${totalPages}`, pageWidth - margin, pageHeight - 8, { align: "right" });
 		}
 
@@ -369,40 +528,21 @@ function LaporanKehadiran() {
 		doc.save(fileName);
 	};
 
-	const downloadCsv = () => {
-		const headers = reportType === "cuti"
-			? ["Pegawai", "Unit Kerja", "Jenis", "Tanggal Mulai", "Status", "Keterangan"]
-			: reportType === "lembur"
-				? ["Pegawai", "Unit Kerja", "Tanggal", "Jam Rencana", "Durasi", "Status", "Keterangan"]
-			: ["Pegawai", "Unit Kerja", "Tanggal", "Hadir", "Terlambat", "Alpha", "Izin", "Status"];
-		const values = rows.map((row) => reportType === "cuti"
-			? [row.name, row.unit, row.category, row.date, row.status, row.detail]
-			: reportType === "lembur"
-				? [row.name, row.unit, row.date, row.timeRange, row.duration, row.status, row.detail]
-			: [row.name, row.unit, row.date, row.hadir, row.terlambat, row.alpha, row.izin, row.status]);
-		const csv = [headers, ...values].map((line) => line.map(escapeCsv).join(",")).join("\r\n");
-		const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" });
-		const url = URL.createObjectURL(blob);
-		const link = document.createElement("a");
-		link.href = url;
-		const periodShort = period === "bulan-pilihan" ? selectedMonth : period.replace("bulan-", "").replace("tahun-", "");
-		const unitShort = unit === "Semua Unit" ? "semua" : unit.toLowerCase().replace(/\s+/g, "-");
-		link.download = `rekap-${reportType}-${periodShort}-${unitShort}-${new Date().toISOString().slice(0, 10)}.csv`;
-		link.click();
-		URL.revokeObjectURL(url);
-	};
-
 	const tableHeaders = reportType === "cuti"
-		? ["Pegawai", "Unit Kerja", "Jenis", "Tanggal", "Status", "Keterangan"]
+		? ["No", "Pegawai", "NIP", "Unit Kerja", "Jenis", "Tanggal", "Status", "Keterangan"]
 		: reportType === "lembur"
-			? ["Pegawai", "Unit Kerja", "Tanggal", "Jam Rencana", "Durasi", "Status", "Keterangan"]
-			: ["Pegawai", "Unit Kerja", "Tanggal", "Hadir", "Telat", "Alpha", "Izin", "Status"];
+			? ["No", "Pegawai", "NIP", "Unit Kerja", "Tanggal", "Jam Rencana", "Durasi", "Status", "Keterangan"]
+			: ["No", "Nama Pegawai", "NIP", "Unit Kerja", "Hadir", "Terlambat", "Alpha", "Izin/Sakit", "Dinas", "Cuti", "Total"];
 
-	const renderRowCells = (row) => {
+	const renderRowCells = (row, index) => {
+		const rowNumber = (currentPage - 1) * PAGE_SIZE + index + 1;
+
 		if (reportType === "cuti") {
 			return (
 				<>
-					<td><strong>{row.name}</strong></td>
+					<td>{rowNumber}</td>
+					<td><div className="report-person"><span>{getInitials(row.name)}</span><strong>{row.name}</strong></div></td>
+					<td>{row.nip}</td>
 					<td>{row.unit}</td>
 					<td>{row.category}</td>
 					<td>{row.date}</td>
@@ -415,7 +555,9 @@ function LaporanKehadiran() {
 		if (reportType === "lembur") {
 			return (
 				<>
-					<td><strong>{row.name}</strong></td>
+					<td>{rowNumber}</td>
+					<td><div className="report-person"><span>{getInitials(row.name)}</span><strong>{row.name}</strong></div></td>
+					<td>{row.nip}</td>
 					<td>{row.unit}</td>
 					<td>{row.date}</td>
 					<td>{row.timeRange}</td>
@@ -428,14 +570,17 @@ function LaporanKehadiran() {
 
 		return (
 			<>
-				<td><strong>{row.name}</strong></td>
+				<td>{rowNumber}</td>
+				<td><div className="report-person"><span>{getInitials(row.name)}</span><strong>{row.name}</strong></div></td>
+				<td>{row.nip}</td>
 				<td>{row.unit}</td>
-				<td>{row.date}</td>
-				<td>{row.hadir}</td>
-				<td>{row.terlambat}</td>
-				<td>{row.alpha}</td>
-				<td>{row.izin}</td>
-				<td><span className="report-status">{row.status}</span></td>
+				<td><span className="report-pill hadir">{row.hadir}</span></td>
+				<td><span className="report-pill terlambat">{row.terlambat}</span></td>
+				<td><span className="report-pill alpha">{row.alpha}</span></td>
+				<td><span className="report-pill izin">{row.izin}</span></td>
+				<td><span className="report-pill dinas">{row.dinas}</span></td>
+				<td><span className="report-pill cuti">{row.cuti}</span></td>
+				<td><span className="report-pill total">{row.total}</span></td>
 			</>
 		);
 	};
@@ -443,31 +588,92 @@ function LaporanKehadiran() {
 	return (
 		<AdminLayout>
 			<div className="report-page">
-				<div className="page-heading">
-					<div><h2>Rekap & Ekspor</h2><p>Rekapitulasi kehadiran dan pengajuan pegawai</p></div>
-					<div className="report-export-actions">
-						<button className="secondary-button" onClick={downloadCsv} disabled={loading}>Ekspor CSV</button>
-						<button className="primary-button" onClick={downloadPdf} disabled={loading}>Ekspor PDF</button>
+				<div className="page-heading report-heading">
+					<div>
+						<span className="page-breadcrumb">Universitas Tadulako / Laporan / Rekap & Ekspor</span>
+						<h2>Rekap & Ekspor</h2>
+						<p>Rekapitulasi kehadiran dan pengajuan pegawai berdasarkan periode yang dipilih.</p>
 					</div>
 				</div>
 
 				<section className="report-toolbar">
+					<label className="report-filter report-search-filter">
+						<span>Pencarian</span>
+						<div className="report-search-box">
+							<span>Cari</span>
+							<input
+								type="text"
+								placeholder="Nama, NIP, unit, status..."
+								value={search}
+								onChange={(event) => setSearch(event.target.value)}
+							/>
+						</div>
+					</label>
 					<label className="report-filter"><span>Jenis Laporan</span><select value={reportType} onChange={(event) => setReportType(event.target.value)}><option value="kehadiran">Kehadiran</option><option value="cuti">Cuti & Izin</option><option value="lembur">Lembur</option></select></label>
 					<label className="report-filter"><span>Periode Laporan</span><select value={period} onChange={(event) => setPeriod(event.target.value)}><option value="bulan-ini">Bulan Ini</option><option value="bulan-lalu">Bulan Lalu</option><option value="bulan-pilihan">Pilih Bulan</option><option value="tahun-ini">Tahun Ini</option></select></label>
 					{period === "bulan-pilihan" && <label className="report-filter"><span>Bulan yang Diekspor</span><input type="month" value={selectedMonth} onChange={(event) => setSelectedMonth(event.target.value)} /></label>}
 					<label className="report-filter"><span>Unit Kerja</span><select value={unit} onChange={(event) => setUnit(event.target.value)}>{units.map((item) => <option key={item}>{item}</option>)}</select></label>
+					<button className="report-show-button" type="button" onClick={fetchReports} disabled={loading}>
+						{loading ? "Memuat..." : "Tampilkan"}
+					</button>
+					<button className="primary-button report-pdf-button" type="button" onClick={downloadPdf} disabled={loading}>
+						Ekspor PDF
+					</button>
+				</section>
+
+				<section className="report-summary-grid">
+					{reportSummary.map((item) => (
+						<div className={`report-summary-card ${item.tone}`} key={item.label}>
+							<span>{item.label}</span>
+							<strong>{item.value}</strong>
+							<small>{item.detail}</small>
+						</div>
+					))}
 				</section>
 
 				<section className="data-panel report-panel">
+					<div className="report-panel-heading">
+						<div>
+							<span className="report-panel-icon">{reportType === "kehadiran" ? "RK" : reportType === "cuti" ? "CI" : "LB"}</span>
+							<div>
+								<h3>{reportType === "kehadiran" ? "Rekap Kehadiran Pegawai" : reportType === "cuti" ? "Rekap Cuti & Izin" : "Rekap Lembur Pegawai"}</h3>
+								<p>Periode: {getPeriodLabel()} - Unit Kerja: {unit} - Jumlah Data: {filteredRows.length}</p>
+							</div>
+						</div>
+						<span className="report-total-badge">{filteredRows.length} data</span>
+					</div>
 					{loading && <div className="empty-state">Memuat laporan...</div>}
 					{!loading && error && <div className="empty-state"><p>{error}</p><button className="secondary-button" onClick={fetchReports}>Coba Lagi</button></div>}
 					{!loading && !error && (
 						<div className="employee-table-wrapper">
 							<table className="employee-table report-table">
 								<thead><tr>{tableHeaders.map((header) => <th key={header}>{header}</th>)}</tr></thead>
-								<tbody>{rows.map((row) => <tr key={row.id}>{renderRowCells(row)}</tr>)}</tbody>
+								<tbody>{pagedRows.map((row, index) => <tr key={row.id}>{renderRowCells(row, index)}</tr>)}</tbody>
 							</table>
-							{rows.length === 0 && <div className="empty-state">Tidak ada data pada filter ini.</div>}
+							{filteredRows.length === 0 && <div className="empty-state">Tidak ada data pada filter ini.</div>}
+						</div>
+					)}
+					{!loading && !error && filteredRows.length > 0 && (
+						<div className="report-pagination">
+							<span>Menampilkan {(currentPage - 1) * PAGE_SIZE + 1} - {Math.min(currentPage * PAGE_SIZE, filteredRows.length)} dari {filteredRows.length} data</span>
+							<div>
+								<button type="button" onClick={() => setCurrentPage((page) => Math.max(1, page - 1))} disabled={currentPage === 1}>{"<"}</button>
+								{Array.from({ length: totalPages }, (_, index) => index + 1)
+									.filter((page) => page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1)
+									.map((page, index, pages) => (
+										<span key={page}>
+											{index > 0 && page - pages[index - 1] > 1 && <b>...</b>}
+											<button
+												type="button"
+												className={currentPage === page ? "active" : ""}
+												onClick={() => setCurrentPage(page)}
+											>
+												{page}
+											</button>
+										</span>
+									))}
+								<button type="button" onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))} disabled={currentPage === totalPages}>{">"}</button>
+							</div>
 						</div>
 					)}
 				</section>

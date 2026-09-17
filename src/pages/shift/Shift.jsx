@@ -269,13 +269,6 @@ function Shift() {
             <h2>Shift Kerja</h2>
             <p>Khusus pengaturan shift pegawai unit Rumah Sakit Tadulako</p>
           </div>
-
-          {canCreateShift && <button
-            className="primary-button"
-            onClick={() => navigate("/shift/tambah")}
-          >
-            + Tambah Shift
-          </button>}
         </div>
 
         <div className="shift-cards">
@@ -327,18 +320,27 @@ function Shift() {
               />
             </div>
 
-            <select
-              className="filter-select"
-              value={unitFilter}
-              onChange={(e) => setUnitFilter(e.target.value)}
-            >
-              <option>Semua Unit</option>
-              {hospitalUnits.map((unit) => (
-                <option key={unit.id || unit.code || unit.name}>
-                  {unit.name || unit.nama || "Unit Rumah Sakit"}
-                </option>
-              ))}
-            </select>
+            <div className="schedule-toolbar-actions">
+              <select
+                className="filter-select"
+                value={unitFilter}
+                onChange={(e) => setUnitFilter(e.target.value)}
+              >
+                <option>Semua Unit</option>
+                {hospitalUnits.map((unit) => (
+                  <option key={unit.id || unit.code || unit.name}>
+                    {unit.name || unit.nama || "Unit Rumah Sakit"}
+                  </option>
+                ))}
+              </select>
+
+              {canCreateShift && <button
+                className="primary-button"
+                onClick={() => navigate("/shift/tambah")}
+              >
+                + Tambah Shift
+              </button>}
+            </div>
           </div>
 
           {loading && (
