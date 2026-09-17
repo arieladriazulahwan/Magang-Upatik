@@ -133,7 +133,11 @@ class FaceController extends Controller
 
     private function faceErrorResponse(FaceRecognitionException $e): JsonResponse
     {
-        $status = $e->errorKey === 'face_service_error' ? 503 : 422;
+        $status = in_array($e->errorKey, [
+            'face_service_error',
+            'face_service_unavailable',
+            'face_service_http_error',
+        ], true) ? 503 : 422;
 
         return response()->json([
             'message' => $e->getMessage(),

@@ -23,7 +23,12 @@ class OvertimeController extends Controller
     public function store(StoreOvertimeRequestRequest $request): JsonResponse
     {
         $employee = $this->resolveActingEmployee($request->user());
-        $overtime = $this->service->submit($employee, $request->validated());
+
+        try {
+            $overtime = $this->service->submit($employee, $request->validated());
+        } catch (OvertimeValidationException $e) {
+            return $this->validationErrorResponse($e);
+        }
 
         return response()->json(['data' => $this->serialize($overtime)], 201);
     }

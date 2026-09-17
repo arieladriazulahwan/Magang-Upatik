@@ -3,8 +3,34 @@
 .env
 .env.backup
 .env.production
+.env.*
+!.env.example
+
+# Temporary local files
+origin)
+
+# Local documents and archives
+docs/
+*.pdf
+*.doc
+*.docx
+*.xls
+*.xlsx
+*.ppt
+*.pptx
+*.csv
+*.zip
+*.rar
+*.7z
+
 tes-api-*.json
 google-calendar-service-account*.json
+*.pem
+*.key
+*.p8
+*.p12
+*.jks
+*.keystore
 database/data pegawai/
 scripts/__pycache__/
 *.pyc
@@ -24,6 +50,7 @@ scripts/__pycache__/
 /public/hot
 /public/storage
 /storage/*.key
+/storage/app/public
 /storage/pail
 /vendor
 _ide_helper.php

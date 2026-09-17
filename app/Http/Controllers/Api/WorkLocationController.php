@@ -7,12 +7,21 @@ use App\Models\ActivityLog;
 use App\Models\WorkLocation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class WorkLocationController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
+        if ($request->has('is_active')) {
+            $normalizedActive = filter_var($request->query('is_active'), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+
+            if ($normalizedActive !== null) {
+                $request->merge(['is_active' => $normalizedActive]);
+            }
+        }
+
         $filters = $request->validate([
             'work_unit_id' => ['sometimes', 'integer'],
             'is_active' => ['sometimes', 'boolean'],
@@ -21,9 +30,7 @@ class WorkLocationController extends Controller
         $query = WorkLocation::query()->with('workUnit:id,name,code');
 
         if (isset($filters['work_unit_id'])) {
-            $query->where(fn ($q) => $q
-                ->whereNull('work_unit_id')
-                ->orWhere('work_unit_id', $filters['work_unit_id']));
+            $query->where('work_unit_id', $filters['work_unit_id']);
         }
 
         $allowedUnitIds = $request->user()?->scopedUnitIds();
@@ -97,6 +104,23 @@ class WorkLocationController extends Controller
     {
         $this->assertUnitInScope($request, $workLocation->work_unit_id !== null ? (int) $workLocation->work_unit_id : null);
 
+        $isUsedByAttendance = DB::table('attendance')
+            ->where('work_location_id', $workLocation->id)
+            ->exists();
+
+        if ($isUsedByAttendance) {
+            $workLocation->update(['is_active' => false]);
+
+            ActivityLog::record('work_location.deactivate', $workLocation, [
+                'reason' => 'Lokasi sudah dipakai pada riwayat presensi.',
+            ]);
+
+            return response()->json([
+                'message' => 'Lokasi sudah dipakai pada riwayat presensi, sehingga dinonaktifkan dan tidak dihapus.',
+                'data' => $this->serialize($workLocation->load('workUnit:id,name,code')),
+            ]);
+        }
+
         ActivityLog::record('work_location.delete', $workLocation);
         $workLocation->delete();
 
@@ -124,6 +148,7 @@ class WorkLocationController extends Controller
     {
         return [
             'id' => $location->id,
+            'work_unit_id' => $location->work_unit_id,
             'work_unit' => $location->workUnit?->only(['id', 'name', 'code']),
             'is_global' => $location->work_unit_id === null,
             'name' => $location->name,

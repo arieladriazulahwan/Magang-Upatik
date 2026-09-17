@@ -5,6 +5,7 @@ namespace App\Services\Notification;
 use App\Models\AppNotification;
 use App\Models\Employee;
 use App\Models\LeaveRequest;
+use App\Models\OvertimeRequest;
 use App\Models\Role;
 use App\Models\RoleUser;
 use App\Models\User;
@@ -123,6 +124,40 @@ class NotificationService
             "Pengajuan WFH Anda ({$wfhRequest->start_date->toDateString()} s.d. {$wfhRequest->end_date->toDateString()}) telah {$wfhRequest->status}.",
             $wfhRequest->status,
             "/wfh-requests/{$wfhRequest->id}",
+        );
+    }
+
+    public function overtimeRequestSubmitted(OvertimeRequest $overtimeRequest): void
+    {
+        $overtimeRequest->loadMissing('employee');
+
+        $approvers = $this->resolveApproversForRole('atasan_langsung', $overtimeRequest->employee->work_unit_id);
+
+        $this->notifyMany(
+            $approvers,
+            'Pengajuan Lembur Menunggu Persetujuan',
+            "{$overtimeRequest->employee->name} mengajukan lembur tanggal {$overtimeRequest->date->toDateString()}, menunggu persetujuan Anda.",
+            'pengajuan_baru',
+            "/overtime-requests/{$overtimeRequest->id}",
+        );
+    }
+
+    public function overtimeRequestDecided(OvertimeRequest $overtimeRequest): void
+    {
+        $overtimeRequest->loadMissing('employee');
+
+        if (! in_array($overtimeRequest->status, ['disetujui', 'ditolak'], true)) {
+            return;
+        }
+
+        $label = $overtimeRequest->status === 'disetujui' ? 'Disetujui' : 'Ditolak';
+
+        $this->send(
+            $overtimeRequest->employee,
+            "Pengajuan Lembur {$label}",
+            "Pengajuan lembur Anda tanggal {$overtimeRequest->date->toDateString()} telah {$overtimeRequest->status}.",
+            $overtimeRequest->status,
+            "/overtime-requests/{$overtimeRequest->id}",
         );
     }
 

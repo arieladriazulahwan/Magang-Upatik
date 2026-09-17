@@ -35,7 +35,7 @@ class FaceRecognitionService
         try {
             $response = $request->post($this->url('/enroll'));
         } catch (\Throwable $e) {
-            throw new FaceRecognitionException('Layanan pengenalan wajah tidak dapat dihubungi.');
+            throw new FaceRecognitionException('Layanan pengenalan wajah tidak dapat dihubungi atau timeout.', 'face_service_unavailable');
         }
 
         if (! $response->successful()) {
@@ -74,7 +74,7 @@ class FaceRecognitionService
                     )
                     ->post($this->url('/enroll'));
             } catch (\Throwable $e) {
-                throw new FaceRecognitionException('Layanan pengenalan wajah tidak dapat dihubungi.');
+                throw new FaceRecognitionException('Layanan pengenalan wajah tidak dapat dihubungi atau timeout.', 'face_service_unavailable');
             }
 
             if (! $response->successful()) {
@@ -145,7 +145,7 @@ class FaceRecognitionService
                     $this->verifyThresholdField() => $this->threshold(),
                 ]);
         } catch (\Throwable $e) {
-            throw new FaceRecognitionException('Layanan pengenalan wajah tidak dapat dihubungi.');
+            throw new FaceRecognitionException('Layanan pengenalan wajah tidak dapat dihubungi atau timeout.', 'face_service_unavailable');
         }
 
         if (! $response->successful()) {
@@ -159,7 +159,10 @@ class FaceRecognitionService
                 'threshold_field' => $this->verifyThresholdField(),
             ]);
 
-            throw new FaceRecognitionException($this->messageFromResponse($response->json(), 'Layanan pengenalan wajah gagal memverifikasi wajah.'));
+            throw new FaceRecognitionException(
+                $this->messageFromResponse($response->json(), 'Layanan pengenalan wajah mengembalikan error.'),
+                'face_service_http_error',
+            );
         }
 
         $data = $response->json('data', []);
@@ -181,6 +184,7 @@ class FaceRecognitionService
             'matched' => $matched,
             'server_matched' => $serverMatched,
             'similarity_score' => $similarityScore,
+            'liveness_passed' => $this->normalizeLiveness($data),
             'threshold' => $this->threshold(),
             'threshold_percent' => $this->thresholdAsPercent(),
             'response_keys' => array_keys($data),
@@ -189,15 +193,7 @@ class FaceRecognitionService
         return [
             'matched' => $matched,
             'similarity_score' => $similarityScore,
-            'liveness_passed' => $this->normalizeNullableBool(
-                $data['liveness_passed']
-                    ?? $data['liveness']
-                    ?? $data['is_live']
-                    ?? $data['live']
-                    ?? $data['result']['liveness_passed']
-                    ?? $data['result']['liveness']
-                    ?? null,
-            ),
+            'liveness_passed' => $this->normalizeLiveness($data),
             'message' => $data['message'] ?? null,
         ];
     }
@@ -370,22 +366,78 @@ class FaceRecognitionService
             return;
         }
 
-        $liveness = $this->normalizeNullableBool(
-            $data['liveness_passed']
-                ?? $data['liveness']
-                ?? $data['is_live']
-                ?? $data['live']
-                ?? $data['result']['liveness_passed']
-                ?? $data['result']['liveness']
-                ?? null,
-        );
+        $liveness = $this->normalizeLiveness($data);
 
         if ($liveness !== true) {
+            Log::warning('face.verify.liveness_failed', [
+                'liveness' => $this->livenessDebugPayload($data),
+                'response_keys' => array_keys($data),
+            ]);
+
+            if ($liveness === false) {
+                throw new FaceRecognitionException(
+                    'Liveness wajah ditolak oleh layanan. Pastikan wajah asli terlihat jelas, tidak memakai foto/video, dan pencahayaan cukup.',
+                    'face_liveness_failed',
+                );
+            }
+
             throw new FaceRecognitionException(
-                'Liveness wajah gagal atau tidak dikembalikan oleh layanan pengenalan wajah.',
-                'face_liveness_failed',
+                'Layanan pengenalan wajah tidak mengembalikan hasil liveness.',
+                'face_liveness_missing',
             );
         }
+    }
+
+    private function normalizeLiveness(array $data): ?bool
+    {
+        $result = is_array($data['result'] ?? null) ? $data['result'] : [];
+
+        $explicit = $data['liveness_passed']
+            ?? $data['liveness']
+            ?? $data['is_live']
+            ?? $data['live']
+            ?? $result['liveness_passed']
+            ?? $result['liveness']
+            ?? $result['is_live']
+            ?? $result['live'];
+
+        $normalized = $this->normalizeNullableBool($explicit);
+
+        if ($normalized !== null) {
+            return $normalized;
+        }
+
+        $status = $data['liveness_status'] ?? $result['liveness_status'] ?? null;
+        $normalized = $this->normalizeNullableBool($status);
+
+        if ($normalized !== null) {
+            return $normalized;
+        }
+
+        $score = $data['liveness_score'] ?? $result['liveness_score'] ?? null;
+        $threshold = $data['liveness_threshold'] ?? $result['liveness_threshold'] ?? null;
+
+        if (is_numeric($score) && is_numeric($threshold)) {
+            return (float) $score >= (float) $threshold;
+        }
+
+        return null;
+    }
+
+    private function livenessDebugPayload(array $data): array
+    {
+        $result = is_array($data['result'] ?? null) ? $data['result'] : [];
+
+        return [
+            'liveness_status' => $data['liveness_status'] ?? $result['liveness_status'] ?? null,
+            'liveness_passed' => $data['liveness_passed'] ?? $result['liveness_passed'] ?? null,
+            'liveness' => $data['liveness'] ?? $result['liveness'] ?? null,
+            'is_live' => $data['is_live'] ?? $result['is_live'] ?? null,
+            'live' => $data['live'] ?? $result['live'] ?? null,
+            'liveness_score' => $data['liveness_score'] ?? $result['liveness_score'] ?? null,
+            'liveness_threshold' => $data['liveness_threshold'] ?? $result['liveness_threshold'] ?? null,
+            'normalized' => $this->normalizeLiveness($data),
+        ];
     }
 
     private function normalizeQuality(array $sample): ?float
@@ -435,11 +487,11 @@ class FaceRecognitionService
         if (is_string($value)) {
             $normalized = strtolower(trim($value));
 
-            if (in_array($normalized, ['1', 'true', 'yes', 'passed', 'pass', 'live'], true)) {
+            if (in_array($normalized, ['1', 'true', 'yes', 'passed', 'pass', 'lolos', 'lolos_verifikasi', 'live', 'real', 'genuine', 'ok'], true)) {
                 return true;
             }
 
-            if (in_array($normalized, ['0', 'false', 'no', 'failed', 'fail', 'spoof'], true)) {
+            if (in_array($normalized, ['0', 'false', 'no', 'failed', 'fail', 'gagal', 'spoof', 'fake', 'attack', 'not_live'], true)) {
                 return false;
             }
         }

@@ -15,6 +15,7 @@ class DatabaseSeeder extends Seeder
             Siga8RoleMappingSeeder::class,
             TestAccountSeeder::class,
             UnitScopedTestAccountSeeder::class,
+            InterAccountSeeder::class,
             EmployeeImportSeeder::class,
         ]);
     }

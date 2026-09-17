@@ -6,21 +6,31 @@ use App\Models\ApprovalFlow;
 use App\Models\ApprovalLog;
 use App\Models\Attachment;
 use App\Models\Employee;
-use App\Models\LeaveBalance;
 use App\Models\LeaveRequest;
 use App\Models\LeaveType;
 use App\Models\User;
 use App\Services\WorkingDayCalculator;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class LeaveRequestService
 {
-    public function __construct(private readonly WorkingDayCalculator $workingDays) {}
+    public function __construct(
+        private readonly WorkingDayCalculator $workingDays,
+        private readonly LeaveBalanceService $leaveBalances,
+    ) {}
 
-    public function submit(Employee $employee, array $data, ?UploadedFile $attachment): LeaveRequest
+    public function submit(Employee $employee, User $actor, array $data, ?UploadedFile $attachment): LeaveRequest
     {
         $leaveType = LeaveType::findOrFail($data['leave_type_id']);
+
+        if (! $actor->hasGlobalRole('super_admin') && Carbon::parse($data['start_date'])->startOfDay()->lt(Carbon::today())) {
+            throw new LeaveValidationException(
+                'Pengajuan cuti/izin/koreksi cuti oleh pegawai hanya dapat dibuat untuk hari ini atau tanggal setelahnya. Hubungi Super Admin untuk pengajuan tanggal lampau.',
+                'leave_request_backdate_not_allowed',
+            );
+        }
 
         if (! $leaveType->is_active) {
             throw new LeaveValidationException('Jenis pengajuan ini sedang tidak aktif.', 'leave_type_inactive');
@@ -158,9 +168,9 @@ class LeaveRequestService
 
     public function cancel(LeaveRequest $leaveRequest): LeaveRequest
     {
-        if (! in_array($leaveRequest->status, ['diajukan', 'diproses'], true)) {
+        if (! in_array($leaveRequest->status, ['diajukan', 'diproses', 'disetujui'], true)) {
             throw new LeaveValidationException(
-                'Hanya pengajuan yang belum final (diajukan/diproses) yang dapat dibatalkan. Pengajuan yang sudah disetujui tidak didukung dibatalkan di sini.',
+                'Hanya pengajuan berstatus diajukan, diproses, atau disetujui yang dapat dibatalkan.',
                 'invalid_status_for_cancel',
             );
         }
@@ -169,6 +179,10 @@ class LeaveRequestService
             ApprovalLog::where('request_id', $leaveRequest->id)
                 ->where('status', 'menunggu')
                 ->update(['status' => 'dilewati']);
+
+            if ($leaveRequest->status === 'disetujui') {
+                $this->leaveBalances->refund($leaveRequest);
+            }
 
             $leaveRequest->update(['status' => 'dibatalkan']);
 
@@ -222,8 +236,8 @@ class LeaveRequestService
                 return $leaveRequest;
             }
 
-            $leaveRequest->update(['status' => 'disetujui']);
             $this->consumeBalanceIfApplicable($leaveRequest);
+            $leaveRequest->update(['status' => 'disetujui']);
 
             return $leaveRequest;
         });
@@ -262,48 +276,12 @@ class LeaveRequestService
 
     private function assertSufficientBalance(Employee $employee, LeaveType $leaveType, string $startDate, int $totalDays): void
     {
-        if ($leaveType->category !== 'cuti') {
-            return;
-        }
-
         $year = (int) substr($startDate, 0, 4);
-
-        $balance = LeaveBalance::where('employee_id', $employee->id)
-            ->where('leave_type_id', $leaveType->id)
-            ->where('year', $year)
-            ->first();
-
-        if (! $balance) {
-            return;
-        }
-
-        if ($balance->remaining < $totalDays) {
-            throw new LeaveValidationException(
-                "Saldo '{$leaveType->name}' tahun {$year} tidak cukup (sisa {$balance->remaining} hari, diajukan {$totalDays} hari).",
-                'insufficient_leave_balance',
-            );
-        }
+        $this->leaveBalances->assertAvailable($employee, $leaveType, $year, $totalDays);
     }
 
     private function consumeBalanceIfApplicable(LeaveRequest $leaveRequest): void
     {
-        $leaveType = $leaveRequest->leaveType ?? LeaveType::find($leaveRequest->leave_type_id);
-
-        if ($leaveType->category !== 'cuti') {
-            return;
-        }
-
-        $year = (int) $leaveRequest->start_date->year;
-
-        $balance = LeaveBalance::where('employee_id', $leaveRequest->employee_id)
-            ->where('leave_type_id', $leaveType->id)
-            ->where('year', $year)
-            ->first();
-
-        if (! $balance) {
-            return;
-        }
-
-        $balance->increment('used', $leaveRequest->total_days);
+        $this->leaveBalances->consume($leaveRequest);
     }
 }

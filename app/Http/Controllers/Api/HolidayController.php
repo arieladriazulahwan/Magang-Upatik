@@ -98,6 +98,7 @@ class HolidayController extends Controller
             'name' => $holiday->name,
             'type' => $holiday->type,
             'legal_basis' => $holiday->legal_basis,
+            'gcal_event_id' => $holiday->gcal_event_id,
             'gcal_status' => $holiday->gcal_status,
             'gcal_synced_at' => $holiday->gcal_synced_at?->toIso8601String(),
         ];

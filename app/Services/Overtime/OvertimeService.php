@@ -3,6 +3,7 @@
 namespace App\Services\Overtime;
 
 use App\Models\ActivityLog;
+use App\Models\AppSetting;
 use App\Models\Attendance;
 use App\Models\Employee;
 use App\Models\OvertimeRequest;
@@ -20,6 +21,8 @@ class OvertimeService
      */
     public function submit(Employee $employee, array $data): OvertimeRequest
     {
+        $this->validatePlannedWindow($data['date'], $data['planned_start_time'], $data['planned_end_time']);
+
         $overtime = OvertimeRequest::create([
             'employee_id' => $employee->id,
             'date' => $data['date'],
@@ -31,15 +34,70 @@ class OvertimeService
 
         ActivityLog::record('overtime_request.create', $overtime, $data);
 
-        $this->notifications->notifyApprovers(
-            'atasan_langsung',
-            $employee,
-            'Pengajuan Lembur Baru',
-            "{$employee->name} mengajukan lembur tanggal {$data['date']}, menunggu persetujuan Anda.",
-            "/overtime-requests/{$overtime->id}",
-        );
+        $this->notifications->overtimeRequestSubmitted($overtime);
 
         return $overtime;
+    }
+
+    /**
+     * @throws OvertimeValidationException
+     */
+    private function validatePlannedWindow(string $date, string $plannedStartTime, string $plannedEndTime): void
+    {
+        $overtimeDate = Carbon::parse($date);
+        $plannedStart = Carbon::parse($overtimeDate->toDateString().' '.$plannedStartTime);
+        $plannedEnd = Carbon::parse($overtimeDate->toDateString().' '.$plannedEndTime);
+        $policy = $this->overtimePolicy();
+
+        if ($plannedEnd->lessThanOrEqualTo($plannedStart)) {
+            throw new OvertimeValidationException(
+                'Jam selesai lembur harus setelah jam mulai lembur.',
+                'invalid_overtime_time_range',
+            );
+        }
+
+        if ($overtimeDate->isWeekend()) {
+            if (! $policy['weekend_allowed']) {
+                throw new OvertimeValidationException(
+                    'Pengajuan lembur Sabtu dan Minggu sedang tidak diizinkan.',
+                    'overtime_weekend_not_allowed',
+                );
+            }
+
+            return;
+        }
+
+        $minimumStart = $overtimeDate->isFriday() ? $policy['friday_start'] : $policy['weekday_start'];
+        $minimumStartAt = Carbon::parse($overtimeDate->toDateString().' '.$minimumStart);
+
+        if ($plannedStart->lessThan($minimumStartAt)) {
+            throw new OvertimeValidationException(
+                "Lembur hari kerja hanya dapat diajukan mulai pukul {$minimumStart} WITA atau setelahnya.",
+                'overtime_before_allowed_start_time',
+            );
+        }
+    }
+
+    private function overtimePolicy(): array
+    {
+        $settings = AppSetting::whereIn('key', [
+            'overtime_weekday_start',
+            'overtime_friday_start',
+            'overtime_weekend_allowed',
+        ])->pluck('value', 'key');
+
+        return [
+            'weekday_start' => $this->validTime($settings->get('overtime_weekday_start')) ?? '16:00',
+            'friday_start' => $this->validTime($settings->get('overtime_friday_start')) ?? '16:30',
+            'weekend_allowed' => $settings->has('overtime_weekend_allowed')
+                ? filter_var($settings->get('overtime_weekend_allowed'), FILTER_VALIDATE_BOOLEAN)
+                : true,
+        ];
+    }
+
+    private function validTime(?string $value): ?string
+    {
+        return is_string($value) && preg_match('/^\d{2}:\d{2}$/', $value) ? $value : null;
     }
 
     /**
@@ -182,17 +240,9 @@ class OvertimeService
 
             ActivityLog::record('overtime_request.'.$status, $overtime, ['note' => $note]);
 
-            $overtime->loadMissing('employee');
+            $overtime->refresh()->load(['employee', 'approver']);
 
-            $this->notifications->notify(
-                $overtime->employee,
-                $status === 'disetujui' ? 'Pengajuan Lembur Disetujui' : 'Pengajuan Lembur Ditolak',
-                $status === 'disetujui'
-                    ? "Pengajuan lembur Anda tanggal {$overtime->date->toDateString()} disetujui."
-                    : "Pengajuan lembur Anda ditolak. Alasan: {$note}",
-                $status,
-                "/overtime-requests/{$overtime->id}",
-            );
+            $this->notifications->overtimeRequestDecided($overtime);
 
             return $overtime;
         });

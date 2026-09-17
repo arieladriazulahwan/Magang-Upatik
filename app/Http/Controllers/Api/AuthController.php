@@ -4,6 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
+use App\Models\Role;
+use App\Models\RoleUser;
+use App\Models\User;
 use App\Services\Auth\RoleSyncService;
 use App\Services\Auth\Siga8TokenStore;
 use App\Services\Auth\UserProvisioningService;
@@ -11,6 +14,7 @@ use App\Services\Siga8\Siga8AuthException;
 use App\Services\Siga8\Siga8AuthService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 
@@ -54,6 +58,12 @@ class AuthController extends Controller
             ]);
         }
 
+        if ($localResponse = $this->attemptLocalTestLogin($request, $credentials)) {
+            RateLimiter::clear($throttleKey);
+
+            return $localResponse;
+        }
+
         try {
             $siga8Result = $this->siga8->login($credentials['username'], $credentials['password']);
         } catch (Siga8AuthException $e) {
@@ -75,6 +85,10 @@ class AuthController extends Controller
                 'message' => 'Akun dinonaktifkan. Hubungi Admin Kepegawaian.',
                 'reason' => 'inactive',
             ], 403);
+        }
+
+        if ($user->employee && $user->hasRole('employee') && ! $user->employee->attendance_active) {
+            $user->employee->forceFill(['attendance_active' => true])->save();
         }
 
         $ttlMinutes = 8 * 60; // 8 jam; samakan dg kebijakan sesi kerja harian
@@ -115,6 +129,7 @@ class AuthController extends Controller
     private function serializeUser(\App\Models\User $user): array
     {
         $user->load(['employee.workUnit', 'roleUsers.role.permissions', 'roleUsers.workUnit']);
+        $currentUnit = $this->currentUnitFor($user);
 
         return [
             'id' => $user->id,
@@ -126,7 +141,9 @@ class AuthController extends Controller
                 'nip' => $user->employee->nip,
                 'employee_type' => $user->employee->employee_type,
                 'employment_status' => $user->employee->employment_status,
+                'attendance_active' => $user->employee->attendance_active,
                 'work_unit' => $user->employee->workUnit?->only(['id', 'name', 'code']),
+                'current_unit' => $currentUnit?->only(['id', 'name', 'code']),
             ] : null,
             'roles' => $user->roleUsers->map(fn ($ru) => [
                 'name' => $ru->role->name,
@@ -140,5 +157,86 @@ class AuthController extends Controller
                 ->unique()
                 ->values(),
         ];
+    }
+
+    private function currentUnitFor(\App\Models\User $user): ?\App\Models\WorkUnit
+    {
+        if (! $user->employee) {
+            return null;
+        }
+
+        $scopedRole = $user->roleUsers
+            ->filter(fn ($roleUser) => $roleUser->work_unit_id !== null)
+            ->first(fn ($roleUser) => in_array($roleUser->role?->name, ['pimpinan', 'admin_unit'], true));
+
+        return $scopedRole?->workUnit ?: $user->employee->workUnit;
+    }
+
+    private function attemptLocalTestLogin(Request $request, array $credentials): ?JsonResponse
+    {
+        if (! app()->environment('local')) {
+            return null;
+        }
+
+        $user = User::where('username', $credentials['username'])
+            ->where('is_active', true)
+            ->first();
+
+        if (! $user || ! $user->password || ! Hash::check($credentials['password'], $user->password)) {
+            return null;
+        }
+
+        $this->ensureLocalTestRole($user);
+
+        if ($user->employee && $user->hasRole('employee') && ! $user->employee->attendance_active) {
+            $user->employee->forceFill(['attendance_active' => true])->save();
+        }
+
+        $ttlMinutes = 8 * 60;
+        $token = $user->createToken(
+            $credentials['device_name'] ?? 'web-local-test',
+            expiresAt: now()->addMinutes($ttlMinutes),
+        );
+
+        ActivityLog::record('login.local_test', $user, ['device_name' => $credentials['device_name'] ?? null]);
+
+        return response()->json([
+            'token' => $token->plainTextToken,
+            'expires_at' => now()->addMinutes($ttlMinutes)->toIso8601String(),
+            'user' => $this->serializeUser($user->fresh()),
+        ]);
+    }
+
+    private function ensureLocalTestRole(User $user): void
+    {
+        $roleName = match ($user->username) {
+            'admin-test' => 'super_admin',
+            'kepegawaian-test' => 'admin_kepegawaian',
+            'unit-test' => 'admin_unit',
+            'pimpinan-test' => 'pimpinan',
+            'intern-test' => 'employee',
+            default => null,
+        };
+
+        if (! $roleName) {
+            return;
+        }
+
+        $roleId = Role::where('name', $roleName)->value('id');
+        if (! $roleId) {
+            return;
+        }
+
+        RoleUser::updateOrCreate(
+            [
+                'user_id' => $user->id,
+                'role_id' => $roleId,
+                'work_unit_id' => null,
+            ],
+            [
+                'source' => 'manual',
+                'siga8_role_id' => null,
+            ],
+        );
     }
 }

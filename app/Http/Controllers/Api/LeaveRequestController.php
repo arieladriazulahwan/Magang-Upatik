@@ -7,9 +7,11 @@ use App\Http\Requests\ApproveLeaveRequestRequest;
 use App\Http\Requests\RejectLeaveRequestRequest;
 use App\Http\Requests\StoreLeaveRequestRequest;
 use App\Models\ActivityLog;
+use App\Models\Attachment;
 use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Models\User;
+use App\Services\Attendance\AttendanceReconciliationService;
 use App\Services\Calendar\GoogleCalendarService;
 use App\Services\Leave\LeaveRequestService;
 use App\Services\Leave\LeaveValidationException;
@@ -18,6 +20,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class LeaveRequestController extends Controller
 {
@@ -25,6 +28,7 @@ class LeaveRequestController extends Controller
         private readonly LeaveRequestService $service,
         private readonly NotificationService $notifications,
         private readonly GoogleCalendarService $calendar,
+        private readonly AttendanceReconciliationService $attendanceReconciliation,
     ) {}
 
     public function store(StoreLeaveRequestRequest $request): JsonResponse
@@ -34,6 +38,7 @@ class LeaveRequestController extends Controller
         try {
             $leaveRequest = $this->service->submit(
                 $employee,
+                $request->user(),
                 $request->validated(),
                 $request->file('attachment'),
             );
@@ -48,7 +53,7 @@ class LeaveRequestController extends Controller
             $this->notifications->leaveRequestSubmitted($leaveRequest, $firstStep->approver_role);
         }
 
-        $leaveRequest->load(['leaveType:id,name,category', 'approvalLogs']);
+        $leaveRequest->load(['leaveType:id,name,category', 'approvalLogs', 'attachments']);
 
         return response()->json(['data' => $this->serialize($leaveRequest)], 201);
     }
@@ -65,6 +70,7 @@ class LeaveRequestController extends Controller
             'employee:id,name,nip,work_unit_id',
             'leaveType:id,name,category',
             'approvalLogs.approver:id,name',
+            'attachments',
         ]);
 
         $this->applyVisibilityScope($query, $request->user());
@@ -102,6 +108,26 @@ class LeaveRequestController extends Controller
         return $this->decide($request, $leaveRequest, fn () => $this->service->reject($leaveRequest, $request->user(), $request->validated('note')));
     }
 
+    public function downloadAttachment(Request $request, LeaveRequest $leaveRequest, Attachment $attachment)
+    {
+        $leaveRequest->loadMissing('employee');
+        $this->assertCanView($request->user(), $leaveRequest->employee);
+
+        if ($attachment->attachable_type !== LeaveRequest::class || (int) $attachment->attachable_id !== (int) $leaveRequest->id) {
+            abort(404, 'Lampiran tidak ditemukan untuk pengajuan ini.');
+        }
+
+        if (! Storage::disk('local')->exists($attachment->path)) {
+            abort(404, 'File lampiran tidak ditemukan di storage.');
+        }
+
+        return Storage::disk('local')->download(
+            $attachment->path,
+            $attachment->file_name,
+            ['Content-Type' => $attachment->mime_type ?: 'application/octet-stream'],
+        );
+    }
+
     public function cancel(Request $request, LeaveRequest $leaveRequest): JsonResponse
     {
         $leaveRequest->loadMissing('employee');
@@ -115,6 +141,8 @@ class LeaveRequestController extends Controller
             abort(403, 'Anda tidak punya izin untuk membatalkan pengajuan ini.');
         }
 
+        $wasApproved = $leaveRequest->status === 'disetujui';
+
         try {
             $leaveRequest = $this->service->cancel($leaveRequest);
         } catch (LeaveValidationException $e) {
@@ -122,6 +150,11 @@ class LeaveRequestController extends Controller
         }
 
         ActivityLog::record('leave_request.cancel', $leaveRequest);
+
+        if ($wasApproved) {
+            $this->attendanceReconciliation->removeLeaveRequestRecords($leaveRequest);
+        }
+
         $this->calendar->syncLeaveRequest($leaveRequest, 'hapus');
 
         return response()->json(['data' => $this->serialize($leaveRequest)]);
@@ -163,10 +196,11 @@ class LeaveRequestController extends Controller
         $this->notifications->leaveRequestDecided($leaveRequest, $nextStep?->approver_role);
 
         if ($leaveRequest->status === 'disetujui') {
+            $this->attendanceReconciliation->applyApprovedLeaveRequest($leaveRequest);
             $this->calendar->syncLeaveRequest($leaveRequest);
         }
 
-        $leaveRequest->load(['leaveType:id,name,category', 'approvalLogs.approver:id,name']);
+        $leaveRequest->load(['leaveType:id,name,category', 'approvalLogs.approver:id,name', 'attachments']);
 
         return response()->json(['data' => $this->serialize($leaveRequest)]);
     }
@@ -300,6 +334,16 @@ class LeaveRequestController extends Controller
                     'recorded_at' => $log->recorded_at?->toIso8601String(),
                 ])
                 : null,
+            'attachments' => $leaveRequest->relationLoaded('attachments')
+                ? $leaveRequest->attachments->map(fn (Attachment $attachment) => [
+                    'id' => $attachment->id,
+                    'file_name' => $attachment->file_name,
+                    'mime_type' => $attachment->mime_type,
+                    'size_bytes' => $attachment->size_bytes,
+                    'download_url' => "/leave-requests/{$leaveRequest->id}/attachments/{$attachment->id}/download",
+                    'created_at' => $attachment->created_at?->toIso8601String(),
+                ])->values()
+                : [],
             'created_at' => $leaveRequest->created_at?->toIso8601String(),
         ];
     }

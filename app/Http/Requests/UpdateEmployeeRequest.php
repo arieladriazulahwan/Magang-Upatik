@@ -35,6 +35,12 @@ class UpdateEmployeeRequest extends FormRequest
             'grade' => ['sometimes', 'nullable', 'string', 'max:20'],
             'rank' => ['sometimes', 'nullable', 'string', 'max:100'],
             'is_active' => ['sometimes', 'boolean'],
+            'attendance_active' => ['sometimes', 'boolean'],
+            'username' => [
+                'sometimes', 'nullable', 'string', 'max:100',
+                Rule::unique('users', 'username')->ignore($this->route('employee')?->user?->id),
+            ],
+            'password' => ['sometimes', 'nullable', 'string', 'min:6', 'max:100'],
         ];
     }
 }

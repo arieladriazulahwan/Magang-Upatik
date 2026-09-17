@@ -57,6 +57,8 @@ return [
         'enabled' => env('GOOGLE_CALENDAR_ENABLED', true),
         'credentials_path' => env('GOOGLE_CALENDAR_CREDENTIALS_PATH'),
         'default_calendar_id' => env('GOOGLE_CALENDAR_DEFAULT_ID'),
+        'holiday_calendar_id' => env('GOOGLE_CALENDAR_HOLIDAY_ID'),
+        'leave_calendar_id' => env('GOOGLE_CALENDAR_LEAVE_ID'),
         'default_timezone' => env('GOOGLE_CALENDAR_TIMEZONE', 'Asia/Makassar'),
         'token_cache_seconds' => env('GOOGLE_CALENDAR_TOKEN_CACHE_SECONDS', 3300),
         'timeout' => env('GOOGLE_CALENDAR_TIMEOUT', 15),

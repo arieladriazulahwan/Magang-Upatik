@@ -181,4 +181,34 @@ class FaceRecognitionServiceTest extends TestCase
 
         app(FaceRecognitionService::class)->verify('face-verification-photos/1/test.jpg', $registeredFaces);
     }
+
+    public function test_verify_accepts_explicit_liveness_boolean_with_localized_status(): void
+    {
+        Storage::fake('local');
+        Storage::disk('local')->put('face-verification-photos/1/test.jpg', 'fake-image');
+
+        Http::fake([
+            'face.test/verify' => Http::response([
+                'matched' => true,
+                'similarity_score' => 0.91,
+                'liveness_status' => 'lolos',
+                'liveness_passed' => true,
+            ]),
+        ]);
+
+        $registeredFaces = new Collection([
+            new FaceData([
+                'employee_id' => 1,
+                'embedding' => '[0.1,0.2,0.3]',
+                'is_active' => true,
+            ]),
+        ]);
+
+        $result = app(FaceRecognitionService::class)->verify(
+            'face-verification-photos/1/test.jpg',
+            $registeredFaces,
+        );
+
+        $this->assertTrue($result['liveness_passed']);
+    }
 }

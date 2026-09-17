@@ -3,6 +3,7 @@
 namespace App\Services\Attendance;
 
 use App\Models\Attendance;
+use App\Models\AppSetting;
 use App\Models\User;
 use App\Models\AttendanceLog;
 use App\Models\Employee;
@@ -11,6 +12,7 @@ use App\Models\ShiftSchedule;
 use App\Models\WfhRequest;
 use App\Models\WorkHourSetting;
 use App\Models\WorkLocation;
+use App\Models\WorkUnit;
 use App\Services\Face\FaceRecognitionException;
 use App\Services\Face\FaceRecognitionService;
 use Illuminate\Support\Carbon;
@@ -37,27 +39,35 @@ class AttendanceService
      */
     public function checkIn(Employee $employee, array $data): Attendance
     {
+        if (! $employee->attendance_active) {
+            throw new AttendanceValidationException(
+                'Akun Anda belum diaktifkan untuk presensi. Hubungi Admin Kepegawaian.',
+                'attendance_not_active',
+            );
+        }
+
         $now = Carbon::now();
         $today = $now->toDateString();
         $type = $data['type']; // wfo | wfh | shift | dinas_luar
 
-        $mode = $employee->workUnit->effectiveAttendanceMode(); // 'reguler' | 'shift'
+        $mode = $this->attendanceModeFor($employee); // 'reguler' | 'shift'
+        $schedule = ShiftSchedule::with('shift')
+            ->where('employee_id', $employee->id)
+            ->where('date', $today)
+            ->first();
 
         $shift = null;
-        if ($mode === 'shift') {
-            $schedule = ShiftSchedule::with('shift')
-                ->where('employee_id', $employee->id)
-                ->where('date', $today)
-                ->first();
-
+        if ($schedule) {
+            $mode = 'shift';
+            $type = 'shift';
+            $shift = $schedule->shift;
+        } elseif ($mode === 'shift') {
             if (! $schedule) {
                 throw new AttendanceValidationException(
                     'Anda belum dijadwalkan shift untuk hari ini. Hubungi admin unit.',
                     'no_shift_scheduled',
                 );
             }
-
-            $shift = $schedule->shift;
         }
 
         // --- Cek record ganda: WHERE employee_id=X AND date=Y AND shift_id
@@ -106,7 +116,7 @@ class AttendanceService
 
             if (! $location) {
                 throw new AttendanceValidationException(
-                    'Unit kerja Anda belum memiliki lokasi presensi terdaftar. Hubungi Super Admin.',
+                    'Unit presensi Anda belum memiliki titik lokasi aktif. Hubungi Admin Unit.',
                     'no_work_location',
                 );
             }
@@ -184,30 +194,23 @@ class AttendanceService
             );
         }
 
-        $mode = $employee->workUnit->effectiveAttendanceMode();
+        $mode = $this->attendanceModeFor($employee);
         $shift = $attendance->shift_id ? Shift::find($attendance->shift_id) : null;
+        $durationMinutes = (int) $attendance->check_in->diffInMinutes($now);
 
-        // Lokasi untuk check-out: aturan berdasar type yang SUDAH ditetapkan
-        // saat check-in (tidak boleh ganti type di tengah hari kerja).
+        $this->assertMinimumWorkDurationBeforeCheckOut(
+            $employee,
+            $mode,
+            $attendance,
+            $durationMinutes,
+        );
+
+        // Check-out dapat dilakukan dari mana saja. Lokasi tetap direkam di
+        // attendance_log sebagai informasi, tapi tidak menjadi syarat lolos.
         $distanceMeters = null;
         $withinRadius = null;
 
-        if (in_array($attendance->type, ['wfo', 'shift'], true)) {
-            [$location, $distanceMeters, $withinRadius] = $this->resolveNearestLocation(
-                $employee, (float) $data['latitude'], (float) $data['longitude'],
-            );
-
-            if (! $location || ! $withinRadius) {
-                throw new AttendanceValidationException(
-                    'Anda harus berada di lokasi kerja untuk presensi keluar.',
-                    'out_of_radius',
-                );
-            }
-        }
-
         $faceResult = $this->verifyFace($employee, $data['photo'] ?? null);
-
-        $durationMinutes = (int) $attendance->check_in->diffInMinutes($now);
 
         return DB::transaction(function () use (
             $employee, $attendance, $now, $mode, $shift, $durationMinutes,
@@ -257,7 +260,7 @@ class AttendanceService
     public function markPresent(Employee $employee, User $actor, array $data): Attendance
     {
         $date = $data['date'];
-        $mode = $employee->workUnit->effectiveAttendanceMode();
+        $mode = $this->attendanceModeFor($employee);
         $shift = $mode === 'shift' ? $this->resolveShiftForDate($employee, $date) : null;
 
         $existing = Attendance::where('employee_id', $employee->id)
@@ -296,6 +299,72 @@ class AttendanceService
     }
 
     /**
+     * Pengajuan koreksi dari pegawai. Data ini belum dianggap koreksi manual
+     * sampai admin/pimpinan memverifikasi lewat correctAttendance().
+     *
+     * @throws AttendanceValidationException
+     */
+    public function requestCorrection(Employee $employee, User $actor, array $data): Attendance
+    {
+        $date = $data['date'];
+
+        if (! $actor->hasGlobalRole('super_admin')) {
+            $requestDate = Carbon::parse($date)->startOfDay();
+            $oldestAllowedDate = Carbon::today()->subDays(6);
+
+            if ($requestDate->lt($oldestAllowedDate)) {
+                throw new AttendanceValidationException(
+                    'Pengajuan perbaikan kehadiran hanya dapat diajukan maksimal 7 hari terakhir. Hubungi Super Admin untuk koreksi tanggal yang lebih lama.',
+                    'attendance_correction_window_expired',
+                );
+            }
+        }
+
+        $mode = $this->attendanceModeFor($employee);
+        $shift = $mode === 'shift' ? $this->resolveShiftForDate($employee, $date) : null;
+        $requestedTimes = collect([
+            isset($data['check_in']) && $data['check_in']
+                ? 'masuk '.Carbon::parse($data['check_in'])->format('H:i')
+                : null,
+            isset($data['check_out']) && $data['check_out']
+                ? 'pulang '.Carbon::parse($data['check_out'])->format('H:i')
+                : null,
+        ])->filter()->implode(', ');
+
+        $reason = $requestedTimes
+            ? "Pengajuan koreksi ({$requestedTimes}). Alasan: {$data['correction_reason']}"
+            : $data['correction_reason'];
+
+        return DB::transaction(function () use ($employee, $date, $mode, $shift, $reason) {
+            $attendance = Attendance::where('employee_id', $employee->id)
+                ->where('date', $date)
+                ->where(fn ($q) => $shift ? $q->where('shift_id', $shift->id) : $q->whereNull('shift_id'))
+                ->lockForUpdate()
+                ->first();
+
+            if (! $attendance) {
+                $attendance = new Attendance([
+                    'employee_id' => $employee->id,
+                    'date' => $date,
+                    'type' => $mode === 'shift' ? 'shift' : 'wfo',
+                    'shift_id' => $shift?->id,
+                    'status' => 'tidak_lengkap',
+                ]);
+            }
+
+            $attendance->correction_reason = $reason;
+
+            if (! $attendance->status || $attendance->status === 'hadir') {
+                $attendance->status = 'tidak_lengkap';
+            }
+
+            $attendance->save();
+
+            return $attendance;
+        });
+    }
+
+    /**
      * Koreksi/lengkapi catatan presensi yang SUDAH ADA (PRD 5.17).
      *
      * @throws AttendanceValidationException
@@ -317,7 +386,7 @@ class AttendanceService
 
                 if (! $hasExplicitStatus) {
                     $employee = $attendance->employee ?? Employee::findOrFail($attendance->employee_id);
-                    $mode = $employee->workUnit->effectiveAttendanceMode();
+                    $mode = $this->attendanceModeFor($employee);
                     $shift = $attendance->shift_id ? Shift::find($attendance->shift_id) : null;
 
                     $attendance->status = $this->evaluateFinalStatus(
@@ -348,6 +417,24 @@ class AttendanceService
             ->first()?->shift;
     }
 
+    private function currentUnitIdFor(Employee $employee): int
+    {
+        $employee->loadMissing(['user.roleUsers.role']);
+
+        $scopedRole = $employee->user?->roleUsers
+            ->filter(fn ($roleUser) => $roleUser->work_unit_id !== null)
+            ->first(fn ($roleUser) => in_array($roleUser->role?->name, ['pimpinan', 'admin_unit'], true));
+
+        return (int) ($scopedRole?->work_unit_id ?: $employee->work_unit_id);
+    }
+
+    private function attendanceModeFor(Employee $employee): string
+    {
+        $workUnit = WorkUnit::find($this->currentUnitIdFor($employee));
+
+        return $workUnit?->effectiveAttendanceMode() ?? 'reguler';
+    }
+
     /**
      * Cari lokasi TERDEKAT dari semua lokasi aktif unit pegawai (bukan cuma
      * lokasi pertama yang kebetulan dalam radius) — unit dg banyak gedung
@@ -359,9 +446,7 @@ class AttendanceService
      */
     private function resolveNearestLocation(Employee $employee, float $lat, float $lng): array
     {
-        $locations = WorkLocation::where(fn ($query) => $query
-                ->whereNull('work_unit_id')
-                ->orWhere('work_unit_id', $employee->work_unit_id))
+        $locations = WorkLocation::where('work_unit_id', $this->currentUnitIdFor($employee))
             ->where('is_active', true)
             ->get();
 
@@ -391,6 +476,61 @@ class AttendanceService
             ->where('start_date', '<=', $date)
             ->where('end_date', '>=', $date)
             ->exists();
+    }
+
+    /**
+     * Mode reguler mengikuti durasi minimal kategori pegawai:
+     * dosen, dosen tugas tambahan, atau tenaga kependidikan.
+     * Mode shift tetap mengikuti jadwal shift dan tidak dipaksa oleh aturan
+     * kategori ini karena durasi shift bisa berbeda-beda per jadwal.
+     *
+     * @throws AttendanceValidationException
+     */
+    private function assertMinimumWorkDurationBeforeCheckOut(
+        Employee $employee,
+        string $mode,
+        Attendance $attendance,
+        int $durationMinutes,
+    ): void {
+        if ($mode === 'shift') {
+            return;
+        }
+
+        $category = $employee->workHourCategory();
+        $setting = WorkHourSetting::resolveFor($this->currentUnitIdFor($employee), $category);
+        $minimumMinutes = $setting?->min_minutes;
+
+        if (! $minimumMinutes || $durationMinutes >= $minimumMinutes) {
+            return;
+        }
+
+        $earliestCheckOut = $attendance->check_in->copy()->addMinutes($minimumMinutes);
+
+        throw new AttendanceValidationException(
+            sprintf(
+                'Belum bisa presensi pulang. Minimal jam kerja %s sejak presensi masuk. Anda baru bekerja %s. Presensi pulang dapat dilakukan mulai %s WITA.',
+                $this->formatDurationLabel($minimumMinutes),
+                $this->formatDurationLabel($durationMinutes),
+                $earliestCheckOut->format('H:i'),
+            ),
+            'minimum_work_duration_not_met',
+        );
+    }
+
+    private function formatDurationLabel(int $minutes): string
+    {
+        $hours = intdiv($minutes, 60);
+        $remainingMinutes = $minutes % 60;
+
+        if ($hours > 0 && $remainingMinutes > 0) {
+            return "{$hours} jam {$remainingMinutes} menit";
+        }
+
+        if ($hours > 0) {
+            return "{$hours} jam";
+        }
+
+        return "{$remainingMinutes} menit";
     }
 
     /**
@@ -458,7 +598,7 @@ class AttendanceService
         $category = $employee->workHourCategory();
         $minMinutes = $mode === 'shift'
             ? null // durasi minimal per kategori (PRD 5.3) berlaku mode reguler; shift dievaluasi thd jadwal shift itu sendiri.
-            : WorkHourSetting::resolveFor($employee->work_unit_id, $category)?->min_minutes;
+            : WorkHourSetting::resolveFor($this->currentUnitIdFor($employee), $category)?->min_minutes;
 
         $isLate = $attendance->status === 'terlambat';
 
@@ -490,14 +630,50 @@ class AttendanceService
 
     private function settingTimeOn(Employee $employee, Carbon $referenceDate, string $column): ?Carbon
     {
+        $policyDay = $this->workingDayPolicyFor($referenceDate);
+
+        if ($policyDay) {
+            if ($column === 'standard_check_in' && ! empty($policyDay['start_time'])) {
+                return $referenceDate->copy()->setTimeFromTimeString($policyDay['start_time']);
+            }
+
+            if ($column === 'standard_check_out' && ! empty($policyDay['end_time'])) {
+                return $referenceDate->copy()->setTimeFromTimeString($policyDay['end_time']);
+            }
+        }
+
         $category = $employee->workHourCategory();
-        $setting = WorkHourSetting::resolveFor($employee->work_unit_id, $category);
+        $setting = WorkHourSetting::resolveFor($this->currentUnitIdFor($employee), $category);
 
         if (! $setting || ! $setting->$column) {
             return null;
         }
 
         return $referenceDate->copy()->setTimeFromTimeString($setting->$column);
+    }
+
+    private function workingDayPolicyFor(Carbon $date): ?array
+    {
+        $setting = AppSetting::where('key', 'working_days_policy')->first();
+
+        if (! $setting || ! $setting->value) {
+            return null;
+        }
+
+        $days = json_decode((string) $setting->value, true);
+
+        if (! is_array($days)) {
+            return null;
+        }
+
+        $dayCode = strtolower($date->englishDayOfWeek);
+        $day = collect($days)->first(fn ($item) => ($item['dayCode'] ?? null) === $dayCode);
+
+        if (! is_array($day) || ! ($day['is_active'] ?? false)) {
+            return null;
+        }
+
+        return $day;
     }
 
     private function shiftTimeOn(Carbon $referenceDate, string $time, bool $isOvernight = false): Carbon

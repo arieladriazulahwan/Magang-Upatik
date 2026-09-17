@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ActivityLog;
 use App\Models\WorkUnit;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -47,5 +48,51 @@ class WorkUnitController extends Controller
                 'attendance_mode_effective' => $workUnit->effectiveAttendanceMode(),
             ],
         ]);
+    }
+
+    public function store(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'parent_id' => ['nullable', 'integer', 'exists:work_unit,id'],
+            'code' => ['sometimes', 'nullable', 'string', 'max:30', 'unique:work_unit,code'],
+            'kode' => ['sometimes', 'nullable', 'string', 'max:30', 'unique:work_unit,code'],
+            'name' => ['sometimes', 'nullable', 'string', 'max:150'],
+            'nama' => ['sometimes', 'nullable', 'string', 'max:150'],
+            'type' => ['sometimes', 'nullable', 'in:universitas,rektorat,fakultas,pascasarjana,biro,lembaga,upt,rumah_sakit,jurusan,program_studi,bagian,sub_bagian,laboratorium,instalasi,ruangan,koordinator,lainnya'],
+            'attendance_mode' => ['sometimes', 'nullable', 'in:reguler,shift'],
+            'wfh_allowed' => ['sometimes', 'boolean'],
+            'max_wfh_per_month' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:31'],
+            'is_active' => ['sometimes', 'boolean'],
+        ]);
+
+        $name = trim((string) ($data['name'] ?? $data['nama'] ?? ''));
+        $code = strtoupper(trim((string) ($data['code'] ?? $data['kode'] ?? '')));
+
+        if ($name === '') {
+            return response()->json([
+                'message' => 'Nama unit kerja wajib diisi.',
+            ], 422);
+        }
+
+        if ($code === '') {
+            return response()->json([
+                'message' => 'Kode unit kerja wajib diisi.',
+            ], 422);
+        }
+
+        $workUnit = WorkUnit::create([
+            'parent_id' => $data['parent_id'] ?? null,
+            'code' => $code,
+            'name' => $name,
+            'type' => $data['type'] ?? 'lainnya',
+            'attendance_mode' => $data['attendance_mode'] ?? null,
+            'wfh_allowed' => $data['wfh_allowed'] ?? false,
+            'max_wfh_per_month' => $data['max_wfh_per_month'] ?? null,
+            'is_active' => $data['is_active'] ?? true,
+        ]);
+
+        ActivityLog::record('work_unit.create', $workUnit, $data);
+
+        return response()->json(['data' => $workUnit], 201);
     }
 }

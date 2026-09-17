@@ -8,10 +8,13 @@ use App\Http\Requests\StoreEmployeeRequest;
 use App\Http\Requests\UpdateEmployeeRequest;
 use App\Models\ActivityLog;
 use App\Models\Employee;
+use App\Models\Role;
+use App\Models\RoleUser;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 
 /**
  * Master data pegawai (PRD 5.1).
@@ -48,7 +51,13 @@ class EmployeeController extends Controller
         ]);
 
         $query = Employee::query()
-            ->with(['workUnit:id,name,code', 'structuralPosition:id,name', 'user:id,employee_id,username'])
+            ->with([
+                'workUnit:id,name,code',
+                'structuralPosition:id,name',
+                'user:id,employee_id,username',
+                'user.roleUsers:id,user_id,role_id',
+                'user.roleUsers.role:id,name',
+            ])
             ->withCount(['activeFaceData as face_data_count']);
 
         $this->applyVisibilityScope($query, $request->user());
@@ -90,7 +99,13 @@ class EmployeeController extends Controller
     {
         $this->assertCanView($request->user(), $employee);
 
-        $employee->load(['workUnit:id,name,code', 'structuralPosition:id,name', 'user:id,employee_id,username'])
+        $employee->load([
+            'workUnit:id,name,code',
+            'structuralPosition:id,name',
+            'user:id,employee_id,username',
+            'user.roleUsers:id,user_id,role_id',
+            'user.roleUsers.role:id,name',
+        ])
             ->loadCount(['activeFaceData as face_data_count']);
 
         return response()->json(['data' => $this->serialize($employee)]);
@@ -100,15 +115,33 @@ class EmployeeController extends Controller
     {
         $this->assertUnitInScope($request, $request->validated('work_unit_id'));
 
-        $employee = DB::transaction(function () use ($request) {
-            $employee = Employee::create($request->validated());
+        $validated = $request->validated();
+        $userPayload = [
+            'username' => $validated['username'] ?? null,
+            'password' => $validated['password'] ?? null,
+        ];
+        unset($validated['username'], $validated['password']);
+        $validated['attendance_active'] = false;
 
-            ActivityLog::record('employee.create', $employee, $request->validated());
+        $employee = DB::transaction(function () use ($request, $validated, $userPayload) {
+            $employee = Employee::create($validated);
+
+            if (! empty($userPayload['username'])) {
+                $this->createEmployeeUser($employee, $userPayload['username'], $userPayload['password']);
+            }
+
+            ActivityLog::record('employee.create', $employee, $validated);
 
             return $employee;
         });
 
-        $employee->load(['workUnit:id,name,code', 'structuralPosition:id,name'])
+        $employee->load([
+            'workUnit:id,name,code',
+            'structuralPosition:id,name',
+            'user:id,employee_id,username',
+            'user.roleUsers:id,user_id,role_id',
+            'user.roleUsers.role:id,name',
+        ])
             ->loadCount(['activeFaceData as face_data_count']);
 
         return response()->json(['data' => $this->serialize($employee)], 201);
@@ -122,13 +155,36 @@ class EmployeeController extends Controller
             $this->assertUnitInScope($request, $request->validated('work_unit_id'));
         }
 
-        DB::transaction(function () use ($request, $employee) {
-            $employee->update($request->validated());
+        $validated = $request->validated();
+        $userPayload = [
+            'username' => array_key_exists('username', $validated) ? $validated['username'] : null,
+            'password' => array_key_exists('password', $validated) ? $validated['password'] : null,
+            'has_username' => array_key_exists('username', $validated),
+            'has_password' => array_key_exists('password', $validated),
+        ];
+        unset($validated['username'], $validated['password']);
 
-            ActivityLog::record('employee.update', $employee, $request->validated());
+        if (($validated['attendance_active'] ?? false) && ! $this->employeeHasMobileAccount($employee)) {
+            return response()->json([
+                'message' => 'Presensi hanya bisa diaktifkan untuk akun yang memiliki role employee/mobile.',
+                'reason' => 'not_mobile_employee_account',
+            ], 422);
+        }
+
+        DB::transaction(function () use ($request, $employee, $validated, $userPayload) {
+            $employee->update($validated);
+            $this->syncEmployeeUser($employee, $userPayload);
+
+            ActivityLog::record('employee.update', $employee, $validated);
         });
 
-        $employee->load(['workUnit:id,name,code', 'structuralPosition:id,name', 'user:id,employee_id,username'])
+        $employee->load([
+            'workUnit:id,name,code',
+            'structuralPosition:id,name',
+            'user:id,employee_id,username',
+            'user.roleUsers:id,user_id,role_id',
+            'user.roleUsers.role:id,name',
+        ])
             ->loadCount(['activeFaceData as face_data_count']);
 
         return response()->json(['data' => $this->serialize($employee)]);
@@ -192,7 +248,13 @@ class EmployeeController extends Controller
             ActivityLog::record('employee.link_user', $employee, ['user_id' => $targetUser->id]);
         });
 
-        $employee->load(['workUnit:id,name,code', 'structuralPosition:id,name', 'user:id,employee_id,username'])
+        $employee->load([
+            'workUnit:id,name,code',
+            'structuralPosition:id,name',
+            'user:id,employee_id,username',
+            'user.roleUsers:id,user_id,role_id',
+            'user.roleUsers.role:id,name',
+        ])
             ->loadCount(['activeFaceData as face_data_count']);
 
         return response()->json(['data' => $this->serialize($employee)]);
@@ -300,6 +362,17 @@ class EmployeeController extends Controller
 
     private function serialize(Employee $employee): array
     {
+        $employee->loadMissing(['user.roleUsers.role', 'user.roleUsers.workUnit', 'workUnit']);
+        $linkedRoles = $employee->user
+            ? $employee->user->roleUsers
+                ->map(fn ($roleUser) => $roleUser->role?->name)
+                ->filter()
+                ->unique()
+                ->values()
+                ->all()
+            : [];
+        $currentUnit = $this->currentUnitFor($employee);
+
         return [
             'id' => $employee->id,
             'nip' => $employee->nip,
@@ -311,6 +384,7 @@ class EmployeeController extends Controller
             'employment_status' => $employee->employment_status,
             'employee_type' => $employee->employee_type,
             'work_unit' => $employee->workUnit?->only(['id', 'name', 'code']),
+            'current_unit' => $currentUnit?->only(['id', 'name', 'code']),
             'structural_position' => $employee->structuralPosition?->only(['id', 'name']),
             'tmt' => $employee->tmt?->toDateString(),
             'grade' => $employee->grade,
@@ -320,12 +394,106 @@ class EmployeeController extends Controller
             'face_samples' => (int) ($employee->face_data_count ?? 0),
             'face_count' => (int) ($employee->face_data_count ?? 0),
             'is_active' => $employee->is_active,
+            'attendance_active' => $employee->attendance_active,
             'linked_user' => $employee->user ? [
                 'id' => $employee->user->id,
                 'username' => $employee->user->username,
+                'roles' => $linkedRoles,
+                'is_mobile_user' => in_array('employee', $linkedRoles, true),
             ] : null,
             'created_at' => $employee->created_at?->toIso8601String(),
             'updated_at' => $employee->updated_at?->toIso8601String(),
         ];
+    }
+
+    private function currentUnitFor(Employee $employee)
+    {
+        if (! $employee->user) {
+            return $employee->workUnit;
+        }
+
+        $scopedRole = $employee->user->roleUsers
+            ->filter(fn ($roleUser) => $roleUser->work_unit_id !== null)
+            ->first(fn ($roleUser) => in_array($roleUser->role?->name, ['pimpinan', 'admin_unit'], true));
+
+        return $scopedRole?->workUnit ?: $employee->workUnit;
+    }
+
+    private function employeeHasMobileAccount(Employee $employee): bool
+    {
+        $employee->loadMissing(['user.roleUsers.role']);
+
+        return $employee->user?->roleUsers
+            ->contains(fn ($roleUser) => $roleUser->role?->name === 'employee') ?? false;
+    }
+
+    private function createEmployeeUser(Employee $employee, string $username, string $password): User
+    {
+        $user = User::create([
+            'employee_id' => $employee->id,
+            'siga8_user_id' => 'manual-employee-'.$employee->id,
+            'username' => $username,
+            'full_name' => $employee->name,
+            'email' => $employee->email,
+            'level' => 1,
+            'faculty_code' => $employee->workUnit?->code,
+            'faculty_name' => $employee->workUnit?->name,
+            'password' => Hash::make($password),
+            'is_active' => true,
+        ]);
+
+        $employeeRoleId = Role::where('name', 'employee')->value('id');
+
+        if ($employeeRoleId) {
+            RoleUser::updateOrCreate(
+                [
+                    'user_id' => $user->id,
+                    'role_id' => $employeeRoleId,
+                    'work_unit_id' => null,
+                ],
+                [
+                    'source' => 'manual',
+                    'siga8_role_id' => null,
+                ],
+            );
+        }
+
+        return $user;
+    }
+
+    private function syncEmployeeUser(Employee $employee, array $payload): void
+    {
+        if (! $payload['has_username'] && ! $payload['has_password']) {
+            return;
+        }
+
+        $employee->loadMissing('user', 'workUnit');
+        $user = $employee->user;
+
+        if (! $user && ! empty($payload['username'])) {
+            $this->createEmployeeUser($employee, $payload['username'], $payload['password'] ?: $employee->nip ?: $payload['username']);
+            return;
+        }
+
+        if (! $user) {
+            return;
+        }
+
+        $updates = [
+            'full_name' => $employee->name,
+            'email' => $employee->email,
+            'faculty_code' => $employee->workUnit?->code,
+            'faculty_name' => $employee->workUnit?->name,
+        ];
+
+        if ($payload['has_username'] && ! empty($payload['username'])) {
+            $updates['username'] = $payload['username'];
+        }
+
+        if ($payload['has_password'] && ! empty($payload['password'])) {
+            $updates['password'] = Hash::make($payload['password']);
+        }
+
+        $user->update($updates);
     }
 }

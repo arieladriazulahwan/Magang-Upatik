@@ -7,8 +7,10 @@ use App\Http\Requests\StoreShiftRequest;
 use App\Http\Requests\UpdateShiftRequest;
 use App\Models\ActivityLog;
 use App\Models\Shift;
+use App\Models\WorkUnit;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ShiftController extends Controller
 {
@@ -20,6 +22,9 @@ class ShiftController extends Controller
         ]);
 
         $query = Shift::query()->with('workUnit:id,name,code');
+        $hospitalUnitIds = $this->hospitalUnitIds();
+
+        $query->whereIn('work_unit_id', $hospitalUnitIds ?: [-1]);
 
         if (isset($filters['work_unit_id'])) {
             $query->where('work_unit_id', $filters['work_unit_id']);
@@ -45,6 +50,7 @@ class ShiftController extends Controller
     {
         $data = $request->validated();
         $this->assertUnitInScope($request, $data['work_unit_id']);
+        $this->assertHospitalUnit($data['work_unit_id']);
 
         $shift = Shift::create($data);
 
@@ -57,9 +63,11 @@ class ShiftController extends Controller
     {
         $data = $request->validated();
         $this->assertUnitInScope($request, $shift->work_unit_id);
+        $this->assertHospitalUnit($shift->work_unit_id);
 
         if (isset($data['work_unit_id'])) {
             $this->assertUnitInScope($request, $data['work_unit_id']);
+            $this->assertHospitalUnit($data['work_unit_id']);
         }
 
         $shift->update($data);
@@ -67,6 +75,30 @@ class ShiftController extends Controller
         ActivityLog::record('shift.update', $shift, $data);
 
         return response()->json(['data' => $this->serialize($shift)]);
+    }
+
+    public function destroy(Request $request, Shift $shift): JsonResponse
+    {
+        $this->assertUnitInScope($request, $shift->work_unit_id);
+        $this->assertHospitalUnit($shift->work_unit_id);
+
+        if ($shift->schedules()->exists()) {
+            $shift->update(['is_active' => false]);
+
+            ActivityLog::record('shift.deactivate', $shift, [
+                'reason' => 'Shift sudah dipakai pada jadwal pegawai.',
+            ]);
+
+            return response()->json([
+                'message' => 'Shift sudah dipakai pada jadwal pegawai, sehingga dinonaktifkan dan tidak dihapus.',
+                'data' => $this->serialize($shift),
+            ]);
+        }
+
+        ActivityLog::record('shift.delete', $shift);
+        $shift->delete();
+
+        return response()->json(['message' => 'Shift berhasil dihapus.']);
     }
 
     private function assertUnitInScope(Request $request, ?int $workUnitId): void
@@ -79,6 +111,36 @@ class ShiftController extends Controller
         if ($allowedUnitIds !== null && ! in_array($workUnitId, $allowedUnitIds, true)) {
             abort(403, 'Anda tidak punya izin mengelola shift unit lain.');
         }
+    }
+
+    private function assertHospitalUnit(int $workUnitId): void
+    {
+        if (! in_array($workUnitId, $this->hospitalUnitIds(), true)) {
+            abort(422, 'Shift hanya dapat dibuat untuk unit Rumah Sakit Tadulako.');
+        }
+    }
+
+    private function hospitalUnitIds(): array
+    {
+        $rootIds = WorkUnit::query()
+            ->where('type', 'rumah_sakit')
+            ->orWhereRaw('LOWER(name) LIKE ?', ['%rumah sakit%'])
+            ->orWhereRaw('LOWER(name) LIKE ?', ['%rs pendidikan tadulako%'])
+            ->orWhere('code', 'ZS')
+            ->pluck('id')
+            ->all();
+
+        if (empty($rootIds)) {
+            return [];
+        }
+
+        $arrayLiteral = '{'.implode(',', array_map('intval', $rootIds)).'}';
+
+        return DB::table('v_work_unit')
+            ->whereRaw('ancestor_ids && ?::bigint[]', [$arrayLiteral])
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
     }
 
     private function serialize(Shift $shift): array

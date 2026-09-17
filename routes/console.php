@@ -6,11 +6,14 @@ use App\Models\RoleUser;
 use App\Models\StructuralPosition;
 use App\Models\User;
 use App\Models\WorkUnit;
+use App\Services\Attendance\AttendanceReconciliationService;
 use App\Services\Calendar\GoogleCalendarService;
+use App\Services\Leave\LeaveBalanceService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schedule;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -45,6 +48,145 @@ Artisan::command('holidays:sync-google {--year=} {--direction=push} {--preview=0
 
     return self::SUCCESS;
 })->purpose('Sinkronisasi hari libur dari/ke Google Calendar');
+
+Artisan::command('calendar:sync-google {--year=} {--type=all} {--retry} {--limit=50}', function (GoogleCalendarService $calendar) {
+    $year = $this->option('year') ? (int) $this->option('year') : now('Asia/Makassar')->year;
+    $type = (string) $this->option('type');
+    $limit = max(1, (int) $this->option('limit'));
+    $result = [];
+
+    try {
+        if ((bool) $this->option('retry')) {
+            $result['retry'] = $calendar->retryPendingSyncs($limit);
+        }
+
+        if (in_array($type, ['all', 'holidays', 'libur'], true)) {
+            $result['hari_libur'] = $calendar->syncHolidays($year);
+        }
+
+        if (in_array($type, ['all', 'leaves', 'cuti', 'pengajuan'], true)) {
+            $result['cuti_disetujui'] = $calendar->syncApprovedLeaveRequests($year);
+        }
+
+        if ($result === []) {
+            throw new InvalidArgumentException('Type harus all, holidays/libur, atau leaves/cuti/pengajuan.');
+        }
+    } catch (Throwable $e) {
+        $this->error($e->getMessage());
+
+        return self::FAILURE;
+    }
+
+    $this->info('Sinkronisasi Google Calendar selesai.');
+
+    foreach ($result as $section => $items) {
+        $this->line('');
+        $this->line(str_replace('_', ' ', strtoupper($section)));
+        $this->table(['Item', 'Jumlah'], collect($items)->map(fn ($value, $key) => [$key, $value])->all());
+    }
+
+    return self::SUCCESS;
+})->purpose('Sinkronisasi ulang hari libur, cuti disetujui, dan retry antrean Google Calendar');
+
+Artisan::command('calendar:retry-google {--limit=50}', function (GoogleCalendarService $calendar) {
+    $result = $calendar->retryPendingSyncs(max(1, (int) $this->option('limit')));
+
+    $this->info('Retry sinkronisasi Google Calendar selesai.');
+    $this->table(['Item', 'Jumlah'], collect($result)->map(fn ($value, $key) => [$key, $value])->all());
+
+    return self::SUCCESS;
+})->purpose('Retry antrean Google Calendar yang tertunda atau gagal');
+
+Artisan::command('calendar:attendance-reminders {date?} {--popup=15}', function (GoogleCalendarService $calendar) {
+    $date = $this->argument('date') ?: now('Asia/Makassar')->toDateString();
+    $popupMinutes = max(0, (int) $this->option('popup'));
+    $result = $calendar->syncAttendanceReminders($date, $popupMinutes);
+
+    $this->info('Sinkronisasi reminder presensi selesai untuk '.$date.'.');
+    $this->table(['Item', 'Jumlah'], collect($result)->map(fn ($value, $key) => [$key, $value])->all());
+
+    return ($result['gagal'] ?? 0) > 0 ? self::FAILURE : self::SUCCESS;
+})->purpose('Buat reminder Google Calendar untuk jangan lupa absen masuk dan pulang');
+
+Artisan::command('attendance:sync-approved-leaves {--from=} {--to=} {--request-id=} {--dry-run}', function (AttendanceReconciliationService $attendance) {
+    $requestId = $this->option('request-id') ? (int) $this->option('request-id') : null;
+    $result = $attendance->syncApprovedLeaveRequests(
+        $this->option('from') ?: null,
+        $this->option('to') ?: null,
+        $requestId,
+        (bool) $this->option('dry-run'),
+    );
+
+    $this->info($this->option('dry-run') ? 'Preview sinkronisasi pengajuan disetujui.' : 'Sinkronisasi pengajuan disetujui selesai.');
+    $this->table(['Item', 'Jumlah'], collect($result)->map(fn ($value, $key) => [$key, $value])->all());
+
+    return self::SUCCESS;
+})->purpose('Isi status cuti/izin/sakit/dinas pada attendance dari pengajuan yang sudah disetujui');
+
+Artisan::command('attendance:mark-alpha {date?} {--work-unit-id=} {--dry-run}', function (AttendanceReconciliationService $attendance) {
+    $date = $this->argument('date') ?: now('Asia/Makassar')->subDay()->toDateString();
+    $workUnitId = $this->option('work-unit-id') ? (int) $this->option('work-unit-id') : null;
+    $result = $attendance->markAlphaForDate($date, $workUnitId, (bool) $this->option('dry-run'));
+
+    $this->info(($this->option('dry-run') ? 'Preview' : 'Penandaan').' alpha untuk '.$date.'.');
+    $this->table(['Item', 'Jumlah'], collect($result)->map(fn ($value, $key) => [$key, $value])->all());
+
+    return self::SUCCESS;
+})->purpose('Tandai alpha untuk pegawai yang tidak punya presensi/pengajuan pada hari kerja');
+
+Artisan::command('attendance:activate-employees {--nip=*} {--all} {--deactivate}', function () {
+    $nips = array_values(array_filter(array_map('trim', (array) $this->option('nip'))));
+
+    if (! $this->option('all') && empty($nips)) {
+        $this->error('Gunakan --nip=NIP untuk pegawai tertentu atau --all untuk semua pegawai.');
+
+        return self::FAILURE;
+    }
+
+    $query = Employee::query();
+
+    if (! $this->option('all')) {
+        $query->whereIn('nip', $nips);
+    }
+
+    $active = ! (bool) $this->option('deactivate');
+    $count = $query->update(['attendance_active' => $active]);
+
+    $this->info(($active ? 'Aktivasi' : 'Nonaktivasi').' presensi pegawai selesai.');
+    $this->table(['Item', 'Jumlah'], [
+        ['updated', $count],
+        ['attendance_active', $active ? 'true' : 'false'],
+    ]);
+
+    return self::SUCCESS;
+})->purpose('Aktifkan/nonaktifkan pegawai yang ikut sistem presensi dan alpha otomatis');
+
+Artisan::command('leave-balances:init {year?} {--employee-id=} {--dry-run}', function (LeaveBalanceService $balances) {
+    $year = $this->argument('year') ? (int) $this->argument('year') : now('Asia/Makassar')->year;
+    $employeeId = $this->option('employee-id') ? (int) $this->option('employee-id') : null;
+    $result = $balances->initializeYear($year, $employeeId, (bool) $this->option('dry-run'));
+
+    $this->info(($this->option('dry-run') ? 'Preview' : 'Inisialisasi').' saldo cuti tahun '.$year.'.');
+    $this->table(['Item', 'Jumlah'], collect($result)->map(fn ($value, $key) => [$key, $value])->all());
+
+    return self::SUCCESS;
+})->purpose('Inisialisasi entitlement dan carry-over saldo cuti tahunan per pegawai');
+
+Schedule::command('attendance:mark-alpha')
+    ->dailyAt('23:55')
+    ->timezone('Asia/Makassar');
+
+Schedule::command('leave-balances:init')
+    ->yearlyOn(1, 1, '00:10')
+    ->timezone('Asia/Makassar');
+
+Schedule::command('calendar:retry-google')
+    ->everyFifteenMinutes()
+    ->timezone('Asia/Makassar');
+
+Schedule::command('calendar:attendance-reminders')
+    ->dailyAt('00:20')
+    ->timezone('Asia/Makassar');
 
 Artisan::command('employees:import-fkip {--sheet=FKIP_Lengkap} {--csv=}', function () {
     $path = database_path('data pegawai/Data_Pegawai_FKIP_2026.xlsx');

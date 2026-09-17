@@ -20,12 +20,13 @@ class Employee extends Model
         'nip', 'nik', 'name', 'email', 'phone', 'gender',
         'employment_status', 'employee_type', 'work_unit_id',
         'structural_position_id', 'tmt', 'grade', 'rank',
-        'profile_photo', 'is_active',
+        'profile_photo', 'is_active', 'attendance_active',
     ];
 
     protected $casts = [
         'tmt' => 'date',
         'is_active' => 'boolean',
+        'attendance_active' => 'boolean',
     ];
 
     public function workUnit(): BelongsTo

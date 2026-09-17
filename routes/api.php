@@ -83,8 +83,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/holidays', [HolidayController::class, 'index']);
 
     Route::middleware('role:super_admin')->group(function () {
+        Route::post('/work-units', [WorkUnitController::class, 'store']);
+    });
+
+    Route::middleware('role:super_admin,admin_kepegawaian')->group(function () {
         Route::post('/work-hour-settings', [WorkHourSettingController::class, 'store']);
         Route::patch('/work-hour-settings/{workHourSetting}', [WorkHourSettingController::class, 'update']);
+    });
+
+    Route::middleware('role:super_admin')->group(function () {
         Route::post('/holidays', [HolidayController::class, 'store']);
         Route::post('/holidays/sync-from-google', [HolidayController::class, 'syncFromGoogle']);
         Route::post('/holidays/sync-to-google', [HolidayController::class, 'syncToGoogle']);
@@ -96,6 +103,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('role:super_admin,admin_unit')->group(function () {
         Route::post('/shifts', [ShiftController::class, 'store']);
         Route::patch('/shifts/{shift}', [ShiftController::class, 'update']);
+        Route::delete('/shifts/{shift}', [ShiftController::class, 'destroy']);
         Route::post('/work-locations', [WorkLocationController::class, 'store']);
         Route::patch('/work-locations/{workLocation}', [WorkLocationController::class, 'update']);
         Route::delete('/work-locations/{workLocation}', [WorkLocationController::class, 'destroy']);
@@ -111,6 +119,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // lihat docblock AttendanceService untuk detail ----
     Route::post('/attendance/check-in', [AttendanceController::class, 'checkIn']);
     Route::post('/attendance/check-out', [AttendanceController::class, 'checkOut']);
+    Route::post('/attendance/correction-request', [AttendanceController::class, 'requestCorrection']);
     Route::get('/attendance', [AttendanceController::class, 'index']);
     Route::get('/attendance/{attendance}', [AttendanceController::class, 'show']);
 
@@ -140,6 +149,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/leave-requests', [LeaveRequestController::class, 'store']);
     Route::get('/leave-requests', [LeaveRequestController::class, 'index']);
     Route::get('/leave-requests/{leaveRequest}', [LeaveRequestController::class, 'show']);
+    Route::get('/leave-requests/{leaveRequest}/attachments/{attachment}/download', [LeaveRequestController::class, 'downloadAttachment']);
     Route::post('/leave-requests/{leaveRequest}/approve', [LeaveRequestController::class, 'approve']);
     Route::post('/leave-requests/{leaveRequest}/reject', [LeaveRequestController::class, 'reject']);
     Route::post('/leave-requests/{leaveRequest}/cancel', [LeaveRequestController::class, 'cancel']);
@@ -162,6 +172,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/overtime-requests/{overtimeRequest}/reject', [OvertimeController::class, 'reject']);
     Route::post('/overtime-requests/{overtimeRequest}/realize', [OvertimeController::class, 'realize']);
     Route::post('/overtime-requests/{overtimeRequest}/cancel', [OvertimeController::class, 'cancel']);
+
+    // ---- Master hari & jam kerja — super_admin + admin_kepegawaian ----
+    Route::middleware('role:super_admin,admin_kepegawaian')->group(function () {
+        Route::get('/policies/working-days', [AppSettingController::class, 'workingDaysPolicy']);
+        Route::post('/policies/working-days', [AppSettingController::class, 'saveWorkingDaysPolicy']);
+    });
+
         // ---- Admin Global (PRD 5.15) — super_admin saja ----
     Route::middleware('role:super_admin')->group(function () {
         Route::get('/siga8-role-mappings', [Siga8RoleMappingController::class, 'index']);

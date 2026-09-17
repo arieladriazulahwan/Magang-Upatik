@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Holiday;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 
 /**
  * PRD 5.10: "Perhitungan jumlah hari kerja pada pengajuan cuti otomatis
@@ -16,11 +17,19 @@ class WorkingDayCalculator
 {
     public function countBetween(Carbon|string $start, Carbon|string $end): int
     {
+        return $this->datesBetween($start, $end)->count();
+    }
+
+    /**
+     * @return Collection<int, string>
+     */
+    public function datesBetween(Carbon|string $start, Carbon|string $end): Collection
+    {
         $start = Carbon::parse($start)->startOfDay();
         $end = Carbon::parse($end)->startOfDay();
 
         if ($end->lt($start)) {
-            return 0;
+            return collect();
         }
 
         $holidayDates = Holiday::whereBetween('date', [$start->toDateString(), $end->toDateString()])
@@ -28,17 +37,17 @@ class WorkingDayCalculator
             ->map(fn ($d) => $d->toDateString())
             ->flip();
 
-        $count = 0;
+        $dates = collect();
         $cursor = $start->copy();
 
         while ($cursor->lte($end)) {
             if (! $cursor->isWeekend() && ! $holidayDates->has($cursor->toDateString())) {
-                $count++;
+                $dates->push($cursor->toDateString());
             }
 
             $cursor->addDay();
         }
 
-        return $count;
+        return $dates;
     }
 }

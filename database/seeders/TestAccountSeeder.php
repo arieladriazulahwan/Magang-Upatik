@@ -62,8 +62,8 @@ class TestAccountSeeder extends Seeder
                     'work_unit_id' => in_array($account['role'], ['admin_unit', 'pimpinan'], true) ? $unit->id : null,
                 ],
                 [
-                    'source' => 'siga8',
-                    'siga8_role_id' => $account['siga8_role_id'],
+                    'source' => 'manual',
+                    'siga8_role_id' => null,
                 ],
             );
         }

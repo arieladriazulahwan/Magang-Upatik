@@ -37,6 +37,9 @@ class StoreEmployeeRequest extends FormRequest
             'tmt' => ['required', 'date', 'before_or_equal:today'],
             'grade' => ['nullable', 'string', 'max:20'],
             'rank' => ['nullable', 'string', 'max:100'],
+            'attendance_active' => ['sometimes', 'boolean'],
+            'username' => ['nullable', 'string', 'max:100', Rule::unique('users', 'username')],
+            'password' => ['nullable', 'string', 'min:6', 'max:100', 'required_with:username'],
         ];
     }
 

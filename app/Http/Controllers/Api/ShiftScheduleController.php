@@ -8,6 +8,7 @@ use App\Http\Requests\StoreShiftScheduleRequest;
 use App\Models\ActivityLog;
 use App\Models\Shift;
 use App\Models\ShiftSchedule;
+use App\Models\WorkUnit;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -23,7 +24,12 @@ class ShiftScheduleController extends Controller
             'date_to' => ['sometimes', 'date', 'after_or_equal:date_from'],
         ]);
 
-        $query = ShiftSchedule::query()->with(['employee:id,name,nip,work_unit_id', 'shift:id,name,work_unit_id']);
+        $hospitalUnitIds = $this->hospitalUnitIds();
+
+        $query = ShiftSchedule::query()
+            ->with(['employee:id,name,nip,work_unit_id,structural_position_id', 'employee.structuralPosition:id,name', 'shift:id,name,work_unit_id'])
+            ->whereHas('employee', fn ($q) => $q
+                ->whereIn('work_unit_id', $hospitalUnitIds ?: [-1]));
 
         $allowedUnitIds = $request->user()?->scopedUnitIds();
         if ($allowedUnitIds !== null) {
@@ -55,6 +61,8 @@ class ShiftScheduleController extends Controller
         $data = $request->validated();
         $this->assertEmployeeInScope($request, $data['employee_id']);
         $this->assertShiftInScope($request, $data['shift_id']);
+        $this->assertHospitalEmployee($data['employee_id']);
+        $this->assertHospitalShift($data['shift_id']);
 
         $this->assertNoExistingScheduleOtherShift($data['employee_id'], $data['date'], $data['shift_id']);
 
@@ -62,7 +70,7 @@ class ShiftScheduleController extends Controller
 
         ActivityLog::record('shift_schedule.create', $schedule, $data);
 
-        $schedule->load(['employee:id,name,nip', 'shift:id,name,work_unit_id']);
+        $schedule->load(['employee:id,name,nip,work_unit_id,structural_position_id', 'employee.structuralPosition:id,name', 'shift:id,name,work_unit_id']);
 
         return response()->json(['data' => $this->serialize($schedule)], 201);
     }
@@ -72,9 +80,11 @@ class ShiftScheduleController extends Controller
         $data = $request->validated();
         $shift = Shift::findOrFail($data['shift_id']);
         $this->assertShiftInScope($request, $shift->id);
+        $this->assertHospitalShift($shift->id);
 
         foreach ($data['employee_ids'] as $employeeId) {
             $this->assertEmployeeInScope($request, $employeeId);
+            $this->assertHospitalEmployee($employeeId);
         }
 
         $created = [];
@@ -173,6 +183,53 @@ class ShiftScheduleController extends Controller
         }
     }
 
+    private function assertHospitalShift(int $shiftId): void
+    {
+        $exists = Shift::query()
+            ->where('id', $shiftId)
+            ->whereIn('work_unit_id', $this->hospitalUnitIds() ?: [-1])
+            ->exists();
+
+        if (! $exists) {
+            abort(422, 'Jadwal shift hanya dapat memakai shift Rumah Sakit Tadulako.');
+        }
+    }
+
+    private function assertHospitalEmployee(int $employeeId): void
+    {
+        $exists = DB::table('employee')
+            ->where('id', $employeeId)
+            ->whereIn('work_unit_id', $this->hospitalUnitIds() ?: [-1])
+            ->exists();
+
+        if (! $exists) {
+            abort(422, 'Jadwal shift hanya untuk pegawai unit Rumah Sakit Tadulako.');
+        }
+    }
+
+    private function hospitalUnitIds(): array
+    {
+        $rootIds = WorkUnit::query()
+            ->where('type', 'rumah_sakit')
+            ->orWhereRaw('LOWER(name) LIKE ?', ['%rumah sakit%'])
+            ->orWhereRaw('LOWER(name) LIKE ?', ['%rs pendidikan tadulako%'])
+            ->orWhere('code', 'ZS')
+            ->pluck('id')
+            ->all();
+
+        if (empty($rootIds)) {
+            return [];
+        }
+
+        $arrayLiteral = '{'.implode(',', array_map('intval', $rootIds)).'}';
+
+        return DB::table('v_work_unit')
+            ->whereRaw('ancestor_ids && ?::bigint[]', [$arrayLiteral])
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
     private function assertNoExistingScheduleOtherShift(int $employeeId, string $date, int $shiftId): void
     {
         $existing = ShiftSchedule::where('employee_id', $employeeId)->where('date', $date)->first();
@@ -190,7 +247,10 @@ class ShiftScheduleController extends Controller
     {
         return [
             'id' => $schedule->id,
-            'employee' => $schedule->employee?->only(['id', 'name', 'nip']),
+            'employee' => $schedule->employee ? [
+                ...$schedule->employee->only(['id', 'name', 'nip']),
+                'structural_position' => $schedule->employee->structuralPosition?->only(['id', 'name']),
+            ] : null,
             'shift' => $schedule->shift?->only(['id', 'name']),
             'date' => $schedule->date?->toDateString(),
             'description' => $schedule->description,

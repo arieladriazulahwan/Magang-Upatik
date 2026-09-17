@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CheckInRequest;
 use App\Http\Requests\CheckOutRequest;
+use App\Http\Requests\AttendanceCorrectionRequest;
 use App\Http\Requests\CorrectAttendanceRequest;
 use App\Http\Requests\MarkPresentRequest;
 use App\Models\ActivityLog;
@@ -130,6 +131,21 @@ class AttendanceController extends Controller
         $this->assertCanView($request->user(), $attendance->employee);
 
         return response()->json(['data' => $this->serialize($attendance)]);
+    }
+
+    public function requestCorrection(AttendanceCorrectionRequest $request): JsonResponse
+    {
+        $employee = $this->resolveActingEmployee($request->user());
+
+        try {
+            $attendance = $this->service->requestCorrection($employee, $request->user(), $request->validated());
+        } catch (AttendanceValidationException $e) {
+            return $this->validationErrorResponse($e);
+        }
+
+        ActivityLog::record('attendance.correction_request', $attendance, $request->validated());
+
+        return response()->json(['data' => $this->serialize($attendance)], 201);
     }
 
     public function correct(CorrectAttendanceRequest $request, Attendance $attendance): JsonResponse
