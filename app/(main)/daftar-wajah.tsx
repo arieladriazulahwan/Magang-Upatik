@@ -26,6 +26,7 @@ import {
   type ApiFaceStatus,
   type PhotoPayload,
 } from "../../services/api";
+import { safeBack } from "../../utils/navigation";
 
 const FACE_STEPS = [
   {
@@ -152,7 +153,7 @@ export default function DaftarWajahScreen() {
         {
           text: "OK",
           onPress: () =>
-            router.back(),
+            safeBack(),
         },
       ]
     );
@@ -468,7 +469,7 @@ function Header() {
       <Pressable
         style={styles.backButton}
         onPress={() =>
-          router.back()
+          safeBack()
         }
       >
         <Ionicons

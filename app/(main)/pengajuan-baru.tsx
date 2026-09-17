@@ -28,6 +28,7 @@ import * as DocumentPicker from "expo-document-picker";
 import Button from "../../components/Button";
 import MainScreen from "../../components/MainScreen";
 import { Colors } from "../../constants/colors";
+import { safeBack } from "../../utils/navigation";
 import {
   formatWitaShortDate,
 } from "../../constants/time";
@@ -45,7 +46,8 @@ type RequestType =
   | "Izin"
   | "WFA"
   | "Lembur"
-  | "Perjadi";
+  | "Perjadin"
+  | "Lupa Presensi";
 
 type CutiCategory = {
   label: string;
@@ -71,6 +73,11 @@ type ImportantLeaveSubCategory =
   | "keluarga_sakit"
   | "keluarga_meninggal"
   | "bencana";
+
+type AttendanceCorrectionKind =
+  | "masuk"
+  | "pulang"
+  | "masuk_pulang";
 
 const requestTypes: {
   label: string;
@@ -98,8 +105,30 @@ const requestTypes: {
     value: "Lembur",
   },
   {
-    label: "Perjadi",
-    value: "Perjadi",
+    label: "Perjadin",
+    value: "Perjadin",
+  },
+  {
+    label: "Lupa Presensi",
+    value: "Lupa Presensi",
+  },
+];
+
+const correctionKinds: {
+  label: string;
+  value: AttendanceCorrectionKind;
+}[] = [
+  {
+    label: "Masuk",
+    value: "masuk",
+  },
+  {
+    label: "Pulang",
+    value: "pulang",
+  },
+  {
+    label: "Masuk & Pulang",
+    value: "masuk_pulang",
   },
 ];
 
@@ -197,13 +226,18 @@ function getInitialRequestType(
       ? value[0]
       : value;
 
+  if (typeParam === "Perjadi") {
+    return "Perjadin";
+  }
+
   if (
     typeParam === "Cuti" ||
     typeParam === "Sakit" ||
     typeParam === "Izin" ||
     typeParam === "WFA" ||
     typeParam === "Lembur" ||
-    typeParam === "Perjadi"
+    typeParam === "Perjadin" ||
+    typeParam === "Lupa Presensi"
   ) {
     return typeParam;
   }
@@ -251,6 +285,9 @@ const dayNames = [
   "Sab",
 ];
 
+const ATTENDANCE_CORRECTION_WINDOW_DAYS =
+  7;
+
 function toDateKey(
   value: Date
 ) {
@@ -286,6 +323,49 @@ function parseDateKey(
     month - 1,
     day
   );
+}
+
+function parseTimeToMinutes(
+  value: string
+) {
+  const [
+    hour,
+    minute,
+  ] =
+    value
+      .split(":")
+      .map(Number);
+
+  if (
+    Number.isNaN(hour) ||
+    Number.isNaN(minute)
+  ) {
+    return null;
+  }
+
+  return hour * 60 + minute;
+}
+
+function getOvertimeMinimumStart(
+  dateKey: string
+) {
+  const date =
+    parseDateKey(
+      dateKey
+    );
+  const day =
+    date.getDay();
+
+  if (
+    day === 0 ||
+    day === 6
+  ) {
+    return null;
+  }
+
+  return day === 5
+    ? "16:30"
+    : "16:00";
 }
 
 function formatDisplayDate(
@@ -393,6 +473,26 @@ function daysBetween(
   );
 }
 
+function isBeforeDateKey(
+  value: string,
+  min: string
+) {
+  return (
+    parseDateKey(value).getTime() <
+    parseDateKey(min).getTime()
+  );
+}
+
+function isAfterDateKey(
+  value: string,
+  max: string
+) {
+  return (
+    parseDateKey(value).getTime() >
+    parseDateKey(max).getTime()
+  );
+}
+
 /* =====================================================
    SCREEN
 ===================================================== */
@@ -491,6 +591,26 @@ export default function PengajuanBaruScreen() {
     useState("19:00");
 
   const [
+    correctionKind,
+    setCorrectionKind,
+  ] =
+    useState<AttendanceCorrectionKind>(
+      "masuk"
+    );
+
+  const [
+    correctionCheckIn,
+    setCorrectionCheckIn,
+  ] =
+    useState("08:00");
+
+  const [
+    correctionCheckOut,
+    setCorrectionCheckOut,
+  ] =
+    useState("16:00");
+
+  const [
     doctorLetterNumber,
     setDoctorLetterNumber,
   ] =
@@ -520,6 +640,22 @@ export default function PengajuanBaruScreen() {
 
   const isOvertime =
     type === "Lembur";
+  const isAttendanceCorrection =
+    type === "Lupa Presensi";
+  const isLeaveLikeRequest =
+    type === "Cuti" ||
+    type === "Sakit" ||
+    type === "Izin" ||
+    type === "Perjadin";
+  const todayKey =
+    toDateKey(new Date());
+  const oldestCorrectionDateKey =
+    toDateKey(
+      addDays(
+        new Date(),
+        -(ATTENDANCE_CORRECTION_WINDOW_DAYS - 1)
+      )
+    );
   const selectedCutiCategory =
     cutiCategories.find(
       (item) =>
@@ -558,14 +694,14 @@ export default function PengajuanBaruScreen() {
   const documentLabel =
     needsDoctorLetter
       ? "Surat dokter"
-      : type === "Perjadi"
+      : type === "Perjadin"
       ? "Surat tugas"
       : "Dokumen pendukung";
 
   const uploadText =
     needsDoctorLetter
       ? "Unggah surat dokter"
-      : type === "Perjadi"
+      : type === "Perjadin"
       ? "Unggah surat tugas"
       : "Unggah surat / dokumen pendukung";
 
@@ -610,6 +746,16 @@ export default function PengajuanBaruScreen() {
   const selectDate =
     (value: string) => {
       if (
+        isDateOutOfRangeForCurrentRequest(
+          value
+        )
+      ) {
+        showDateRangeWarning();
+
+        return;
+      }
+
+      if (
         datePickerTarget ===
         "start"
       ) {
@@ -638,6 +784,53 @@ export default function PengajuanBaruScreen() {
       }
 
       closeDatePicker();
+    };
+
+  const isDateOutOfRangeForCurrentRequest =
+    (value: string) => {
+      if (isAttendanceCorrection) {
+        if (
+          isBeforeDateKey(
+            value,
+            oldestCorrectionDateKey
+          ) ||
+          isAfterDateKey(
+            value,
+            todayKey
+          )
+        ) {
+          return true;
+        }
+      }
+
+      if (
+        isLeaveLikeRequest &&
+        isBeforeDateKey(
+          value,
+          todayKey
+        )
+      ) {
+        return true;
+      }
+
+      return false;
+    };
+
+  const showDateRangeWarning =
+    () => {
+      if (isAttendanceCorrection) {
+        Alert.alert(
+          "Tanggal tidak tersedia",
+          `Perbaikan kehadiran hanya bisa diajukan untuk ${ATTENDANCE_CORRECTION_WINDOW_DAYS} hari terakhir.`
+        );
+
+        return;
+      }
+
+      Alert.alert(
+        "Tanggal tidak tersedia",
+        "Pengajuan cuti/izin hanya bisa dibuat untuk hari ini atau tanggal setelahnya."
+      );
     };
 
   /* ===================================================
@@ -785,11 +978,88 @@ export default function PengajuanBaruScreen() {
       if (
         !startDate.trim() ||
         (!isOvertime &&
+          !isAttendanceCorrection &&
           !endDate.trim())
       ) {
         Alert.alert(
           "Tanggal diperlukan",
-          "Silakan isi tanggal mulai dan tanggal selesai."
+          isAttendanceCorrection
+            ? "Silakan isi tanggal presensi yang ingin dikoreksi."
+            : "Silakan isi tanggal mulai dan tanggal selesai."
+        );
+
+        return;
+      }
+
+      if (
+        isAttendanceCorrection
+      ) {
+        if (
+          isBeforeDateKey(
+            startDate,
+            oldestCorrectionDateKey
+          ) ||
+          isAfterDateKey(
+            startDate,
+            todayKey
+          )
+        ) {
+          Alert.alert(
+            "Tanggal tidak tersedia",
+            `Perbaikan kehadiran hanya bisa diajukan untuk ${ATTENDANCE_CORRECTION_WINDOW_DAYS} hari terakhir.`
+          );
+
+          return;
+        }
+
+        const needsCheckIn =
+          correctionKind === "masuk" ||
+          correctionKind === "masuk_pulang";
+        const needsCheckOut =
+          correctionKind === "pulang" ||
+          correctionKind === "masuk_pulang";
+        const timePattern =
+          /^\d{2}:\d{2}$/;
+
+        if (
+          needsCheckIn &&
+          !timePattern.test(
+            correctionCheckIn
+          )
+        ) {
+          Alert.alert(
+            "Jam masuk tidak valid",
+            "Gunakan format jam HH:mm, contoh 08:00."
+          );
+
+          return;
+        }
+
+        if (
+          needsCheckOut &&
+          !timePattern.test(
+            correctionCheckOut
+          )
+        ) {
+          Alert.alert(
+            "Jam pulang tidak valid",
+            "Gunakan format jam HH:mm, contoh 16:00."
+          );
+
+          return;
+        }
+      }
+
+      if (
+        isLeaveLikeRequest &&
+        isBeforeDateKey(
+          startDate,
+          todayKey
+        )
+      ) {
+        Alert.alert(
+          "Tanggal tidak tersedia",
+          "Pengajuan cuti/izin hanya bisa dibuat untuk hari ini atau tanggal setelahnya."
         );
 
         return;
@@ -810,6 +1080,52 @@ export default function PengajuanBaruScreen() {
         );
 
         return;
+      }
+
+      if (isOvertime) {
+        const startMinutes =
+          parseTimeToMinutes(
+            plannedStartTime
+          );
+        const endMinutes =
+          parseTimeToMinutes(
+            plannedEndTime
+          );
+        const minimumStart =
+          getOvertimeMinimumStart(
+            startDate
+          );
+        const minimumStartMinutes =
+          minimumStart
+            ? parseTimeToMinutes(
+                minimumStart
+              )
+            : null;
+
+        if (
+          startMinutes === null ||
+          endMinutes === null ||
+          endMinutes <= startMinutes
+        ) {
+          Alert.alert(
+            "Jam lembur tidak valid",
+            "Jam selesai lembur harus setelah jam mulai."
+          );
+
+          return;
+        }
+
+        if (
+          minimumStartMinutes !== null &&
+          startMinutes < minimumStartMinutes
+        ) {
+          Alert.alert(
+            "Jam lembur belum tersedia",
+            `Lembur hari kerja hanya bisa diajukan mulai pukul ${minimumStart} WITA. Sabtu dan Minggu dapat diajukan sebagai lembur hari libur.`
+          );
+
+          return;
+        }
       }
 
       if (
@@ -849,7 +1165,7 @@ export default function PengajuanBaruScreen() {
       }
 
       if (
-        type === "Perjadi" &&
+        type === "Perjadin" &&
         !selectedFile
       ) {
         Alert.alert(
@@ -871,20 +1187,23 @@ export default function PengajuanBaruScreen() {
               ? isBirthBeyondThird
                 ? "CLTN"
                 : selectedCutiCategory.label
+              : type === "Lupa Presensi"
+              ? "Koreksi/Lupa Presensi"
               : type === "WFA"
               ? "Work From Anywhere"
               : type === "Sakit"
               ? "Cuti Sakit"
               : type === "Lembur"
               ? "Lembur"
-              : type === "Perjadi"
+              : type === "Perjadin"
               ? "Perjalanan Dinas"
               : "Izin",
 
           days:
             `${daysBetween(
               startDate,
-              isOvertime
+              isOvertime ||
+                isAttendanceCorrection
                 ? startDate
                 : endDate
             )} hari`,
@@ -894,7 +1213,8 @@ export default function PengajuanBaruScreen() {
           startDate,
 
           endDate:
-            isOvertime
+            isOvertime ||
+            isAttendanceCorrection
               ? startDate
               : endDate,
 
@@ -948,6 +1268,24 @@ export default function PengajuanBaruScreen() {
             isOvertime
               ? plannedEndTime.trim()
               : undefined,
+
+          correctionCheckIn:
+            isAttendanceCorrection &&
+            (correctionKind ===
+              "masuk" ||
+              correctionKind ===
+                "masuk_pulang")
+              ? correctionCheckIn.trim()
+              : null,
+
+          correctionCheckOut:
+            isAttendanceCorrection &&
+            (correctionKind ===
+              "pulang" ||
+              correctionKind ===
+                "masuk_pulang")
+              ? correctionCheckOut.trim()
+              : null,
         });
 
       /* =========================================
@@ -981,7 +1319,9 @@ export default function PengajuanBaruScreen() {
             if (
               !loadingRequest
             ) {
-              router.back();
+              safeBack(
+                "/(main)/pengajuan"
+              );
             }
           }}
           style={[
@@ -1018,7 +1358,7 @@ export default function PengajuanBaruScreen() {
               styles.subtitle
             }
           >
-            Cuti, sakit, izin, WFA, lembur, dan perjalanan dinas
+            Cuti, sakit, izin, WFA, lembur, perjadin, dan lupa presensi
           </Text>
         </View>
       </View>
@@ -1396,7 +1736,9 @@ export default function PengajuanBaruScreen() {
       >
         <DateField
           label={
-            isOvertime
+            isAttendanceCorrection
+              ? "Tanggal presensi"
+              : isOvertime
               ? "Tanggal lembur"
               : "Tanggal mulai"
           }
@@ -1411,7 +1753,8 @@ export default function PengajuanBaruScreen() {
           }
         />
 
-        {!isOvertime ? (
+        {!isOvertime &&
+        !isAttendanceCorrection ? (
           <DateField
             label="Tanggal selesai"
             value={endDate}
@@ -1460,6 +1803,116 @@ export default function PengajuanBaruScreen() {
               loadingRequest
             }
           />
+        </View>
+      ) : null}
+
+      {isAttendanceCorrection ? (
+        <View
+          style={
+            styles.fieldBlock
+          }
+        >
+          <Text
+            style={
+              styles.fieldLabel
+            }
+          >
+            Presensi yang lupa
+          </Text>
+
+          <View
+            style={
+              styles.subCategoryGrid
+            }
+          >
+            {correctionKinds.map(
+              (item) => {
+                const active =
+                  item.value ===
+                  correctionKind;
+
+                return (
+                  <Pressable
+                    key={item.value}
+                    style={[
+                      styles.subCategoryOption,
+                      active
+                        ? styles.subCategoryOptionActive
+                        : null,
+                    ]}
+                    onPress={() =>
+                      setCorrectionKind(
+                        item.value
+                      )
+                    }
+                    disabled={
+                      loadingRequest
+                    }
+                  >
+                    <Text
+                      style={[
+                        styles.subCategoryText,
+                        active
+                          ? styles.subCategoryTextActive
+                          : null,
+                      ]}
+                    >
+                      {item.label}
+                    </Text>
+                  </Pressable>
+                );
+              }
+            )}
+          </View>
+        </View>
+      ) : null}
+
+      {isAttendanceCorrection ? (
+        <View
+          style={
+            correctionKind ===
+            "masuk_pulang"
+              ? styles.twoCol
+              : styles.singleCol
+          }
+        >
+          {correctionKind ===
+            "masuk" ||
+          correctionKind ===
+            "masuk_pulang" ? (
+            <Field
+              label="Jam masuk yang diajukan"
+              value={
+                correctionCheckIn
+              }
+              onChangeText={
+                setCorrectionCheckIn
+              }
+              placeholder="08:00"
+              disabled={
+                loadingRequest
+              }
+            />
+          ) : null}
+
+          {correctionKind ===
+            "pulang" ||
+          correctionKind ===
+            "masuk_pulang" ? (
+            <Field
+              label="Jam pulang yang diajukan"
+              value={
+                correctionCheckOut
+              }
+              onChangeText={
+                setCorrectionCheckOut
+              }
+              placeholder="16:00"
+              disabled={
+                loadingRequest
+              }
+            />
+          ) : null}
         </View>
       ) : null}
 
@@ -1520,6 +1973,7 @@ export default function PengajuanBaruScreen() {
           DOKUMEN
       ================================================== */}
 
+      {!isAttendanceCorrection ? (
       <View
         style={
           styles.fieldBlock
@@ -1682,6 +2136,7 @@ export default function PengajuanBaruScreen() {
           </Pressable>
         ) : null}
       </View>
+      ) : null}
 
       {/* ==================================================
           BUTTON
@@ -1720,6 +2175,12 @@ export default function PengajuanBaruScreen() {
         }
         onSelect={
           selectDate
+        }
+        isDateDisabled={
+          (value) =>
+            isDateOutOfRangeForCurrentRequest(
+              value
+            )
         }
         onClose={
           closeDatePicker
@@ -1789,6 +2250,7 @@ function DatePickerModal({
   monthDate,
   onChangeMonth,
   onSelect,
+  isDateDisabled,
   onClose,
 }: {
   visible: boolean;
@@ -1800,6 +2262,9 @@ function DatePickerModal({
   onSelect: (
     value: string
   ) => void;
+  isDateDisabled?: (
+    value: string
+  ) => boolean;
   onClose: () => void;
 }) {
   const days =
@@ -1891,6 +2356,14 @@ function DatePickerModal({
                 const isToday =
                   dateKey ===
                   todayKey;
+                const disabled =
+                  !dateKey ||
+                  Boolean(
+                    dateKey &&
+                      isDateDisabled?.(
+                        dateKey
+                      )
+                  );
 
                 return (
                   <Pressable
@@ -1903,8 +2376,11 @@ function DatePickerModal({
                       !dateKey
                         ? styles.calendarDayEmpty
                         : null,
+                      disabled
+                        ? styles.calendarDayDisabled
+                        : null,
                     ]}
-                    disabled={!dateKey}
+                    disabled={disabled}
                     onPress={() => {
                       if (dateKey) {
                         onSelect(dateKey);
@@ -1919,6 +2395,9 @@ function DatePickerModal({
                           : null,
                         selected
                           ? styles.calendarDaySelectedText
+                          : null,
+                        disabled
+                          ? styles.calendarDayDisabledText
                           : null,
                       ]}
                     >
@@ -2623,6 +3102,10 @@ const styles =
       opacity: 0,
     },
 
+    calendarDayDisabled: {
+      opacity: 0.34,
+    },
+
     calendarDaySelected: {
       backgroundColor:
         Colors.background,
@@ -2644,5 +3127,9 @@ const styles =
     calendarDaySelectedText: {
       color:
         Colors.white,
+    },
+
+    calendarDayDisabledText: {
+      color: "#AAB3C2",
     },
   });

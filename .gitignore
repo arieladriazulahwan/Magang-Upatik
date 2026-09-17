@@ -21,11 +21,15 @@ android/.idea/
 android/app/build/
 android/build/
 android/local.properties
+android/app/release/
+android/app/debug.keystore
 ios/Pods/
 ios/build/
 *.xcworkspace/
 .kotlin/
 *.orig.*
+*.apk
+*.aab
 
 # Signing / credentials
 *.jks
@@ -36,6 +40,10 @@ ios/build/
 *.pem
 *.mobileprovision
 *.certSigningRequest
+google-services.json
+GoogleService-Info.plist
+tes-api-*.json
+google-calendar-service-account*.json
 
 # Metro
 .metro-health-check*
@@ -54,6 +62,19 @@ expo-web*.log
 .env.*
 !.env.example
 !.env.sample
+
+# Local documents and archives
+*.pdf
+*.doc
+*.docx
+*.xls
+*.xlsx
+*.ppt
+*.pptx
+*.csv
+*.zip
+*.rar
+*.7z
 
 # OS / editor
 .DS_Store

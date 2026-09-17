@@ -27,6 +27,7 @@ import {
   getToken,
   getWfhRequests,
   postLeaveRequest,
+  postAttendanceCorrectionRequest,
   postNotification,
   postOvertimeRequest,
   postWfhRequest,
@@ -206,6 +207,8 @@ interface PrototypeContextValue {
       subCategory?: "menikah" | "keluarga_sakit" | "keluarga_meninggal" | "bencana";
       plannedStartTime?: string;
       plannedEndTime?: string;
+      correctionCheckIn?: string | null;
+      correctionCheckOut?: string | null;
     }
   ) => Promise<boolean>;
 
@@ -432,28 +435,11 @@ function canApproveLeaveStep(
   approverRole?: string | null
 ) {
   if (
-    userHasRole(user, [
-      "super_admin",
-    ])
-  ) {
-    return true;
-  }
-
-  if (
     approverRole ===
     "atasan_langsung"
   ) {
     return userHasRole(user, [
       "pimpinan",
-    ]);
-  }
-
-  if (
-    approverRole ===
-    "admin_kepegawaian"
-  ) {
-    return userHasRole(user, [
-      "admin_kepegawaian",
     ]);
   }
 
@@ -542,7 +528,7 @@ const LEAVE_TYPE_IDS = {
   Cuti: 1,
   Sakit: 3,
   Izin: 8,
-  Perjadi: 9,
+  Perjadin: 9,
 } as const;
 
 /* =====================================================
@@ -1486,25 +1472,16 @@ export function PrototypeProvider({
           null;
         const employeeId =
           currentUser?.employee?.id;
+        const canUseMobileApprovals =
+          userHasRole(currentUser, [
+            "pimpinan",
+          ]);
         const canLoadLeaveApprovals =
-          userHasRole(currentUser, [
-            "super_admin",
-            "admin_kepegawaian",
-            "pimpinan",
-          ]);
+          canUseMobileApprovals;
         const canLoadWfhApprovals =
-          userHasRole(currentUser, [
-            "super_admin",
-            "admin_kepegawaian",
-            "admin_unit",
-            "pimpinan",
-          ]);
+          canUseMobileApprovals;
         const canLoadOvertimeApprovals =
-          userHasRole(currentUser, [
-            "super_admin",
-            "admin_kepegawaian",
-            "pimpinan",
-          ]);
+          canUseMobileApprovals;
         const emptyResponse =
           Promise.resolve({
             data: [],
@@ -2286,6 +2263,62 @@ export function PrototypeProvider({
                     mapOvertimeRequest(
                       response.data
                     ),
+
+                    ...current,
+                  ]
+                );
+              }
+
+              else if (
+                payload.type ===
+                "Lupa Presensi"
+              ) {
+                const response =
+                  await postAttendanceCorrectionRequest(
+                    {
+                      date:
+                        payload.startDate,
+
+                      check_in:
+                        payload.correctionCheckIn
+                          ? `${payload.startDate} ${payload.correctionCheckIn}:00`
+                          : null,
+
+                      check_out:
+                        payload.correctionCheckOut
+                          ? `${payload.startDate} ${payload.correctionCheckOut}:00`
+                          : null,
+
+                      correction_reason:
+                        payload.reason ||
+                        payload.title,
+                    }
+                  );
+
+                setRequests(
+                  (current) => [
+                    {
+                      id:
+                        `attendance-${response.data.id}`,
+
+                      title:
+                        "Koreksi/Lupa Presensi",
+
+                      meta:
+                        response.data.date ||
+                        payload.startDate,
+
+                      days:
+                        "1 hari",
+
+                      status:
+                        response.data.is_manual
+                          ? "Disetujui"
+                          : "Menunggu",
+
+                      type:
+                        "Lupa Presensi",
+                    },
 
                     ...current,
                   ]

@@ -18,7 +18,7 @@ import * as SecureStore from "expo-secure-store";
 
 const DEFAULT_API_URL =
   Platform.OS === "android"
-    ? "http://10.10.16.251:8000/api"
+    ? "http://10.10.55.25:8000/api"
     : "http://127.0.0.1:8000/api";
 
 export const API_URL =
@@ -29,6 +29,25 @@ const TOKEN_KEY = "auth_token";
 const USER_KEY = "auth_user";
 
 type JsonMap = Record<string, unknown>;
+
+export class ApiError extends Error {
+  status: number;
+  reason?: string;
+  data?: unknown;
+
+  constructor(
+    message: string,
+    status: number,
+    reason?: string,
+    data?: unknown
+  ) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.reason = reason;
+    this.data = data;
+  }
+}
 
 /**
  * ============================================================
@@ -52,6 +71,11 @@ export type ApiEmployee = {
   employment_status?: string;
 
   work_unit?: {
+    id: number;
+    name: string;
+    code: string;
+  } | null;
+  current_unit?: {
     id: number;
     name: string;
     code: string;
@@ -463,6 +487,21 @@ function errorMessage(
   return `Request gagal (${status})`;
 }
 
+function errorReason(data: unknown) {
+  if (
+    !data ||
+    typeof data !== "object"
+  ) {
+    return undefined;
+  }
+
+  const body = data as JsonMap;
+
+  return typeof body.reason === "string"
+    ? body.reason
+    : undefined;
+}
+
 /**
  * ============================================================
  * SESSION
@@ -659,11 +698,11 @@ export async function apiRequest<T>(
       await clearSession();
     }
 
-    throw new Error(
-      errorMessage(
-        data,
-        response.status
-      )
+    throw new ApiError(
+      errorMessage(data, response.status),
+      response.status,
+      errorReason(data),
+      data
     );
   }
 
@@ -754,6 +793,21 @@ export async function getWorkUnit(
   }>(`/work-units/${id}`);
 }
 
+export async function getWorkLocations(
+  params?: {
+    work_unit_id?: number;
+    is_active?: boolean;
+  }
+) {
+  return apiRequest<{
+    data: ApiWorkLocation[];
+  }>(
+    `/work-locations${buildQuery(
+      params
+    )}`
+  );
+}
+
 /**
  * ============================================================
  * QUERY BUILDER
@@ -780,7 +834,11 @@ function buildQuery(
       ) {
         query.set(
           key,
-          String(value)
+          typeof value === "boolean"
+            ? value
+              ? "1"
+              : "0"
+            : String(value)
         );
       }
     }
@@ -824,6 +882,24 @@ export async function getAttendance(
       params
     )}`
   );
+}
+
+export async function postAttendanceCorrectionRequest(
+  payload: {
+    date: string;
+    check_in?: string | null;
+    check_out?: string | null;
+    correction_reason: string;
+  }
+) {
+  return apiRequest<{
+    data: ApiAttendance;
+  }>("/attendance/correction-request", {
+    method: "POST",
+    body: JSON.stringify(
+      payload
+    ),
+  });
 }
 
 /**

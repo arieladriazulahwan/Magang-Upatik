@@ -32,13 +32,14 @@ import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
 import {
+  ApiError,
   ApiAttendance,
   ApiWorkLocation,
   checkIn,
   checkOut,
   getAttendance,
   getProfile,
-  getWorkUnit,
+  getWorkLocations,
 } from "../../services/api";
 import {
   getWitaDateKey,
@@ -126,6 +127,62 @@ function getErrorMessage(
   }
 
   return "Terjadi kesalahan saat melakukan presensi.";
+}
+
+function getAttendanceErrorMessage(
+  error: unknown
+) {
+  if (error instanceof ApiError) {
+    switch (error.reason) {
+      case "no_work_location":
+        return "Unit presensi Anda belum memiliki titik lokasi aktif. Minta Admin Unit menambahkan lokasi pada menu Lokasi Presensi.";
+
+      case "out_of_radius":
+        return error.message || "Anda berada di luar radius lokasi presensi unit. Dekati titik lokasi yang terdaftar lalu coba lagi.";
+
+      case "face_not_registered":
+        return "Presensi gagal: wajah Anda belum terdaftar. Buka Profil > Daftar Wajah lalu simpan minimal 5 sampel.";
+
+      case "face_liveness_failed":
+        return "Presensi gagal: liveness ditolak. Pastikan memakai wajah asli, seluruh wajah masuk bingkai, tidak menggunakan foto/video, dan pencahayaan cukup.";
+
+      case "face_liveness_missing":
+        return "Presensi gagal: layanan tidak mengembalikan hasil liveness. Periksa FaceServer dan coba lagi.";
+
+      case "face_not_matched":
+        return "Presensi gagal: wajah tidak cocok dengan data terdaftar. Coba ambil foto ulang dengan wajah menghadap kamera.";
+
+      case "face_service_unavailable":
+        return "Presensi gagal: FaceServer tidak dapat dihubungi atau timeout. Pastikan service pengenalan wajah aktif.";
+
+      case "face_service_http_error":
+      case "face_service_error":
+        return `Presensi gagal: FaceServer mengembalikan error (${error.status}). Coba lagi atau periksa log Backend.`;
+
+      case "face_photo_missing":
+        return "Presensi gagal: foto verifikasi tidak ditemukan di Backend. Ambil foto ulang.";
+
+      case "already_checked_in":
+        return "Presensi masuk hari ini sudah tercatat.";
+
+      case "already_checked_out":
+        return "Presensi pulang hari ini sudah tercatat.";
+
+      case "check_in_required":
+        return "Anda belum presensi masuk, jadi presensi pulang belum bisa dilakukan.";
+
+      case "minimum_work_duration":
+        return error.message;
+
+      case "wfh_not_approved":
+        return "Tidak ada pengajuan WFH yang disetujui untuk tanggal ini.";
+
+      default:
+        return error.message;
+    }
+  }
+
+  return getErrorMessage(error);
 }
 
 function attendanceNotificationStatus(
@@ -259,7 +316,8 @@ function buildLocationStatus(
     latitude: number;
     longitude: number;
   },
-  locations: ApiWorkLocation[]
+  locations: ApiWorkLocation[],
+  unitName?: string | null
 ): LocationStatus {
   const activeLocations =
     locations.filter(
@@ -272,7 +330,9 @@ function buildLocationStatus(
   ) {
     return {
       kind: "unknown",
-      text: "Lokasi presensi unit belum tersedia.",
+      text: unitName
+        ? `Belum ada lokasi presensi aktif untuk unit ${unitName}.`
+        : "Belum ada lokasi presensi aktif untuk unit Anda.",
     };
   }
 
@@ -310,7 +370,7 @@ function buildLocationStatus(
   if (!nearest) {
     return {
       kind: "unknown",
-      text: "Lokasi presensi belum dapat dihitung.",
+      text: "Koordinat lokasi presensi belum valid. Periksa data latitude dan longitude di web admin.",
     };
   }
 
@@ -328,7 +388,7 @@ function buildLocationStatus(
         nearest.item.name,
       distanceMeters:
         roundedDistance,
-      text: `Di area ${nearest.item.name}`,
+      text: `Di area ${nearest.item.name} (${formatDistance(roundedDistance)} dari titik presensi).`,
     };
   }
 
@@ -338,7 +398,7 @@ function buildLocationStatus(
       nearest.item.name,
     distanceMeters:
       roundedDistance,
-    text: `${formatDistance(roundedDistance)} dari ${nearest.item.name}`,
+    text: `Di luar radius ${nearest.item.name}. Jarak Anda ${formatDistance(roundedDistance)}, radius maksimal ${formatDistance(radius)}.`,
   };
 }
 
@@ -414,6 +474,11 @@ export default function PresensiScreen() {
     setWorkLocations,
   ] =
     useState<ApiWorkLocation[]>([]);
+
+  const [
+    workUnitName,
+    setWorkUnitName,
+  ] = useState<string | null>(null);
 
   const [
     locationStatus,
@@ -579,10 +644,11 @@ export default function PresensiScreen() {
           longitude:
             location.coords.longitude,
         },
-        workLocations
+        workLocations,
+        workUnitName
       )
     );
-  }, [location, workLocations]);
+  }, [location, workLocations, workUnitName]);
 
   useEffect(() => {
     let active = true;
@@ -593,13 +659,25 @@ export default function PresensiScreen() {
           await getProfile();
         const workUnitId =
           profile.user.employee
+            ?.current_unit?.id ||
+          profile.user.employee
             ?.work_unit?.id;
+        const unitName =
+          profile.user.employee
+            ?.current_unit?.name ||
+          profile.user.employee
+            ?.work_unit?.name ||
+          null;
+
+        if (active) {
+          setWorkUnitName(unitName);
+        }
 
         if (!workUnitId) {
           if (active) {
             setLocationStatus({
               kind: "unknown",
-              text: "Unit kerja belum tertaut ke akun ini.",
+              text: "Unit presensi belum tertaut ke akun ini. Hubungi Admin Kepegawaian untuk memperbaiki unit pegawai.",
             });
           }
 
@@ -607,16 +685,27 @@ export default function PresensiScreen() {
         }
 
         const response =
-          await getWorkUnit(
-            workUnitId
-          );
+          await getWorkLocations({
+            work_unit_id:
+              workUnitId,
+            is_active: true,
+          });
         const locations =
-          response.data.locations || [];
+          response.data || [];
 
         if (active) {
           setWorkLocations(
             locations
           );
+
+          if (locations.length === 0) {
+            setLocationStatus({
+              kind: "unknown",
+              text: unitName
+                ? `Belum ada lokasi presensi aktif untuk unit ${unitName}.`
+                : "Belum ada lokasi presensi aktif untuk unit Anda.",
+            });
+          }
         }
       } catch (error) {
         console.error(
@@ -627,7 +716,7 @@ export default function PresensiScreen() {
         if (active) {
           setLocationStatus({
             kind: "unknown",
-            text: "Lokasi presensi unit belum dapat dimuat.",
+            text: "Data lokasi presensi belum dapat dimuat. Periksa koneksi dan alamat API, lalu coba lagi.",
           });
         }
       }
@@ -717,7 +806,8 @@ export default function PresensiScreen() {
       setLocationStatus(
         buildLocationStatus(
           currentLocation,
-          workLocations
+          workLocations,
+          workUnitName
         )
       );
 
@@ -828,17 +918,19 @@ export default function PresensiScreen() {
 
       setProcessing(false);
       setStep("camera");
+      const message =
+        getAttendanceErrorMessage(error);
 
       pushNotification({
         title: "Presensi gagal",
-        desc: getErrorMessage(error),
+        desc: message,
         status: "error",
         category: "attendance",
       });
 
       Alert.alert(
         "Presensi gagal",
-        getErrorMessage(error)
+        message
       );
     }
   };
@@ -1008,8 +1100,20 @@ export default function PresensiScreen() {
           error
         );
 
+        if (error instanceof ApiError) {
+          console.error(
+            "ATTENDANCE ERROR DETAIL:",
+            {
+              reason: error.reason,
+              status: error.status,
+              message: error.message,
+              serverData: error.data,
+            }
+          );
+        }
+
         const message =
-          getErrorMessage(error);
+          getAttendanceErrorMessage(error);
 
         if (
           message
@@ -1043,15 +1147,18 @@ export default function PresensiScreen() {
      BACK
   ========================================================== */
 
-  const handleBack =
-    () => {
+    const handleBack = () => {
       if (processing) {
         return;
       }
 
-      router.back();
-    };
+      if (router.canGoBack()) {
+        router.back();
+        return;
+      }
 
+      router.replace("/(main)");
+    };
   /* ==========================================================
      BACK TO DASHBOARD
   ========================================================== */

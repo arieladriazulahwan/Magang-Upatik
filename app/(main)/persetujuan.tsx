@@ -5,7 +5,6 @@ import {
   Text,
   View,
 } from "react-native";
-import { router } from "expo-router";
 import Avatar from "../../components/Avatar";
 import Badge from "../../components/Badge";
 import MainScreen from "../../components/MainScreen";
@@ -14,6 +13,7 @@ import {
 } from "../../components/Skeleton";
 import { Colors } from "../../constants/colors";
 import { usePrototype } from "../../contexts/PrototypeContext";
+import { safeBack } from "../../utils/navigation";
 
 export default function PersetujuanScreen() {
   const [tab, setTab] = useState<
@@ -81,7 +81,7 @@ export default function PersetujuanScreen() {
         <Pressable
           onPress={() => {
             if (!isAnyProcessing) {
-              router.back();
+              safeBack("/(main)/pengajuan");
             }
           }}
           style={[

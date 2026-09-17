@@ -573,7 +573,7 @@ export default function RiwayatScreen() {
     periodFilter,
     setPeriodFilter,
   ] = useState<PeriodFilter>(
-    "all"
+    "today"
   );
   const currentDate =
     dateKeyToUtcDate(

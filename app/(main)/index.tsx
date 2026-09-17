@@ -42,7 +42,7 @@ import {
   getOvertimeRequests,
   getProfile,
   getStoredUser,
-  getWorkUnit,
+  getWorkLocations,
   getWfhRequests,
 } from "../../services/api";
 /* ============================================================
@@ -188,12 +188,21 @@ function distanceMeters(
   );
 }
 
+function formatDistance(value: number) {
+  if (value >= 1000) {
+    return `${(value / 1000).toFixed(2)} km`;
+  }
+
+  return `${Math.round(value)} m`;
+}
+
 function buildLocationStatus(
   currentLocation: {
     latitude: number;
     longitude: number;
   },
-  locations: ApiWorkLocation[]
+  locations: ApiWorkLocation[],
+  unitName?: string | null
 ): DashboardLocationStatus {
   const activeLocations =
     locations.filter(
@@ -206,7 +215,9 @@ function buildLocationStatus(
   ) {
     return {
       kind: "unknown",
-      text: "Lokasi presensi unit belum tersedia",
+      text: unitName
+        ? `Belum ada lokasi aktif untuk ${unitName}`
+        : "Belum ada lokasi aktif untuk unit Anda",
     };
   }
 
@@ -244,7 +255,7 @@ function buildLocationStatus(
   if (!nearest) {
     return {
       kind: "unknown",
-      text: "Lokasi presensi belum dapat dihitung",
+      text: "Koordinat lokasi presensi belum valid",
     };
   }
 
@@ -259,13 +270,13 @@ function buildLocationStatus(
   ) {
     return {
       kind: "inside",
-      text: `${roundedDistance} m dari ${nearest.item.name}`,
+      text: `Di area ${nearest.item.name}`,
     };
   }
 
   return {
     kind: "outside",
-    text: `${roundedDistance} m dari ${nearest.item.name}`,
+    text: `${formatDistance(roundedDistance)} dari ${nearest.item.name}, di luar radius ${formatDistance(nearest.item.radius_meters)}`,
   };
 }
 
@@ -340,28 +351,11 @@ function canApproveLeaveStep(
   approverRole?: string | null
 ) {
   if (
-    userHasRole(user, [
-      "super_admin",
-    ])
-  ) {
-    return true;
-  }
-
-  if (
     approverRole ===
     "atasan_langsung"
   ) {
     return userHasRole(user, [
       "pimpinan",
-    ]);
-  }
-
-  if (
-    approverRole ===
-    "admin_kepegawaian"
-  ) {
-    return userHasRole(user, [
-      "admin_kepegawaian",
     ]);
   }
 
@@ -616,9 +610,6 @@ export default function DashboardScreen() {
       (role) =>
         [
           "pimpinan",
-          "admin_unit",
-          "admin_kepegawaian",
-          "super_admin",
         ].includes(role)
     );
   }, [user]);
@@ -629,12 +620,20 @@ export default function DashboardScreen() {
         try {
           const workUnitId =
             currentUser.employee
+              ?.current_unit?.id ||
+            currentUser.employee
               ?.work_unit?.id;
+          const unitName =
+            currentUser.employee
+              ?.current_unit?.name ||
+            currentUser.employee
+              ?.work_unit?.name ||
+            null;
 
           if (!workUnitId) {
             setLocationStatus({
               kind: "unknown",
-              text: "Unit kerja belum tertaut",
+              text: "Unit presensi belum tertaut",
             });
             return;
           }
@@ -659,11 +658,15 @@ export default function DashboardScreen() {
           }
 
           const [
-            workUnitResult,
+            workLocationResult,
             currentLocation,
           ] =
             await Promise.all([
-              getWorkUnit(workUnitId),
+              getWorkLocations({
+                work_unit_id:
+                  workUnitId,
+                is_active: true,
+              }),
               Location.getCurrentPositionAsync({
                 accuracy:
                   Location.Accuracy.High,
@@ -680,8 +683,9 @@ export default function DashboardScreen() {
                   currentLocation.coords
                     .longitude,
               },
-              workUnitResult.data
-                .locations || []
+              workLocationResult.data ||
+                [],
+              unitName
             )
           );
         } catch (error) {
@@ -967,9 +971,6 @@ export default function DashboardScreen() {
               (role) =>
                 [
                   "pimpinan",
-                  "admin_unit",
-                  "admin_kepegawaian",
-                  "super_admin",
                 ].includes(
                   role.name
                 )
@@ -989,21 +990,14 @@ export default function DashboardScreen() {
 
             const canApproveLeave =
               hasRole([
-                "super_admin",
-                "admin_kepegawaian",
                 "pimpinan",
               ]);
             const canApproveWfa =
               hasRole([
-                "super_admin",
-                "admin_kepegawaian",
-                "admin_unit",
                 "pimpinan",
               ]);
             const canApproveOvertime =
               hasRole([
-                "super_admin",
-                "admin_kepegawaian",
                 "pimpinan",
               ]);
 

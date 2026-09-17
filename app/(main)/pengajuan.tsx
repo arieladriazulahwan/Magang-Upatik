@@ -28,10 +28,12 @@ import {
 
 import {
   getLeaveRequests,
+  getAttendance,
   getOvertimeRequests,
   getProfile,
   getWfhRequests,
   ApiLeaveRequest,
+  ApiAttendance,
   ApiOvertimeRequest,
   ApiWfhRequest,
 } from "../../services/api";
@@ -43,7 +45,8 @@ const filters = [
   "Izin",
   "WFA",
   "Lembur",
-  "Perjadi",
+  "Perjadin",
+  "Lupa Presensi",
 ];
 
 const LIVE_REFRESH_INTERVAL_MS =
@@ -362,7 +365,7 @@ function isInPeriod(
 export default function PengajuanScreen() {
   const [activeFilter, setActiveFilter] = useState("Semua");
   const [periodFilter, setPeriodFilter] =
-    useState<PeriodFilter>("all");
+    useState<PeriodFilter>("today");
   const currentDate =
     dateKeyToUtcDate(
       getWitaDateKey()
@@ -410,7 +413,7 @@ export default function PengajuanScreen() {
       const employeeId =
         profile.user.employee?.id;
 
-      const [leaveResult, wfhResult, overtimeResult] =
+      const [leaveResult, wfhResult, overtimeResult, correctionResult] =
         await Promise.allSettled([
           getLeaveRequests({
             employee_id:
@@ -423,6 +426,11 @@ export default function PengajuanScreen() {
           getOvertimeRequests({
             employee_id:
               employeeId,
+          }),
+          getAttendance({
+            employee_id:
+              employeeId,
+            per_page: 100,
           }),
         ]);
 
@@ -556,6 +564,60 @@ export default function PengajuanScreen() {
         console.error(
           "OVERTIME LOAD ERROR:",
           overtimeResult.reason
+        );
+      }
+
+      /**
+       * --------------------------------------------------------
+       * KOREKSI / LUPA PRESENSI
+       * --------------------------------------------------------
+       */
+
+      if (correctionResult.status === "fulfilled") {
+        const correctionData =
+          correctionResult.value?.data ?? [];
+
+        correctionData
+          .filter(
+            (item: ApiAttendance) =>
+              Boolean(
+                item.correction_reason
+              )
+          )
+          .forEach(
+            (item: ApiAttendance) => {
+              result.push({
+                id: `attendance-${item.id}`,
+                type: "Lupa Presensi",
+                status:
+                  item.is_manual
+                    ? "Disetujui"
+                    : "Menunggu",
+                title: "Koreksi/Lupa Presensi",
+
+                meta: formatDate(
+                  item.date
+                ),
+
+                days:
+                  formatCorrectionTimes(
+                    item
+                  ),
+
+                rawDate:
+                  item.date,
+
+                createdAt:
+                  item.updated_at ||
+                  item.created_at ||
+                  null,
+              });
+            }
+          );
+      } else {
+        console.error(
+          "CORRECTION LOAD ERROR:",
+          correctionResult.reason
         );
       }
 
@@ -698,7 +760,7 @@ export default function PengajuanScreen() {
           </Text>
 
           <Text style={styles.subtitle}>
-            Cuti, sakit, izin, WFA, lembur, dan perjadi
+            Cuti, sakit, izin, WFA, lembur, dan perjadin
           </Text>
         </View>
 
@@ -1224,7 +1286,7 @@ function mapLeaveType(
     name.includes("dinas") ||
     name.includes("perjalanan")
   ) {
-    return "Perjadi";
+    return "Perjadin";
   }
 
   return "Cuti";
@@ -1318,6 +1380,23 @@ function formatOvertimeRange(
   }
 
   return `${start} - ${end}`;
+}
+
+function formatCorrectionTimes(
+  item: ApiAttendance
+) {
+  const checkIn =
+    formatWitaTime(
+      item.check_in,
+      "--:--"
+    );
+  const checkOut =
+    formatWitaTime(
+      item.check_out,
+      "--:--"
+    );
+
+  return `${checkIn} - ${checkOut}`;
 }
 
 function formatDate(

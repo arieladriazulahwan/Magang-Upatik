@@ -11,7 +11,6 @@ import {
   Text,
   View,
 } from "react-native";
-import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import Badge from "../../components/Badge";
 import MainScreen from "../../components/MainScreen";
@@ -20,6 +19,7 @@ import {
   ApiLeaveBalance,
   getDashboardMe,
 } from "../../services/api";
+import { safeBack } from "../../utils/navigation";
 
 type BalanceRow = {
   name: string;
@@ -140,7 +140,7 @@ export default function SaldoScreen() {
     <MainScreen>
       <View style={styles.headerRow}>
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => safeBack()}
           style={styles.back}
         >
           <Ionicons

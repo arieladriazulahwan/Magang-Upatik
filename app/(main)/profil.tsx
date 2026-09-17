@@ -150,6 +150,7 @@ export default function ProfilScreen() {
       <View style={styles.panel}>
         <InfoRow label="NIP" value={employee?.nip || "-"} mono />
         <InfoRow label="Unit kerja" value={employee?.work_unit?.name || "-"} />
+        <InfoRow label="Unit presensi" value={employee?.current_unit?.name || employee?.work_unit?.name || "-"} />
         <InfoRow label="Kategori" value={employee?.employee_type || "-"} />
         <InfoRow label="Status" value={employee?.employment_status || "-"} />
       </View>

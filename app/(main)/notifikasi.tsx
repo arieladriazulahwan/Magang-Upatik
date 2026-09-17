@@ -10,7 +10,6 @@ import {
   View,
 } from "react-native";
 import {
-  router,
   useFocusEffect,
 } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -23,6 +22,7 @@ import {
   getWitaMonthStartKey,
   getWitaYearStartKey,
 } from "../../constants/time";
+import { safeBack } from "../../utils/navigation";
 import {
   NotificationItem,
   usePrototype,
@@ -747,7 +747,7 @@ export default function NotifikasiScreen() {
     setFilters,
   ] =
     useState<NotificationFilters>({
-      time: "all",
+      time: "today",
       activity: "all",
       status: "all",
     });
@@ -794,7 +794,7 @@ export default function NotifikasiScreen() {
     <MainScreen>
       <View style={styles.headerRow}>
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => safeBack()}
           style={styles.back}
         >
           <Ionicons
