@@ -38,7 +38,7 @@ const getNip = (item, employee = {}) =>
 	employee.nik ||
 	"-";
 
-const UNTAD_LOGO_PATH = "/logo-untad.svg";
+const UNTAD_LOGO_PATH = "/logo.png";
 
 const loadImageAsPngDataUrl = (src, width = 180, height = 180) =>
 	new Promise((resolve) => {

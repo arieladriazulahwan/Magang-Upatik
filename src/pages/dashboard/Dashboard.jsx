@@ -45,6 +45,7 @@ function Dashboard() {
   const [faceStats, setFaceStats] = useState({ registered: 0, total: 0 });
   const [loading, setLoading] = useState(true);
   const currentDate = new Intl.DateTimeFormat("id-ID", {
+    weekday: "long",
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -129,9 +130,8 @@ function Dashboard() {
           value: day.total ? Math.round(((day.hadir + day.terlambat) / day.total) * 100) : 0,
         }));
 
-        // Sebagian API mengirim relasi face_data/flag enrollment, bukan field
-        // face_data_count. Presensi yang lolos verifikasi wajah juga menjadi
-        // bukti cadangan agar dashboard tetap sinkron dengan aplikasi mobile.
+
+
         const verifiedEmployeeIds = new Set(
           records
             .filter((record) => record.face_matched === true || record.face_verified === true)
@@ -248,7 +248,7 @@ function Dashboard() {
       } catch (error) {
         console.error("Gagal mengambil data dashboard:", error);
 
-        // Tetap kosong kalau backend belum mempunyai data
+
         setStatistics([]);
         setAttendance([]);
         setDailyTrend([]);
@@ -291,7 +291,7 @@ function Dashboard() {
     <AdminLayout>
       <div className="dashboard-page">
 
-        {/* HEADER */}
+
         <div className="dashboard-heading">
           <div>
             <h2>Ringkasan Kehadiran</h2>
@@ -302,11 +302,13 @@ function Dashboard() {
           </div>
 
           <div className="dashboard-date">
-            {currentDate}
+            <span className="dashboard-date-icon" aria-hidden="true" />
+            <span>{currentDate}</span>
+            <span className="dashboard-date-chevron" aria-hidden="true">&gt;</span>
           </div>
         </div>
 
-        {/* STATISTICS */}
+
         <div className="dashboard-kpis">
 
           {loading ? (
@@ -499,10 +501,10 @@ function Dashboard() {
           </section>
         </div>
 
-        {/* MAIN GRID */}
+
         <div className="dashboard-grid">
 
-          {/* TREND KEHADIRAN */}
+
           <section className="dashboard-panel">
 
             <div className="panel-header">
@@ -561,7 +563,7 @@ function Dashboard() {
 
           </section>
 
-          {/* STATUS KEHADIRAN */}
+
           <section className="dashboard-panel">
 
             <div className="panel-header">
@@ -609,7 +611,7 @@ function Dashboard() {
 
         </div>
 
-        {/* AKTIVITAS */}
+
         <section className="dashboard-panel activity-panel">
 
           <div className="panel-header">

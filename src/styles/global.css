@@ -1,6 +1,4 @@
-/* =========================================================
-   GLOBAL
-========================================================= */
+
 
 * {
   margin: 0;
@@ -57,9 +55,7 @@ img {
 }
 
 
-/* =========================================================
-   ADMIN LAYOUT
-========================================================= */
+
 
 .admin-layout {
   min-height: 100vh;
@@ -72,9 +68,7 @@ img {
 }
 
 
-/* =========================================================
-   SIDEBAR
-========================================================= */
+
 
 .sidebar {
   position: fixed;
@@ -94,7 +88,7 @@ img {
 }
 
 
-/* BRAND */
+
 
 .sidebar-brand {
   height: 74px;
@@ -146,7 +140,7 @@ img {
 }
 
 
-/* NAVIGATION */
+
 
 .sidebar-nav {
   flex: 1;
@@ -250,7 +244,7 @@ img {
 }
 
 
-/* SIDEBAR USER */
+
 
 .sidebar-user {
   min-height: 68px;
@@ -308,9 +302,7 @@ img {
 }
 
 
-/* =========================================================
-   HEADER
-========================================================= */
+
 
 .header {
   min-height: 62px;
@@ -327,7 +319,7 @@ img {
 }
 
 
-/* HEADER LEFT */
+
 
 .header-left {
   min-width: 0;
@@ -366,7 +358,7 @@ img {
 }
 
 
-/* HEADER RIGHT */
+
 
 .header-right {
   position: relative;
@@ -514,18 +506,14 @@ img {
 }
 
 
-/* =========================================================
-   CONTENT
-========================================================= */
+
 
 .admin-content {
   padding: 24px 26px 40px;
 }
 
 
-/* =========================================================
-   COMMON PAGE HEADING
-========================================================= */
+
 
 .page-heading {
   margin-bottom: 20px;
@@ -574,9 +562,7 @@ img {
 }
 
 
-/* =========================================================
-   BUTTON
-========================================================= */
+
 
 .primary-button {
   padding: 10px 15px;
@@ -613,9 +599,7 @@ img {
 }
 
 
-/* =========================================================
-   DASHBOARD
-========================================================= */
+
 
 .dashboard-page {
   display: flex;
@@ -666,7 +650,7 @@ img {
 }
 
 
-/* KPI */
+
 
 .dashboard-kpis {
   display: grid;
@@ -1115,7 +1099,7 @@ img {
 }
 
 
-/* DASHBOARD GRID */
+
 
 .dashboard-grid {
   display: grid;
@@ -1136,7 +1120,7 @@ img {
 }
 
 
-/* PANEL HEADER */
+
 
 .panel-header {
   padding: 15px 18px;
@@ -1179,7 +1163,7 @@ img {
 }
 
 
-/* ATTENDANCE CHART */
+
 
 .attendance-chart {
   height: 235px;
@@ -1247,7 +1231,7 @@ img {
 }
 
 
-/* ATTENDANCE STATUS */
+
 
 .attendance-status {
   padding: 8px 18px 12px;
@@ -1310,9 +1294,7 @@ img {
 }
 
 
-/* =========================================================
-   ACTIVITY
-========================================================= */
+
 
 .activity-panel {
   margin-top: 16px;
@@ -1421,9 +1403,7 @@ img {
 }
 
 
-/* =========================================================
-   SUMMARY CARD
-========================================================= */
+
 
 .employee-summary,
 .monitoring-summary,
@@ -1466,9 +1446,7 @@ img {
 }
 
 
-/* =========================================================
-   DATA TOOLBAR
-========================================================= */
+
 
 .data-toolbar {
   padding: 15px;
@@ -1530,9 +1508,7 @@ img {
 }
 
 
-/* =========================================================
-   TABLE
-========================================================= */
+
 
 .employee-table-wrapper {
   overflow-x: auto;
@@ -1577,7 +1553,7 @@ img {
 }
 
 
-/* EMPLOYEE */
+
 
 .employee-name {
   display: flex;
@@ -1631,7 +1607,7 @@ img {
 }
 
 
-/* STATUS */
+
 
 .status-pill,
 .face-status {
@@ -1684,7 +1660,7 @@ button.action-face-status:hover {
 }
 
 
-/* ACTION */
+
 
 .action-button {
   padding: 6px 9px;
@@ -1719,7 +1695,7 @@ button.action-face-status:hover {
 }
 
 
-/* TABLE FOOTER */
+
 
 .table-footer {
   min-height: 52px;
@@ -1772,9 +1748,7 @@ button.action-face-status:hover {
 }
 
 
-/* =========================================================
-   MODAL
-========================================================= */
+
 
 .modal-overlay {
   position: fixed;
@@ -1841,7 +1815,7 @@ button.action-face-status:hover {
   color: #26354b;
 }
 
-/* Detail koreksi presensi */
+
 .correction-detail {
   padding: 22px;
 }
@@ -2243,9 +2217,7 @@ button.action-face-status:hover {
 }
 
 
-/* =========================================================
-   MONITORING KEHADIRAN
-========================================================= */
+
 
 .monitoring-page {
   width: 100%;
@@ -2451,9 +2423,7 @@ button.action-face-status:hover {
 }
 
 
-/* =========================================================
-   UNIT KERJA
-========================================================= */
+
 
 .unit-table {
   min-width: 950px;
@@ -2507,9 +2477,7 @@ button.action-face-status:hover {
 }
 
 
-/* =========================================================
-   SHIFT & JADWAL
-========================================================= */
+
 
 .shift-cards {
   display: grid;
@@ -2624,9 +2592,7 @@ button.action-face-status:hover {
 }
 
 
-/* =========================================================
-   PENGAJUAN
-========================================================= */
+
 
 .submission-card {
   padding: 15px 17px;
@@ -2738,9 +2704,7 @@ button.action-face-status:hover {
 }
 
 
-/* =========================================================
-   VERIFIKASI & KOREKSI
-========================================================= */
+
 
 .verification-page {
   display: flex;
@@ -2914,9 +2878,7 @@ button.action-face-status:hover {
 }
 
 
-/* =========================================
-   PERSETUJUAN
-========================================= */
+
 
 .approval-page {
   display: flex;
@@ -3200,9 +3162,7 @@ button.action-face-status:hover {
   font-size: 10px;
 }
 
-/* =========================================
-   SUMMARY
-========================================= */
+
 
 .approval-summary {
   display: grid;
@@ -3255,9 +3215,7 @@ button.action-face-status:hover {
   font-weight: 600;
 }
 
-/* =========================================
-   APPROVAL PANEL
-========================================= */
+
 
 .approval-panel {
   background: #ffffff;
@@ -3306,9 +3264,7 @@ button.action-face-status:hover {
   font-weight: 600;
 }
 
-/* =========================================
-   FILTER
-========================================= */
+
 
 .approval-toolbar {
   padding: 12px 15px;
@@ -3348,9 +3304,7 @@ button.action-face-status:hover {
   border-color: #315b86;
 }
 
-/* =========================================
-   TABLE
-========================================= */
+
 
 .approval-table-wrapper {
   width: 100%;
@@ -3400,9 +3354,7 @@ button.action-face-status:hover {
   border-bottom: none;
 }
 
-/* =========================================
-   EMPLOYEE
-========================================= */
+
 
 .approval-employee {
   display: flex;
@@ -3456,9 +3408,7 @@ button.action-face-status:hover {
   white-space: nowrap;
 }
 
-/* =========================================
-   SUBMISSION TYPE
-========================================= */
+
 
 .approval-type {
   display: inline-flex;
@@ -3491,9 +3441,7 @@ button.action-face-status:hover {
   color: #198754;
 }
 
-/* =========================================
-   DATE
-========================================= */
+
 
 .approval-date {
   display: flex;
@@ -3512,9 +3460,7 @@ button.action-face-status:hover {
   font-size: 8px;
 }
 
-/* =========================================
-   REASON
-========================================= */
+
 
 .approval-reason {
   max-width: 180px;
@@ -3525,9 +3471,7 @@ button.action-face-status:hover {
   line-height: 1.4;
 }
 
-/* =========================================
-   STATUS
-========================================= */
+
 
 .approval-status {
   display: inline-flex;
@@ -3562,9 +3506,7 @@ button.action-face-status:hover {
   color: #c2413d;
 }
 
-/* =========================================
-   ACTION
-========================================= */
+
 
 .approval-actions {
   display: flex;
@@ -3609,9 +3551,7 @@ button.action-face-status:hover {
   opacity: 0.85;
 }
 
-/* =========================================
-   FOOTER
-========================================= */
+
 
 .approval-table-footer {
   min-height: 52px;
@@ -3661,9 +3601,7 @@ button.action-face-status:hover {
   color: #ffffff;
 }
 
-/* =========================================
-   DETAIL MODAL
-========================================= */
+
 
 .approval-modal-overlay {
   position: fixed;
@@ -3741,9 +3679,7 @@ button.action-face-status:hover {
   background: #f5f7fa;
 }
 
-/* =========================================
-   DETAIL CONTENT
-========================================= */
+
 
 .approval-detail {
   padding: 20px;
@@ -3854,9 +3790,7 @@ button.action-face-status:hover {
   line-height: 1.5;
 }
 
-/* =========================================
-   CONFIRMATION MODAL
-========================================= */
+
 
 .approval-confirm {
   padding: 22px 20px 8px;
@@ -3901,9 +3835,7 @@ button.action-face-status:hover {
   line-height: 1.5;
 }
 
-/* =========================================
-   MODAL TEXTAREA
-========================================= */
+
 
 .approval-form-field {
   padding: 15px 20px;
@@ -3951,9 +3883,7 @@ button.action-face-status:hover {
     0 0 0 3px rgba(49, 91, 134, 0.08);
 }
 
-/* =========================================
-   MODAL ACTIONS
-========================================= */
+
 
 .approval-modal-actions {
   padding: 15px 20px;
@@ -3999,9 +3929,7 @@ button.action-face-status:hover {
   opacity: 0.88;
 }
 
-/* =========================================
-   RESPONSIVE
-========================================= */
+
 
 @media (max-width: 1000px) {
   .approval-summary {
@@ -4064,9 +3992,7 @@ button.action-face-status:hover {
     width: 100%;
   }
 }
-/* =========================================================
-   LOGIN
-========================================================= */
+
 
 .login-page {
   min-height: 100vh;
@@ -4099,7 +4025,7 @@ button.action-face-status:hover {
 }
 
 
-/* LOGIN BRAND */
+
 
 .login-brand {
   position: relative;
@@ -4160,7 +4086,7 @@ button.action-face-status:hover {
 }
 
 
-/* LOGIN FORM */
+
 
 .login-form-section {
   padding: 40px 32px;
@@ -4310,7 +4236,7 @@ button.action-face-status:hover {
 }
 
 
-/* PASSWORD */
+
 
 .password-label {
   display: flex;
@@ -4342,7 +4268,7 @@ button.action-face-status:hover {
 }
 
 
-/* LOGIN OPTIONS */
+
 
 .login-options {
   margin: 3px 0 20px;
@@ -4368,7 +4294,7 @@ button.action-face-status:hover {
 }
 
 
-/* LOGIN BUTTON */
+
 
 .login-button {
   width: 100%;
@@ -4405,12 +4331,10 @@ button.action-face-status:hover {
 }
 
 
-/* =========================================================
-   RESPONSIVE
-========================================================= */
 
 
-/* TABLET */
+
+
 
 @media (max-width: 1000px) {
   .dashboard-kpis,
@@ -4435,7 +4359,7 @@ button.action-face-status:hover {
 }
 
 
-/* SIDEBAR TABLET */
+
 
 @media (max-width: 900px) {
   .sidebar {
@@ -4469,7 +4393,7 @@ button.action-face-status:hover {
 }
 
 
-/* MOBILE SIDEBAR */
+
 
 @media (max-width: 700px) {
   .sidebar {
@@ -4619,7 +4543,7 @@ button.action-face-status:hover {
 }
 
 
-/* SMALL MOBILE */
+
 
 @media (max-width: 600px) {
   .approval-summary,
@@ -4691,7 +4615,7 @@ button.action-face-status:hover {
 }
 
 
-/* VERY SMALL */
+
 
 @media (max-width: 500px) {
   .dashboard-kpis,
@@ -4771,7 +4695,7 @@ button.action-face-status:hover {
   box-shadow: 0 12px 32px rgba(13, 29, 54, 0.16);
 }
 
-/* UNIT KERJA */
+
 
 .unit-page {
   padding-bottom: 32px;
@@ -5476,7 +5400,7 @@ button.action-face-status:hover {
   color: #94a3b8;
 }
 
-/* Report export polish */
+
 .report-page {
   gap: 18px;
 }
@@ -6900,9 +6824,7 @@ button.action-face-status:hover {
   text-align: center;
 }
 
-/* =========================================================
-   ROLE & PERMISSION MANAGEMENT
-========================================================= */
+
 
 .role-page {
   display: flex;
@@ -7218,9 +7140,7 @@ button.action-face-status:hover {
   border-radius: 8px;
 }
 
-/* ===============================
-   LAYOUT
-================================ */
+
 
 .location-layout {
   display: grid;
@@ -7230,9 +7150,7 @@ button.action-face-status:hover {
 }
 
 
-/* ===============================
-   MAP
-================================ */
+
 
 .location-map-panel {
   padding: 0;
@@ -7258,9 +7176,7 @@ button.action-face-status:hover {
 }
 
 
-/* ===============================
-   LIST
-================================ */
+
 
 .location-list-section {
   display: flex;
@@ -7278,10 +7194,41 @@ button.action-face-status:hover {
   margin: 0;
 }
 
+.location-management-panel {
+  padding: 16px;
+}
 
-/* ===============================
-   LOCATION CARD
-================================ */
+.location-toolbar {
+  align-items: stretch;
+  gap: 12px;
+}
+
+.location-search-box {
+  min-width: min(100%, 360px);
+}
+
+.location-toolbar-actions,
+.location-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.location-toolbar-actions .filter-select {
+  min-width: 180px;
+}
+
+.location-card-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.location-active-checkbox {
+  align-self: end;
+}
+
+
+
 
 .location-card {
   display: flex;
@@ -7348,9 +7295,7 @@ button.action-face-status:hover {
 }
 
 
-/* ===============================
-   RADIUS
-================================ */
+
 
 .location-radius {
   display: flex;
@@ -7389,9 +7334,7 @@ button.action-face-status:hover {
 }
 
 
-/* ===============================
-   DELETE BUTTON
-================================ */
+
 
 .delete-location-button {
   border: 1px solid #fecaca;
@@ -7426,9 +7369,7 @@ button.action-face-status:hover {
 }
 
 
-/* ===============================
-   EMPTY MAP
-================================ */
+
 
 .map-empty-overlay {
   position: absolute;
@@ -7457,9 +7398,7 @@ button.action-face-status:hover {
 }
 
 
-/* ===============================
-   RESPONSIVE
-================================ */
+
 
 @media (max-width: 1000px) {
 
@@ -7480,11 +7419,23 @@ button.action-face-status:hover {
     flex-wrap: wrap;
   }
 
+  .location-toolbar,
+  .location-toolbar-actions {
+    flex-direction: column;
+  }
+
+  .location-toolbar-actions .filter-select,
+  .location-toolbar-actions button {
+    width: 100%;
+  }
+
   .location-radius {
     align-items: flex-start;
   }
 
-  .delete-location-button {
+  .location-card-actions,
+  .delete-location-button,
+  .location-card-actions .action-button {
     width: 100%;
   }
 
@@ -7494,9 +7445,7 @@ button.action-face-status:hover {
 
 }
 
-/* =========================================================
-   MODERN VISUAL REFRESH
-========================================================= */
+
 
 :root {
   --app-bg: #f4f7fb;
@@ -8181,9 +8130,7 @@ textarea:focus-visible {
   }
 }
 
-/* =========================================================
-   APPROVAL MODERN LIST
-========================================================= */
+
 
 .approval-page .data-panel {
   border-color: #dfe8f5;
@@ -8453,9 +8400,7 @@ textarea:focus-visible {
   }
 }
 
-/* =========================================================
-   MODERN DATA TABLES
-========================================================= */
+
 
 .employee-table-wrapper,
 .siga8-mapping-table-wrapper {
@@ -8664,9 +8609,7 @@ textarea:focus-visible {
   }
 }
 
-/* =========================================================
-   QUIET UI OVERRIDES
-========================================================= */
+
 
 body,
 .admin-layout {
@@ -8901,7 +8844,7 @@ body,
   box-shadow: none;
 }
 
-/* Page titles are already represented in the top navigation/header. */
+
 .page-heading > div:first-child,
 .dashboard-heading > div:first-child {
   display: none !important;
@@ -8922,29 +8865,50 @@ body,
 .dashboard-heading {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: stretch;
+  width: 100%;
 }
 
 .dashboard-date {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 10px;
-  min-height: 38px;
-  padding: 0 14px;
+  gap: 8px;
+  width: 100%;
+  min-height: 36px;
+  padding: 0 12px;
   border: 1px solid #dbe3ee;
-  border-radius: 8px;
+  border-radius: 6px;
   background: #ffffff;
   color: #334155;
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 500;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
-.dashboard-date::before {
-  content: "Tanggal";
-  color: #8a99ad;
-  font-size: 11px;
-  font-weight: 700;
+.dashboard-date-icon {
+  position: relative;
+  width: 12px;
+  height: 12px;
+  flex: 0 0 12px;
+  border: 1.5px solid #64748b;
+  border-radius: 3px;
+}
+
+.dashboard-date-icon::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 0;
+  right: 0;
+  height: 1.5px;
+  background: #64748b;
+}
+
+.dashboard-date-chevron {
+  margin-left: auto;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1;
 }
 
 .pegawai-heading-actions {
@@ -9138,7 +9102,7 @@ body,
   }
 }
 
-/* Global readability pass: lighter text and consistent search controls. */
+
 .admin-layout,
 .main-content,
 .data-panel,
