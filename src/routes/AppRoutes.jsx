@@ -15,6 +15,7 @@ import TambahShift from "../pages/shift/TambahShift";
 import Pengajuan from "../pages/pengajuan/Pengajuan";
 import Approval from "../pages/pengajuan/Approval";
 import DetailPengajuan from "../pages/pengajuan/DetailPengajuan";
+import DetailPersetujuan from "../pages/pengajuan/DetailPersetujuan";
 import Verifikasi from "../pages/verifikasi/Verifikasi";
 import TambahKoreksi from "../pages/verifikasi/TambahKoreksi";
 import LaporanKehadiran from "../pages/laporan/LaporanKehadiran";
@@ -49,8 +50,9 @@ function AppRoutes() {
       <Route path="/pengajuan" element={guarded("/pengajuan", <Pengajuan />)} />
       <Route path="/pengajuan/detail" element={guarded("/pengajuan/detail", <DetailPengajuan />)} />
       <Route path="/verifikasi" element={guarded("/verifikasi", <Verifikasi />)} />
-      <Route path="/verifikasi/tambah" element={guarded("/verifikasi/tambah", <TambahKoreksi />)} />
+      <Route path="/verifikasi/tambah" element={guarded("/verifikasi", <TambahKoreksi />)} />
       <Route path="/persetujuan" element={guarded("/persetujuan", <Approval />)} />
+      <Route path="/persetujuan/detail" element={guarded("/persetujuan", <DetailPersetujuan />)} />
       <Route path="/laporan" element={guarded("/laporan", <LaporanKehadiran />)} />
       <Route path="/siga8" element={guarded("/siga8", <PemetaanSIGA8 />)} />
       <Route path="/geofence" element={guarded("/geofence", <Lokasi />)} />

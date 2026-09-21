@@ -120,9 +120,11 @@ function Sidebar() {
         return;
       }
 
-      const [attendanceResult, leaveResult] = await Promise.allSettled([
-        canViewVerification ? apiRequest("/attendance?per_page=100") : Promise.resolve([]),
-        canViewApproval ? apiRequest("/leave-requests") : Promise.resolve([]),
+      const shouldFetchApprovals = canViewVerification || canViewApproval;
+      const [leaveResult, wfhResult, overtimeResult] = await Promise.allSettled([
+        shouldFetchApprovals ? apiRequest("/leave-requests") : Promise.resolve([]),
+        shouldFetchApprovals ? apiRequest("/wfh-requests") : Promise.resolve([]),
+        shouldFetchApprovals ? apiRequest("/overtime-requests") : Promise.resolve([]),
       ]);
       const getItems = (result) => {
         if (result.status !== "fulfilled") return [];
@@ -132,27 +134,22 @@ function Sidebar() {
         if (Array.isArray(payload?.items)) return payload.items;
         return [];
       };
-      const attendance = getItems(attendanceResult);
-      const leaveRequests = getItems(leaveResult);
+      const approvalRequests = [
+        ...getItems(leaveResult),
+        ...getItems(wfhResult),
+        ...getItems(overtimeResult),
+      ];
       const isPendingApproval = (item) => {
         const status = String(
           item.status || item.verification_status || item.approval_status || ""
         ).toLowerCase();
         return ["menunggu", "diajukan", "diproses", "pending"].includes(status);
       };
-      const needsAttendanceVerification = (item) => {
-        const status = String(
-          item.status || item.verification_status || item.attendance_status || ""
-        ).toLowerCase();
-
-        if (item.is_manual || item.verified_at || item.verified_by) return false;
-
-        return ["alpha", "tidak_lengkap", "tak_lengkap", "menunggu", "pending"].includes(status);
-      };
+      const pendingApprovalCount = approvalRequests.filter(isPendingApproval).length;
 
       setPendingCounts({
-        verifikasi: attendance.filter(needsAttendanceVerification).length,
-        persetujuan: leaveRequests.filter(isPendingApproval).length,
+        verifikasi: canViewVerification ? pendingApprovalCount : 0,
+        persetujuan: canViewApproval ? pendingApprovalCount : 0,
       });
     };
 
@@ -184,7 +181,7 @@ function Sidebar() {
   return (
     <aside className="sidebar">
 
-      {/* Logo */}
+
       <div className="sidebar-brand">
         <div className="sidebar-logo">
           KP
@@ -196,7 +193,7 @@ function Sidebar() {
         </div>
       </div>
 
-      {/* Navigation */}
+
       <nav className="sidebar-nav">
 
         {filteredGroups.filter((group) => group.items.length > 0).map((group) => (
@@ -238,7 +235,7 @@ function Sidebar() {
 
       </nav>
 
-      {/* User */}
+
       <div className="sidebar-user">
 
         <div className="sidebar-user-avatar">

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import AdminLayout from "../../components/layout/AdminLayout";
 import API_URL, { apiRequest } from "../../services/api";
 
@@ -123,6 +124,21 @@ const normalizeAttachments = (item) => {
   return Array.isArray(attachments) ? attachments : [];
 };
 
+const normalizeApprovalSteps = (item) => {
+  const steps = item.approval_steps || item.approvalSteps || item.approval_logs || item.logs || [];
+  if (!Array.isArray(steps)) return [];
+
+  return steps.map((step, index) => ({
+    id: step.id || `${step.sequence || index + 1}-${step.approver_role || index}`,
+    sequence: step.sequence || index + 1,
+    approverRole: step.approver_role || step.role || step.role_name || "Penyetuju",
+    approverName: step.approver?.name || step.approver_name || step.user?.name || "",
+    status: normalizeApprovalStatus(step.status || step.state),
+    note: step.note || step.catatan || "",
+    recordedAt: step.recorded_at || step.created_at || step.updated_at || "",
+  }));
+};
+
 const formatFileSize = (bytes) => {
   const size = Number(bytes || 0);
   if (!size) return "";
@@ -215,10 +231,12 @@ const normalizeApprovalData = (item, index, source = "leave") => {
     calendarStatus: calendarStatusForApproval(item, status, source),
     calendarSyncedAt: item.gcal_synced_at || "",
     attachments: normalizeAttachments(item),
+    approvalSteps: normalizeApprovalSteps(item),
   };
 };
 
 function Approval() {
+  const navigate = useNavigate();
   const [data, setData] = useState([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("Semua Status");
@@ -377,6 +395,11 @@ function Approval() {
     }
   };
 
+  const handleAddCorrection = (approval) => {
+    if (!approval) return;
+    navigate(`/verifikasi/tambah?request=${encodeURIComponent(approval.id)}`);
+  };
+
   return (
     <AdminLayout>
       <div className="approval-page">
@@ -449,7 +472,7 @@ function Approval() {
                 const submitted = formatSubmitted(item.submitted);
 
                 return (
-                  <button className="approval-row" key={item.id} onClick={() => setSelectedApproval(item)}>
+                  <button className="approval-row" key={item.id} onClick={() => navigate(`/persetujuan/detail?request=${encodeURIComponent(item.id)}`)}>
                     <div className="approval-avatar">{item.name.charAt(0)}</div>
                     <div className="approval-person">
                       <strong>{item.name}</strong>
@@ -518,6 +541,29 @@ function Approval() {
                   <span>Alasan Pengajuan</span>
                   <p>{selectedApproval.reason}</p>
                 </div>
+                <div className="approval-flow-box">
+                  <span>Alur & Log Persetujuan</span>
+                  {selectedApproval.approvalSteps.length > 0 ? (
+                    <div className="approval-step-list">
+                      {selectedApproval.approvalSteps.map((step) => (
+                        <article className="approval-step-item" key={step.id}>
+                          <b>{step.sequence}</b>
+                          <div>
+                            <strong>{step.approverRole}</strong>
+                            {step.approverName && <small>{step.approverName}</small>}
+                            {step.note && <p>{step.note}</p>}
+                          </div>
+                          <span className={`approval-status-badge ${approvalStatusClass(step.status)}`}>
+                            {step.status}
+                          </span>
+                          {step.recordedAt && <time>{step.recordedAt}</time>}
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <p>Log persetujuan belum tersedia.</p>
+                  )}
+                </div>
                 <div className="approval-attachments-box">
                   <span>Dokumen Pendukung</span>
                   {selectedApproval.attachments.length > 0 ? (
@@ -547,6 +593,9 @@ function Approval() {
               </div>
               {selectedApproval.status === "Menunggu Persetujuan" && (
                 <div className="modal-actions">
+                  <button className="secondary-button" onClick={() => handleAddCorrection(selectedApproval)} disabled={actionLoading}>
+                    Tambah Koreksi
+                  </button>
                   <button className="reject-submit" onClick={() => handleReject(selectedApproval.id)} disabled={actionLoading}>
                     {actionLoading ? "Memproses..." : "Tolak"}
                   </button>

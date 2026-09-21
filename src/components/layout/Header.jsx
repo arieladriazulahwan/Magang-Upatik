@@ -35,7 +35,7 @@ const pageTitles = {
 
   "/pengajuan": {
     title: "Pengajuan",
-    subtitle: "Pengajuan · Izin, cuti, lembur, WFH, dan dinas",
+    subtitle: "Pengajuan · Izin, cuti, lembur, WFA, dan dinas",
   },
 
   "/pengajuan/detail": {
@@ -45,12 +45,22 @@ const pageTitles = {
 
   "/verifikasi": {
     title: "Verifikasi & Koreksi",
-    subtitle: "Pengajuan · Koreksi presensi & presensi manual",
+    subtitle: "Pengajuan · Verifikasi dan koreksi persetujuan",
+  },
+
+  "/verifikasi/tambah": {
+    title: "Verifikasi & Koreksi",
+    subtitle: "Pengajuan - Tambah koreksi persetujuan",
   },
 
   "/persetujuan": {
     title: "Persetujuan",
-    subtitle: "Pengajuan · Cuti, izin, lembur, WFH & dinas",
+    subtitle: "Pengajuan · Cuti, izin, lembur, WFA & dinas",
+  },
+
+  "/persetujuan/detail": {
+    title: "Persetujuan",
+    subtitle: "Pengajuan - Detail persetujuan pegawai",
   },
 
   "/laporan": {
@@ -135,6 +145,10 @@ function Header() {
           title: "Detail Pegawai",
           subtitle: "Manajemen · Informasi lengkap dan riwayat pegawai",
         }
+      : location.pathname.startsWith("/persetujuan/")
+      ? pageTitles["/persetujuan"]
+      : location.pathname.startsWith("/verifikasi/")
+      ? pageTitles["/verifikasi"]
       : pageTitles["/dashboard"]);
 
   useEffect(() => {
@@ -142,7 +156,7 @@ function Header() {
   }, [page.title]);
 
   const handleLogout = () => {
-    // Jangan menahan logout UI jika backend sedang lambat/tidak terjangkau.
+
     void apiRequest("/auth/logout", { method: "POST" }).catch((error) => {
       console.warn("Logout backend gagal:", error);
     });
@@ -150,6 +164,8 @@ function Header() {
     localStorage.removeItem("isLoggedIn");
     localStorage.removeItem("role");
     localStorage.removeItem("user");
+    localStorage.removeItem("userUnit");
+    localStorage.removeItem("unit");
     localStorage.removeItem("token");
     navigate("/login");
   };
@@ -233,7 +249,7 @@ function Header() {
           ⌕
         </button>
 
-        {/* Notification */}
+
         <button
           className="header-button notification"
           onClick={handleNotifications}
@@ -261,7 +277,7 @@ function Header() {
           </div>
         )}
 
-        {/* User */}
+
         <div className="header-profile">
 
           <div className="header-avatar">

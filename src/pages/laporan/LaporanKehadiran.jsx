@@ -165,7 +165,7 @@ function LaporanKehadiran() {
 		const today = new Date();
 		const currentMonth = today.getMonth();
 		const currentYear = today.getFullYear();
-		
+
 		if (periodValue === "bulan-ini") {
 			return {
 				start: new Date(currentYear, currentMonth, 1),
@@ -212,7 +212,7 @@ function LaporanKehadiran() {
 				const dateField = item.start_date || item.tanggal_mulai || "";
 				const matchUnit = unit === "Semua Unit" || itemUnit === unit;
 				const matchPeriod = isDateInRange(dateField);
-				
+
 				return matchUnit && matchPeriod;
 			}).map((item, index) => {
 				const employee = item.employee || item.user || {};
@@ -265,7 +265,7 @@ function LaporanKehadiran() {
 			const dateField = item.date || item.attendance_date || "";
 			const matchUnit = unit === "Semua Unit" || itemUnit === unit;
 			const matchPeriod = isDateInRange(dateField);
-			
+
 			return matchUnit && matchPeriod;
 		}).map((item, index) => {
 			const employee = item.employee || item.user || {};
@@ -342,30 +342,6 @@ function LaporanKehadiran() {
 	}, [filteredRows, currentPage]);
 
 	const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
-
-	const reportSummary = useMemo(() => {
-		const attendanceTotals = rows.reduce(
-			(total, row) => ({
-				hadir: total.hadir + Number(row.hadir || 0),
-				terlambat: total.terlambat + Number(row.terlambat || 0),
-				alpha: total.alpha + Number(row.alpha || 0),
-				izin: total.izin + Number(row.izin || 0),
-				dinas: total.dinas + Number(row.dinas || 0),
-				cuti: total.cuti + Number(row.cuti || 0),
-			}),
-			{ hadir: 0, terlambat: 0, alpha: 0, izin: 0, dinas: 0, cuti: 0 }
-		);
-
-		return [
-			{ label: "Total Pegawai", value: employees.length, detail: "pegawai", tone: "green" },
-			{ label: "Hadir", value: attendanceTotals.hadir, detail: "hari", tone: "mint" },
-			{ label: "Terlambat", value: attendanceTotals.terlambat, detail: "hari", tone: "amber" },
-			{ label: "Izin / Sakit", value: attendanceTotals.izin, detail: "hari", tone: "blue" },
-			{ label: "Dinas", value: attendanceTotals.dinas, detail: "hari", tone: "purple" },
-			{ label: "Cuti", value: reportType === "cuti" ? rows.length : attendanceTotals.cuti, detail: "hari", tone: "pink" },
-			{ label: "Alpha", value: attendanceTotals.alpha, detail: "hari", tone: "red" },
-		];
-	}, [employees.length, reportType, rows]);
 
 	const getPeriodLabel = () => {
 		switch (period) {
@@ -521,7 +497,7 @@ function LaporanKehadiran() {
 			doc.text(`Halaman ${page} dari ${totalPages}`, pageWidth - margin, pageHeight - 8, { align: "right" });
 		}
 
-		// Save PDF with period and unit info
+
 		const periodShort = period === "bulan-pilihan" ? selectedMonth : period.replace("bulan-", "").replace("tahun-", "");
 		const unitShort = unit === "Semua Unit" ? "semua" : unit.toLowerCase().replace(/\s+/g, "-");
 		const fileName = `rekap-${reportType}-${periodShort}-${unitShort}-${new Date().toISOString().slice(0, 10)}.pdf`;
@@ -619,16 +595,6 @@ function LaporanKehadiran() {
 					<button className="primary-button report-pdf-button" type="button" onClick={downloadPdf} disabled={loading}>
 						Ekspor PDF
 					</button>
-				</section>
-
-				<section className="report-summary-grid">
-					{reportSummary.map((item) => (
-						<div className={`report-summary-card ${item.tone}`} key={item.label}>
-							<span>{item.label}</span>
-							<strong>{item.value}</strong>
-							<small>{item.detail}</small>
-						</div>
-					))}
 				</section>
 
 				<section className="data-panel report-panel">
