@@ -1,0 +1,18 @@
+# Face Recognition Microservice — SI-Presensi Untad
+# Sesuai PRD 8.2/9: ArcFace (insightface, 512-d embedding), FastAPI.
+#
+# CATATAN opencv: insightface menarik opencv-python sbg dependency, TAPI
+# untuk server headless (tanpa GUI/display) pakai opencv-python-headless
+# supaya tidak install library GUI (Qt, dll) yang tidak perlu di server.
+# Kalau pip tetap menarik opencv-python juga sbg transitive dependency,
+# itu aman (keduanya sama-sama menyediakan modul cv2), cuma boros disk.
+
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+python-multipart==0.0.32
+pydantic==2.13.5
+
+insightface==1.0.1
+onnxruntime==1.24.4
+opencv-python-headless==4.13.0.92
+numpy==2.4.4

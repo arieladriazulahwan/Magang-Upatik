@@ -1,0 +1,65 @@
+# Python bytecode / cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage/
+htmlcov/
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+lalu/
+
+# Local env files
+.env
+.env.*
+!.env.example
+!.env.sample
+
+# Runtime / logs
+logs/
+*.log
+*.pid
+tmp/
+temp/
+uploads/
+
+# Local model/cache downloads
+.insightface/
+insightface/
+onnxruntime_cache/
+
+# Credentials / secrets
+*.pem
+*.key
+*.p8
+*.p12
+*.jks
+*.keystore
+*.crt
+
+# Local documents and archives
+*.pdf
+*.doc
+*.docx
+*.xls
+*.xlsx
+*.ppt
+*.pptx
+*.csv
+*.zip
+*.rar
+*.7z
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+.zed/
