@@ -101,13 +101,16 @@ function Kalender() {
     return new Date(today.getFullYear(), today.getMonth(), 1);
   });
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
   const [lastUpdated, setLastUpdated] = useState(null);
 
   const fetchHolidays = async () => {
     try {
       setLoading(true);
       setError("");
+      setMessage("");
 
       const response = await apiRequest("/holidays");
       setHolidays(normalizeArray(response));
@@ -118,6 +121,27 @@ function Kalender() {
       setHolidays([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSyncGoogleCalendar = async () => {
+    try {
+      setSyncing(true);
+      setError("");
+      setMessage("");
+
+      await apiRequest("/holidays/sync-from-google", {
+        method: "POST",
+        body: JSON.stringify({ year: activeMonth.getFullYear() }),
+      });
+
+      await fetchHolidays();
+      setMessage("Sinkronisasi Google Calendar berhasil.");
+    } catch (err) {
+      console.error("Gagal sinkronisasi Google Calendar:", err);
+      setError(err.message || "Gagal sinkronisasi Google Calendar.");
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -235,10 +259,12 @@ function Kalender() {
             <button type="button">Hari</button>
           </div>
 
-          <button className="calendar-sync-button" type="button" onClick={fetchHolidays} disabled={loading}>
-            {loading ? "Memuat..." : "Sinkronisasi dengan Google Calendar"}
+          <button className="calendar-sync-button" type="button" onClick={handleSyncGoogleCalendar} disabled={loading || syncing}>
+            {syncing ? "Sinkronisasi..." : "Sinkronisasi dengan Google Calendar"}
           </button>
         </section>
+
+        {message && <div className="settings-success">{message}</div>}
 
         {error && (
           <div className="form-error calendar-error-row">

@@ -8883,6 +8883,7 @@ body,
   font-size: 11px;
   font-weight: 500;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  overflow: hidden;
 }
 
 .dashboard-date-icon {
@@ -8909,6 +8910,39 @@ body,
   color: #64748b;
   font-size: 13px;
   line-height: 1;
+}
+
+.dashboard-date-text {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.dashboard-date-marquee {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 18px;
+  overflow: hidden;
+  color: #b42318;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.dashboard-date-marquee span {
+  position: absolute;
+  white-space: nowrap;
+  padding-left: 100%;
+  animation: dashboard-date-marquee 18s linear infinite;
+}
+
+@keyframes dashboard-date-marquee {
+  0% {
+    transform: translateX(0);
+  }
+
+  100% {
+    transform: translateX(-100%);
+  }
 }
 
 .pegawai-heading-actions {
@@ -9192,9 +9226,13 @@ button,
 .search-box span,
 .unit-search-box span,
 .report-search-box > span {
-  color: #2563eb;
-  font-size: 10px;
-  font-weight: 600 !important;
+  display: none !important;
+}
+
+.search-box span::before,
+.unit-search-box span::before,
+.report-search-box > span::before {
+  content: none !important;
 }
 
 .search-box input,
@@ -9207,6 +9245,13 @@ button,
   color: #27364f;
   font-size: 12.5px !important;
   font-weight: 400 !important;
+}
+
+.search-box input,
+.unit-search-box input,
+.report-search-box input {
+  width: 100%;
+  padding: 0;
 }
 
 .search-box input::placeholder,

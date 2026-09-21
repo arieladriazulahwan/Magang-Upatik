@@ -43,6 +43,7 @@ function Dashboard() {
   const [unitBars, setUnitBars] = useState([]);
   const [pendingApprovals, setPendingApprovals] = useState([]);
   const [faceStats, setFaceStats] = useState({ registered: 0, total: 0 });
+  const [todayHoliday, setTodayHoliday] = useState(null);
   const [loading, setLoading] = useState(true);
   const currentDate = new Intl.DateTimeFormat("id-ID", {
     weekday: "long",
@@ -56,11 +57,12 @@ function Dashboard() {
       try {
         setLoading(true);
 
-        const [attendanceResult, employeesResult, unitsResult, leaveResult] = await Promise.allSettled([
+        const [attendanceResult, employeesResult, unitsResult, leaveResult, holidaysResult] = await Promise.allSettled([
           apiRequest("/attendance"),
           getEmployees(),
           apiRequest("/work-units"),
           apiRequest("/leave-requests"),
+          apiRequest(`/holidays?year=${new Date().getFullYear()}`),
         ]);
         const attendanceResponse =
           attendanceResult.status === "fulfilled"
@@ -72,11 +74,16 @@ function Dashboard() {
             : [];
         const unitsResponse = unitsResult.status === "fulfilled" ? unitsResult.value : [];
         const leaveResponse = leaveResult.status === "fulfilled" ? leaveResult.value : [];
+        const holidaysResponse = holidaysResult.status === "fulfilled" ? holidaysResult.value : [];
         const records = normalizeArray(attendanceResponse);
         const employees = normalizeArray(employeesResponse);
         const units = normalizeArray(unitsResponse);
         const leaveRequests = normalizeArray(leaveResponse);
+        const holidays = normalizeArray(holidaysResponse);
         const todayKey = toDateKey(new Date());
+        const holidayToday = holidays.find((holiday) =>
+          String(holiday.date || holiday.holiday_date || holiday.tanggal || "").slice(0, 10) === todayKey
+        );
         const todayRecords = records.filter((record) => getRecordDateKey(record) === todayKey);
         const presentStatuses = ["hadir", "terlambat", "pulang_cepat"];
         const presentCount = todayRecords.filter((item) =>
@@ -144,6 +151,7 @@ function Dashboard() {
         ).length;
 
         setFaceStats({ registered: registeredFaces, total: employees.length });
+        setTodayHoliday(holidayToday || null);
         setPendingApprovals(
           leaveRequests.filter((item) =>
             ["diajukan", "diproses", "menunggu", "pending"].includes(
@@ -257,6 +265,7 @@ function Dashboard() {
         setUnitBars([]);
         setPendingApprovals([]);
         setFaceStats({ registered: 0, total: 0 });
+        setTodayHoliday(null);
       } finally {
         setLoading(false);
       }
@@ -303,7 +312,14 @@ function Dashboard() {
 
           <div className="dashboard-date">
             <span className="dashboard-date-icon" aria-hidden="true" />
-            <span>{currentDate}</span>
+            <span className="dashboard-date-text">{currentDate}</span>
+            {todayHoliday && (
+              <span className="dashboard-date-marquee">
+                <span>
+                  Hari ini {todayHoliday.name || "tanggal merah"} - presensi reguler dinonaktifkan, kecuali pegawai dengan lembur disetujui.
+                </span>
+              </span>
+            )}
             <span className="dashboard-date-chevron" aria-hidden="true">&gt;</span>
           </div>
         </div>
