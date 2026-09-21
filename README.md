@@ -116,30 +116,4 @@ private function verifyFace(?string $photoPath, Employee $employee): array
 }
 ```
 
-## Keterbatasan yang JUJUR perlu Anda tahu
 
-1. **Liveness/anti-spoofing BELUM diimplementasi** — `liveness_status` SELALU
-   `"belum_diimplementasi"`. `app/liveness.py` isinya stub eksplisit, bukan
-   heuristik lemah yang berpura-pura berfungsi. Ada 2 opsi nyata yang
-   didokumentasikan di file itu kalau Anda mau lanjutkan (model anti-spoofing
-   pasif seperti Silent-Face-Anti-Spoofing, atau challenge-response aktif
-   yang butuh video/multi-frame — ini ubah kontrak API, perlu didiskusikan
-   dulu dengan siapa pun yang pegang mobile app).
-2. **Ambang similarity BELUM dikalibrasi** dengan wajah pegawai Untad
-   sungguhan — angka `0.45` di contoh integrasi itu cuma perkiraan umum dari
-   riset ArcFace, BUKAN hasil kalibrasi data Anda. PRD §8.2 juga bilang
-   begitu ("dikalibrasi tergantung dataset").
-3. **CPU vs GPU**: kode ini jalan di CPU (sudah saya buktikan), tapi lebih
-   lambat (~0.1-0.5 detik/foto tergantung device). PRD menyebut target
-   presensi end-to-end <5 detik — di CPU biasa kemungkinan masih dalam
-   batas itu untuk 1 wajah, tapi belum diuji dengan beban banyak pengguna
-   bersamaan (concurrent load) sama sekali.
-4. **Service ini stateless, tidak simpan apa pun** — tidak ada database,
-   tidak tahu siapa "pegawai". Semua data pegawai/embedding tetap
-   sepenuhnya tanggung jawab Laravel.
-5. **Belum ada autentikasi antar service** — endpoint ini polos, siapa pun
-   yang bisa akses network-nya bisa panggil. Untuk production, minimal
-   batasi lewat firewall/network internal (jangan expose port 8001 ke
-   internet), atau tambahkan API key sederhana di header kalau perlu lebih
-   ketat — saya sengaja tidak menambahkan ini sekarang supaya tidak
-   over-engineer sebelum Anda tahu kebutuhan deployment sebenarnya.
