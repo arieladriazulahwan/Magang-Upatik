@@ -1,47 +1,19 @@
+import { Feather, Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
-  View,
-  Text,
-  TextInput,
-  Pressable,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
-import Svg, { Defs, Pattern, Path, Rect } from "react-native-svg";
-import { Ionicons, Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import GridBackground from "../components/functions/login/GridBackground";
 import { mockLogin } from "../services/mockApi";
-
-const GRID_SIZE = 32;
-
-// ============================================================
-// Grid pattern
-// ============================================================
-function GridBackground() {
-  return (
-    <Svg style={{ position: "absolute", width: "100%", height: "100%" }}>
-      <Defs>
-        <Pattern
-          id="grid"
-          width={GRID_SIZE}
-          height={GRID_SIZE}
-          patternUnits="userSpaceOnUse"
-        >
-          <Path
-            d={`M ${GRID_SIZE} 0 L 0 0 0 ${GRID_SIZE}`}
-            fill="none"
-            stroke="rgba(255,255,255,0.06)"
-            strokeWidth={1}
-          />
-        </Pattern>
-      </Defs>
-      <Rect width="100%" height="100%" fill="url(#grid)" />
-    </Svg>
-  );
-}
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
@@ -69,7 +41,7 @@ export default function LoginScreen() {
 
       // auth di-skip sementara: nggak nyimpen token/context apapun,
       // langsung lempar ke halaman utama begitu "login" (mock) berhasil
-      router.replace("/main");
+      router.replace("/beranda");
     } catch (error: any) {
       setErrorMessage(error.message || "Terjadi kesalahan, coba lagi");
     } finally {
@@ -233,7 +205,11 @@ export default function LoginScreen() {
 
           {/* ===== TOMBOL SSO ===== */}
           <Pressable className="border border-white/10 bg-white/5 rounded-xl py-4 flex-row items-center justify-center gap-2 active:bg-white/10">
-            <Ionicons name="shield-checkmark-outline" size={18} color="#e2e8f0" />
+            <Ionicons
+              name="shield-checkmark-outline"
+              size={18}
+              color="#e2e8f0"
+            />
             <Text className="text-slate-100 font-medium text-sm">
               Masuk dengan SSO SIGA8
             </Text>

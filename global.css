@@ -1,5 +1,19 @@
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/preflight.css" layer(base);
 @import "tailwindcss/utilities.css";
- 
+
 @import "nativewind/theme";
+
+@theme {
+  --color-background: #eaecf0;
+  --color-borderPersetujutan: #e1e8f5;
+  --color-cardBackgroundPersetujuan: #f4f7fc;
+  --color-iconContainerBlue: #d4e2ff;
+  --color-iconContainerGreen: #c3e6df;
+  --color-iconContainerPurple: #f0ecfd;
+  --color-iconContainerYellow: #fdf2dd;
+  --color-iconContainerCyan: #bde3ec;
+  --color-iconContainerRed: #fde8e8;
+  --color-containerPengajuan: #0d2747;
+  --radius-card: 16px;
+}

@@ -1,27 +1,33 @@
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
 import React from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import InfoRow from "../functions/profile/InfoRow";
+import SettingRow from "../functions/profile/SettingRow";
 
 export default function ProfileScreen() {
+  function handleLogout() {
+    router.replace("/login");
+  }
+
   return (
-    <View className="flex-1 bg-gray-100">
+    <SafeAreaView>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 110 }}
+        contentContainerStyle={{ paddingBottom: 100 }}
       >
-        {/* ===== HEADER GRADIENT ===== */}
         <LinearGradient
           colors={["#0f1f4d", "#1c3a8a", "#0f1f4d"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={{
-            paddingTop: 50,
+            paddingTop: 20,
             paddingHorizontal: 20,
-            paddingBottom: 30,
+            paddingBottom: 20,
           }}
         >
-          {/* Avatar + Nama */}
           <View className="flex-row items-center gap-3 mb-4">
             <View className="w-14 h-14 bg-blue-500 rounded-2xl items-center justify-center">
               <Text className="text-white font-bold text-lg">SH</Text>
@@ -36,7 +42,6 @@ export default function ProfileScreen() {
             </View>
           </View>
 
-          {/* Badge row */}
           <View className="flex-row flex-wrap gap-2">
             <View className="px-3 py-1.5 rounded-full bg-white/10">
               <Text className="text-xs font-medium text-slate-200">
@@ -57,7 +62,6 @@ export default function ProfileScreen() {
         </LinearGradient>
 
         <View className="px-5 mt-3">
-          {/* ===== CARD: INFO DATA ===== */}
           <View className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 mb-4">
             <InfoRow label="NIP" value="1982 0315 2008 01 1002" />
             <InfoRow label="Unit kerja" value="FATEK · Teknik Sipil" />
@@ -69,7 +73,6 @@ export default function ProfileScreen() {
             <InfoRow label="Email" value="sutomo.hadi@untad.ac.id" isLast />
           </View>
 
-          {/* ===== CARD: DATA WAJAH ===== */}
           <View className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 mb-4 flex-row items-center justify-between">
             <View className="flex-row items-center gap-3">
               <View className="w-10 h-10 bg-emerald-50 rounded-xl items-center justify-center">
@@ -91,7 +94,6 @@ export default function ProfileScreen() {
             </Pressable>
           </View>
 
-          {/* ===== CARD: LIST PENGATURAN ===== */}
           <View className="bg-white rounded-2xl shadow-sm border border-gray-100 mb-4">
             <SettingRow icon="notifications-outline" label="Notifikasi" />
             <SettingRow icon="globe-outline" label="Bahasa" value="Indonesia" />
@@ -102,13 +104,14 @@ export default function ProfileScreen() {
             />
           </View>
 
-          {/* ===== TOMBOL KELUAR ===== */}
-          <Pressable className="bg-white border border-red-200 rounded-2xl py-3.5 flex-row items-center justify-center gap-2 active:bg-red-50">
+          <Pressable
+            onPress={handleLogout}
+            className="bg-white border border-red-200 rounded-2xl py-3.5 flex-row items-center justify-center gap-2 active:bg-red-50"
+          >
             <Feather name="log-out" size={18} color="#dc2626" />
             <Text className="text-red-600 font-semibold text-base">Keluar</Text>
           </Pressable>
 
-          {/* ===== FOOTER TEXT ===== */}
           <View className="items-center mt-6">
             <Text className="text-gray-400 text-xs">
               KlikPresensi · Universitas Tadulako
@@ -119,68 +122,6 @@ export default function ProfileScreen() {
           </View>
         </View>
       </ScrollView>
-    </View>
-  );
-}
-
-// ============================================================
-// KOMPONEN KECIL — dipisah biar ProfileScreen di atas tidak
-// berantakan, tiap className tetap ditulis statis (aman NativeWind)
-// ============================================================
-
-function InfoRow({
-  label,
-  value,
-  sub,
-  isLast,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  isLast?: boolean;
-}) {
-  return (
-    <View
-      className={`flex-row justify-between items-start py-3 ${
-        isLast ? "" : "border-b border-gray-100"
-      }`}
-    >
-      <Text className="text-gray-400 text-sm">{label}</Text>
-      <View className="items-end">
-        <Text className="text-gray-900 font-semibold text-sm text-right">
-          {value}
-        </Text>
-        {sub && <Text className="text-blue-600 text-xs mt-0.5">{sub}</Text>}
-      </View>
-    </View>
-  );
-}
-
-function SettingRow({
-  icon,
-  label,
-  value,
-  isLast,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  value?: string;
-  isLast?: boolean;
-}) {
-  return (
-    <View
-      className={`flex-row items-center justify-between px-4 py-3.5 ${
-        isLast ? "" : "border-b border-gray-100"
-      }`}
-    >
-      <View className="flex-row items-center gap-3">
-        <Ionicons name={icon} size={20} color="#374151" />
-        <Text className="text-gray-900 text-sm font-medium">{label}</Text>
-      </View>
-      <View className="flex-row items-center gap-1">
-        {value && <Text className="text-gray-400 text-sm">{value}</Text>}
-        <Ionicons name="chevron-forward" size={16} color="#9ca3af" />
-      </View>
-    </View>
+    </SafeAreaView>
   );
 }
