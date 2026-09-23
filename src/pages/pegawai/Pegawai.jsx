@@ -5,9 +5,6 @@ import { apiRequest } from "../../services/api";
 import {
   deleteEmployee,
   getEmployees,
-  getStructuralPositions,
-  getWorkUnits,
-  updateEmployee,
 } from "../../services/pegawaiService";
 import { canAddEmployee, canDeleteEmployee, canEditEmployee } from "../../utils/access";
 import { hasFaceEnrollment } from "../../utils/faceData";
@@ -23,15 +20,10 @@ function Pegawai() {
   const [type, setType] = useState("semua");
   const [loading, setLoading] = useState(true);
   const [updatingAttendanceId, setUpdatingAttendanceId] = useState(null);
-  const [units, setUnits] = useState([]);
-  const [positions, setPositions] = useState([]);
-  const [editingEmployee, setEditingEmployee] = useState(null);
-  const [savingEdit, setSavingEdit] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
 
-  // =========================
-  // AMBIL DATA PEGAWAI
-  // =========================
+
+
 
   const fetchEmployees = async () => {
     try {
@@ -48,19 +40,9 @@ function Pegawai() {
     }
   };
 
-  // Jalankan ketika halaman dibuka
-  useEffect(() => {
-    fetchEmployees();
-  }, []);
 
   useEffect(() => {
-    Promise.all([
-      getWorkUnits().catch(() => []),
-      getStructuralPositions().catch(() => []),
-    ]).then(([unitData, positionData]) => {
-      setUnits(unitData);
-      setPositions(positionData);
-    });
+    fetchEmployees();
   }, []);
 
   const handleToggleAttendance = async (employee) => {
@@ -91,67 +73,6 @@ function Pegawai() {
     }
   };
 
-  const openEdit = (employee) => {
-    setEditingEmployee({
-      ...employee,
-      work_unit_id: employee.work_unit?.id || "",
-      structural_position_id: employee.structural_position?.id || "",
-      username: employee.linked_user?.username || "",
-      password: "",
-    });
-  };
-
-  const handleEditChange = (key, value) => {
-    setEditingEmployee((current) => ({
-      ...current,
-      [key]: value,
-      ...(key === "employee_type" && value !== "dosen"
-        ? { structural_position_id: "" }
-        : {}),
-    }));
-  };
-
-  const handleSaveEdit = async (event) => {
-    event.preventDefault();
-
-    if (!editingEmployee) return;
-
-    const payload = {
-      name: editingEmployee.name,
-      nip: editingEmployee.nip || null,
-      nik: editingEmployee.nik || null,
-      email: editingEmployee.email || null,
-      phone: editingEmployee.phone || null,
-      gender: editingEmployee.gender || "L",
-      employment_status: editingEmployee.employment_status,
-      employee_type: editingEmployee.employee_type,
-      work_unit_id: Number(editingEmployee.work_unit_id),
-      structural_position_id: editingEmployee.structural_position_id
-        ? Number(editingEmployee.structural_position_id)
-        : null,
-      tmt: editingEmployee.tmt,
-      grade: editingEmployee.grade || null,
-      rank: editingEmployee.rank || null,
-      is_active: editingEmployee.is_active !== false,
-      username: editingEmployee.username || null,
-      ...(editingEmployee.password ? { password: editingEmployee.password } : {}),
-    };
-
-    try {
-      setSavingEdit(true);
-      const response = await updateEmployee(editingEmployee.id, payload);
-      const updated = response?.data || response;
-      setEmployees((current) =>
-        current.map((employee) => (employee.id === updated.id ? updated : employee))
-      );
-      setEditingEmployee(null);
-    } catch (error) {
-      alert(error.message || "Gagal menyimpan perubahan pegawai.");
-    } finally {
-      setSavingEdit(false);
-    }
-  };
-
   const handleDelete = async (employee) => {
     if (!confirm(`Hapus pegawai "${employee.name}"?`)) return;
 
@@ -167,9 +88,8 @@ function Pegawai() {
   };
 
 
-  // =========================
-  // FILTER DATA
-  // =========================
+
+
 
   const filteredEmployees = employees.filter((employee) => {
 
@@ -210,9 +130,8 @@ function Pegawai() {
   });
 
 
-  // =========================
-  // HITUNG SUMMARY
-  // =========================
+
+
 
   const totalEmployees = employees.length;
 
@@ -232,18 +151,15 @@ function Pegawai() {
   ).length;
 
 
-  // =========================
-  // RENDER
-  // =========================
+
+
 
   return (
     <AdminLayout>
 
       <div className="pegawai-page">
 
-        {/* =========================
-            PAGE HEADER
-        ========================= */}
+
 
         <div className="page-heading">
 
@@ -262,9 +178,7 @@ function Pegawai() {
         </div>
 
 
-        {/* =========================
-            SUMMARY
-        ========================= */}
+
 
         <div className="employee-summary">
 
@@ -322,20 +236,18 @@ function Pegawai() {
         </div>
 
 
-        {/* =========================
-            TABLE PANEL
-        ========================= */}
+
 
         <section className="data-panel">
 
-          {/* TOOLBAR */}
+
 
           <div className="data-toolbar">
 
             <div className="search-box">
 
               <span>
-                ⌕
+                Cari
               </span>
 
               <input
@@ -411,9 +323,7 @@ function Pegawai() {
           </div>
 
 
-          {/* =========================
-              TABLE
-          ========================= */}
+
 
           <div className="employee-table-wrapper">
 
@@ -539,7 +449,7 @@ function Pegawai() {
                         }
                       >
 
-                        {/* PEGAWAI */}
+
 
                         <td>
 
@@ -570,14 +480,14 @@ function Pegawai() {
                         </td>
 
 
-                        {/* NIP */}
+
 
                         <td>
                           {nip}
                         </td>
 
 
-                        {/* UNIT */}
+
 
                         <td>
                           {unit}
@@ -591,14 +501,14 @@ function Pegawai() {
                         </td>
 
 
-                        {/* JABATAN */}
+
 
                         <td>
                           {position}
                         </td>
 
 
-                        {/* STATUS */}
+
 
                         <td>
 
@@ -615,7 +525,7 @@ function Pegawai() {
                         </td>
 
 
-                        {/* WAJAH */}
+
 
                         <td>
 
@@ -659,7 +569,7 @@ function Pegawai() {
                         </td>
 
 
-                        {/* AKSI */}
+
 
                         <td>
 
@@ -674,7 +584,7 @@ function Pegawai() {
                             {canEdit && (
                               <button
                                 className="action-button"
-                                onClick={() => openEdit(employee)}
+                                onClick={() => navigate(`/pegawai/${employee.id}/edit`)}
                               >
                                 Edit
                               </button>
@@ -720,9 +630,7 @@ function Pegawai() {
           </div>
 
 
-          {/* =========================
-              FOOTER
-          ========================= */}
+
 
           <div className="table-footer">
 
@@ -739,229 +647,6 @@ function Pegawai() {
           </div>
 
         </section>
-
-        {editingEmployee && (
-          <div className="modal-overlay">
-            <div className="employee-modal employee-edit-modal">
-              <div className="modal-header">
-                <div>
-                  <h3>Edit Pegawai</h3>
-                  <p>Perbarui data pegawai dan akun login yang tertaut.</p>
-                </div>
-                <button
-                  className="modal-close"
-                  type="button"
-                  onClick={() => setEditingEmployee(null)}
-                >
-                  &times;
-                </button>
-              </div>
-
-              <form onSubmit={handleSaveEdit}>
-                <div className="form-grid">
-                  <div className="form-field full-width">
-                    <label htmlFor="edit-name">Nama Lengkap</label>
-                    <input
-                      id="edit-name"
-                      value={editingEmployee.name || ""}
-                      onChange={(event) => handleEditChange("name", event.target.value)}
-                      required
-                    />
-                  </div>
-
-                  <div className="form-field">
-                    <label htmlFor="edit-nip">NIP</label>
-                    <input
-                      id="edit-nip"
-                      value={editingEmployee.nip || ""}
-                      onChange={(event) => handleEditChange("nip", event.target.value)}
-                    />
-                  </div>
-
-                  <div className="form-field">
-                    <label htmlFor="edit-nik">NIK</label>
-                    <input
-                      id="edit-nik"
-                      value={editingEmployee.nik || ""}
-                      onChange={(event) => handleEditChange("nik", event.target.value)}
-                    />
-                  </div>
-
-                  <div className="form-field">
-                    <label htmlFor="edit-email">Email</label>
-                    <input
-                      id="edit-email"
-                      type="email"
-                      value={editingEmployee.email || ""}
-                      onChange={(event) => handleEditChange("email", event.target.value)}
-                    />
-                  </div>
-
-                  <div className="form-field">
-                    <label htmlFor="edit-phone">No. HP</label>
-                    <input
-                      id="edit-phone"
-                      value={editingEmployee.phone || ""}
-                      onChange={(event) => handleEditChange("phone", event.target.value)}
-                    />
-                  </div>
-
-                  <div className="form-field">
-                    <label htmlFor="edit-employment-status">Status Kepegawaian</label>
-                    <select
-                      id="edit-employment-status"
-                      value={editingEmployee.employment_status || "pns"}
-                      onChange={(event) => handleEditChange("employment_status", event.target.value)}
-                    >
-                      <option value="pns">PNS</option>
-                      <option value="pppk">PPPK</option>
-                      <option value="non_asn">Non-ASN</option>
-                    </select>
-                  </div>
-
-                  <div className="form-field">
-                    <label htmlFor="edit-employee-type">Jenis Pegawai</label>
-                    <select
-                      id="edit-employee-type"
-                      value={editingEmployee.employee_type || "dosen"}
-                      onChange={(event) => handleEditChange("employee_type", event.target.value)}
-                    >
-                      <option value="dosen">Dosen</option>
-                      <option value="tenaga_kependidikan">Tenaga Kependidikan</option>
-                    </select>
-                  </div>
-
-                  <div className="form-field">
-                    <label htmlFor="edit-gender">Jenis Kelamin</label>
-                    <select
-                      id="edit-gender"
-                      value={editingEmployee.gender || "L"}
-                      onChange={(event) => handleEditChange("gender", event.target.value)}
-                    >
-                      <option value="L">Laki-laki</option>
-                      <option value="P">Perempuan</option>
-                    </select>
-                  </div>
-
-                  <div className="form-field">
-                    <label htmlFor="edit-tmt">TMT</label>
-                    <input
-                      id="edit-tmt"
-                      type="date"
-                      value={editingEmployee.tmt || ""}
-                      onChange={(event) => handleEditChange("tmt", event.target.value)}
-                      required
-                    />
-                  </div>
-
-                  <div className="form-field full-width">
-                    <label htmlFor="edit-work-unit">Unit Kerja</label>
-                    <select
-                      id="edit-work-unit"
-                      value={editingEmployee.work_unit_id || ""}
-                      onChange={(event) => handleEditChange("work_unit_id", event.target.value)}
-                      required
-                    >
-                      <option value="">Pilih unit kerja</option>
-                      {units.map((unit) => (
-                        <option key={unit.id} value={unit.id}>
-                          {unit.code ? `${unit.code} - ` : ""}{unit.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="form-field full-width">
-                    <label htmlFor="edit-position">Jabatan Struktural</label>
-                    <select
-                      id="edit-position"
-                      value={editingEmployee.structural_position_id || ""}
-                      onChange={(event) => handleEditChange("structural_position_id", event.target.value)}
-                      disabled={editingEmployee.employee_type !== "dosen"}
-                    >
-                      <option value="">Tidak ada jabatan struktural</option>
-                      {positions.filter((position) => position.is_active !== false).map((position) => (
-                        <option key={position.id} value={position.id}>
-                          {position.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="form-field">
-                    <label htmlFor="edit-grade">Golongan</label>
-                    <input
-                      id="edit-grade"
-                      value={editingEmployee.grade || ""}
-                      onChange={(event) => handleEditChange("grade", event.target.value)}
-                    />
-                  </div>
-
-                  <div className="form-field">
-                    <label htmlFor="edit-rank">Pangkat</label>
-                    <input
-                      id="edit-rank"
-                      value={editingEmployee.rank || ""}
-                      onChange={(event) => handleEditChange("rank", event.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div className="form-section-title compact">
-                  <div>
-                    <strong>Akun Login Pegawai</strong>
-                    <span>Isi password hanya jika ingin mengganti password.</span>
-                  </div>
-                </div>
-
-                <div className="form-grid">
-                  <div className="form-field">
-                    <label htmlFor="edit-username">Username</label>
-                    <input
-                      id="edit-username"
-                      value={editingEmployee.username || ""}
-                      onChange={(event) => handleEditChange("username", event.target.value)}
-                    />
-                  </div>
-
-                  <div className="form-field">
-                    <label htmlFor="edit-password">Password Baru</label>
-                    <input
-                      id="edit-password"
-                      type="password"
-                      value={editingEmployee.password || ""}
-                      onChange={(event) => handleEditChange("password", event.target.value)}
-                      placeholder="Kosongkan jika tidak diganti"
-                    />
-                  </div>
-                </div>
-
-                <label className="form-checkbox edit-active-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={editingEmployee.is_active !== false}
-                    onChange={(event) => handleEditChange("is_active", event.target.checked)}
-                  />
-                  Pegawai aktif
-                </label>
-
-                <div className="modal-actions">
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    onClick={() => setEditingEmployee(null)}
-                    disabled={savingEdit}
-                  >
-                    Batal
-                  </button>
-                  <button className="primary-button" type="submit" disabled={savingEdit}>
-                    {savingEdit ? "Menyimpan..." : "Simpan Perubahan"}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
 
       </div>
 

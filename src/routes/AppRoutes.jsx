@@ -5,6 +5,7 @@ import Dashboard from "../pages/dashboard/Dashboard";
 import Pegawai from "../pages/pegawai/Pegawai";
 import TambahPegawai from "../pages/pegawai/TambahPegawai";
 import DetailPegawai from "../pages/pegawai/DetailPegawai";
+import EditPegawai from "../pages/pegawai/EditPegawai";
 import Monitoring from "../pages/monitoring/Monitoring";
 import UnitKerja from "../pages/unit/UnitKerja";
 import TambahUnitKerja from "../pages/unit/TambahUnitKerja";
@@ -15,7 +16,6 @@ import TambahShift from "../pages/shift/TambahShift";
 import Pengajuan from "../pages/pengajuan/Pengajuan";
 import Approval from "../pages/pengajuan/Approval";
 import DetailPengajuan from "../pages/pengajuan/DetailPengajuan";
-import DetailPersetujuan from "../pages/pengajuan/DetailPersetujuan";
 import Verifikasi from "../pages/verifikasi/Verifikasi";
 import TambahKoreksi from "../pages/verifikasi/TambahKoreksi";
 import LaporanKehadiran from "../pages/laporan/LaporanKehadiran";
@@ -40,6 +40,7 @@ function AppRoutes() {
       <Route path="/monitoring" element={guarded("/monitoring", <Monitoring />)} />
       <Route path="/pegawai" element={guarded("/pegawai", <Pegawai />)} />
       <Route path="/pegawai/tambah" element={guarded("/pegawai/tambah", <TambahPegawai />)} />
+      <Route path="/pegawai/:id/edit" element={guarded("/pegawai/:id", <EditPegawai />)} />
       <Route path="/pegawai/:id" element={guarded("/pegawai/:id", <DetailPegawai />)} />
       <Route path="/unit" element={guarded("/unit", <UnitKerja />)} />
       <Route path="/unit/tambah" element={guarded("/unit/tambah", <TambahUnitKerja />)} />
@@ -50,9 +51,8 @@ function AppRoutes() {
       <Route path="/pengajuan" element={guarded("/pengajuan", <Pengajuan />)} />
       <Route path="/pengajuan/detail" element={guarded("/pengajuan/detail", <DetailPengajuan />)} />
       <Route path="/verifikasi" element={guarded("/verifikasi", <Verifikasi />)} />
-      <Route path="/verifikasi/tambah" element={guarded("/verifikasi", <TambahKoreksi />)} />
+      <Route path="/verifikasi/tambah" element={guarded("/verifikasi/tambah", <TambahKoreksi />)} />
       <Route path="/persetujuan" element={guarded("/persetujuan", <Approval />)} />
-      <Route path="/persetujuan/detail" element={guarded("/persetujuan", <DetailPersetujuan />)} />
       <Route path="/laporan" element={guarded("/laporan", <LaporanKehadiran />)} />
       <Route path="/siga8" element={guarded("/siga8", <PemetaanSIGA8 />)} />
       <Route path="/geofence" element={guarded("/geofence", <Lokasi />)} />

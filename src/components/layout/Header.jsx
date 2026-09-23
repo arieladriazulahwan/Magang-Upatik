@@ -5,87 +5,71 @@ import { apiRequest } from "../../services/api";
 const pageTitles = {
   "/dashboard": {
     title: "Dashboard",
-    subtitle: "Beranda · Ringkasan kehadiran universitas",
+    subtitle: "Beranda - Ringkasan kehadiran universitas",
   },
-
   "/monitoring": {
     title: "Monitoring Kehadiran",
-    subtitle: "Pemantauan · Presensi real-time hari ini",
+    subtitle: "Pemantauan - Presensi real-time hari ini",
   },
-
   "/pegawai": {
     title: "Manajemen Pegawai",
-    subtitle: "Manajemen · Master data & enrollment wajah",
+    subtitle: "Manajemen - Master data & enrollment wajah",
   },
-
   "/unit": {
     title: "Unit Kerja",
-    subtitle: "Manajemen · Struktur organisasi & mode kerja",
+    subtitle: "Manajemen - Struktur organisasi & mode kerja",
   },
-
   "/shift": {
     title: "Shift & Jadwal",
-    subtitle: "Manajemen · Penjadwalan shift RS Pendidikan",
+    subtitle: "Manajemen - Penjadwalan shift RS Pendidikan",
   },
-
   "/jadwal": {
     title: "Jadwal Kerja",
-    subtitle: "Manajemen · Pengaturan jam kerja dan jadwal presensi",
+    subtitle: "Manajemen - Pengaturan jam kerja dan jadwal presensi",
   },
-
   "/pengajuan": {
     title: "Pengajuan",
-    subtitle: "Pengajuan · Izin, cuti, lembur, WFA, dan dinas",
+    subtitle: "Pengajuan - Izin, cuti, lembur, WFA, dan dinas",
   },
-
   "/pengajuan/detail": {
     title: "Detail Pengajuan",
-    subtitle: "Pengajuan · Rincian dan status pengajuan pegawai",
+    subtitle: "Pengajuan - Rincian dan status pengajuan pegawai",
   },
-
   "/verifikasi": {
     title: "Verifikasi & Koreksi",
-    subtitle: "Pengajuan · Verifikasi dan koreksi persetujuan",
+    subtitle: "Pengajuan - Verifikasi dan koreksi persetujuan",
   },
-
   "/verifikasi/tambah": {
     title: "Verifikasi & Koreksi",
     subtitle: "Pengajuan - Tambah koreksi persetujuan",
   },
-
   "/persetujuan": {
     title: "Persetujuan",
-    subtitle: "Pengajuan · Cuti, izin, lembur, WFA & dinas",
+    subtitle: "Pengajuan - Cuti, izin, lembur, WFA & dinas",
   },
-
   "/persetujuan/detail": {
     title: "Persetujuan",
     subtitle: "Pengajuan - Detail persetujuan pegawai",
   },
-
   "/laporan": {
     title: "Rekap & Ekspor",
-    subtitle: "Laporan · Rekapitulasi kehadiran & ekspor",
+    subtitle: "Laporan - Rekapitulasi kehadiran & ekspor",
   },
-
   "/siga8": {
     title: "Pemetaan SIGA8",
-    subtitle: "Sistem · Integrasi SSO & sinkronisasi data",
+    subtitle: "Sistem - Integrasi SSO & sinkronisasi data",
   },
-
   "/geofence": {
     title: "Lokasi & Geofence",
-    subtitle: "Sistem · Titik presensi & radius geofence",
+    subtitle: "Sistem - Titik presensi & radius geofence",
   },
-
   "/kalender": {
     title: "Google Calendar",
-    subtitle: "Sistem · Sinkronisasi hari libur nasional",
+    subtitle: "Sistem - Sinkronisasi hari libur nasional",
   },
-
   "/pengaturan": {
     title: "Pengaturan",
-    subtitle: "Sistem · Parameter presensi & keamanan",
+    subtitle: "Sistem - Parameter presensi & keamanan",
   },
 };
 
@@ -114,22 +98,24 @@ function Header() {
   const avatar = displayName.charAt(0).toUpperCase();
 
   const fetchNotifications = useCallback(async () => {
-      try {
-        const response = await apiRequest("/notifications");
-        const payload = response?.data || response;
-        if (Array.isArray(payload)) return payload;
-        if (Array.isArray(payload?.data)) return payload.data;
-        if (Array.isArray(payload?.items)) return payload.items;
-        return [];
-      } catch {
-        return [];
-      }
+    try {
+      const response = await apiRequest("/notifications");
+      const payload = response?.data || response;
+      if (Array.isArray(payload)) return payload;
+      if (Array.isArray(payload?.data)) return payload.data;
+      if (Array.isArray(payload?.items)) return payload.items;
+      return [];
+    } catch {
+      return [];
+    }
   }, []);
 
-  const countUnread = (items) => items.filter((notification) =>
+  const countUnread = (items) =>
+    items.filter(
+      (notification) =>
         notification.is_read === false ||
         (notification.is_read === undefined && !notification.read_at)
-      ).length;
+    ).length;
 
   useEffect(() => {
     fetchNotifications().then((items) => {
@@ -140,10 +126,15 @@ function Header() {
 
   const page =
     pageTitles[location.pathname] ||
-    (location.pathname.startsWith("/pegawai/")
+    (location.pathname.startsWith("/pegawai/") && location.pathname.endsWith("/edit")
+      ? {
+          title: "Edit Pegawai",
+          subtitle: "Manajemen - Perbarui data pegawai",
+        }
+      : location.pathname.startsWith("/pegawai/")
       ? {
           title: "Detail Pegawai",
-          subtitle: "Manajemen · Informasi lengkap dan riwayat pegawai",
+          subtitle: "Manajemen - Informasi lengkap dan riwayat pegawai",
         }
       : location.pathname.startsWith("/persetujuan/")
       ? pageTitles["/persetujuan"]
@@ -156,7 +147,6 @@ function Header() {
   }, [page.title]);
 
   const handleLogout = () => {
-
     void apiRequest("/auth/logout", { method: "POST" }).catch((error) => {
       console.warn("Logout backend gagal:", error);
     });
@@ -202,7 +192,13 @@ function Header() {
     if (unreadCount === 0) return;
     try {
       await apiRequest("/notifications/read-all", { method: "PATCH" });
-      setNotifications((current) => current.map((item) => ({ ...item, is_read: true, read_at: item.read_at || new Date().toISOString() })));
+      setNotifications((current) =>
+        current.map((item) => ({
+          ...item,
+          is_read: true,
+          read_at: item.read_at || new Date().toISOString(),
+        }))
+      );
       setNotificationCount(0);
     } catch (error) {
       console.error("Gagal menandai notifikasi sudah dibaca:", error);
@@ -211,23 +207,17 @@ function Header() {
 
   return (
     <header className="header">
-
       <div className="header-left">
-
         <div className="breadcrumb">
           Universitas Tadulako
           <span>/</span>
           SI-PRESENSI
         </div>
-
         <h1>{page.title}</h1>
-
         <p>{page.subtitle}</p>
-
       </div>
 
       <div className="header-right">
-
         {showSearch && (
           <form className="header-search-form" onSubmit={handleSearch}>
             <input
@@ -246,9 +236,8 @@ function Header() {
           title="Cari"
           aria-label="Buka pencarian"
         >
-          ⌕
+          Cari
         </button>
-
 
         <button
           className="header-button notification"
@@ -256,13 +245,16 @@ function Header() {
           title="Notifikasi"
           aria-label="Buka notifikasi"
         >
-          ♢
+          Notif
           {notificationCount > 0 && <span>{notificationCount}</span>}
         </button>
 
         {showNotifications && (
           <div className="notification-popover">
-            <div className="notification-popover-heading"><strong>Notifikasi</strong><span>{notifications.length}</span></div>
+            <div className="notification-popover-heading">
+              <strong>Notifikasi</strong>
+              <span>{notifications.length}</span>
+            </div>
             <div className="notification-list">
               {notifications.slice(0, 5).map((notification) => (
                 <article className="notification-item" key={notification.id || notification.uuid}>
@@ -277,31 +269,22 @@ function Header() {
           </div>
         )}
 
-
         <div className="header-profile">
-
-          <div className="header-avatar">
-            {avatar}
-          </div>
-
+          <div className="header-avatar">{avatar}</div>
           <div className="header-user-info">
             <strong>{displayName}</strong>
             <small>{roleLabel}</small>
           </div>
-
           <button
             type="button"
             className="profile-menu"
             onClick={handleLogout}
             title="Logout"
           >
-            ⇥
+            Keluar
           </button>
-
         </div>
-
       </div>
-
     </header>
   );
 }
