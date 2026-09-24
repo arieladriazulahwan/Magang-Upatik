@@ -18,13 +18,11 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
-  mockAbsenMasuk,
-  mockAbsenPulang,
   mockGetDashboardSummary,
-  mockGetPresensiToday,
+  mockGetPresensiToday
 } from "../../services/mockApi";
 import AttendanceRow from "../functions/beranda/AttendanceRow";
-import GridBackground from "../functions/beranda/GridBackground";
+import PresenceCard from "../functions/beranda/PresenceCard";
 
 type DashboardSummary = {
   kuotaCuti: number;
@@ -102,31 +100,6 @@ export default function BerandaScreen() {
     loadData();
   }, [loadData]);
 
-  async function handleAbsen() {
-    setAbsenLoading(true);
-    try {
-      if (!presensi?.sudahAbsenMasuk) {
-        const result = await mockAbsenMasuk();
-        setPresensi((prev) =>
-          prev
-            ? { ...prev, sudahAbsenMasuk: true, jamMasuk: result.jamMasuk }
-            : prev,
-        );
-      } else if (!presensi?.sudahAbsenPulang) {
-        const result = await mockAbsenPulang();
-        setPresensi((prev) =>
-          prev
-            ? { ...prev, sudahAbsenPulang: true, jamPulang: result.jamPulang }
-            : prev,
-        );
-      }
-    } catch (err: any) {
-      setError(err.message || "Gagal melakukan presensi");
-    } finally {
-      setAbsenLoading(false);
-    }
-  }
-
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center bg-white">
@@ -195,92 +168,21 @@ export default function BerandaScreen() {
         </View>
 
         {/* Card Presensi */}
-        <LinearGradient
-          colors={["#0f2347", "#09152a"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={{
-            borderRadius: 24,
-            padding: 20,
-            overflow: "hidden",
-            width: "100%",
-          }}
-        >
-          <GridBackground />
-
-          <View className="flex-row justify-between items-center mb-3">
-            <Text style={{ color: "#94a3b8", fontSize: 13, fontWeight: "500" }}>
-              Rabu, 12 Agustus 2026
-            </Text>
-            <View
-              style={{
-                backgroundColor: "rgba(255, 255, 255, 0.12)",
-                paddingHorizontal: 12,
-                paddingVertical: 4,
-                borderRadius: 10,
-              }}
-            >
-              <Text
-                style={{ color: "#cbd5e1", fontSize: 12, fontWeight: "600" }}
-              >
-                WFO - Reguler
-              </Text>
-            </View>
-          </View>
-
-          <Text style={{ color: "#ffffff", fontSize: 20, fontWeight: "700" }}>
-            Anda belum absen masuk
-          </Text>
-          <Text
-            style={{
-              color: "#94a3b8",
-              fontSize: 13,
-              marginTop: 4,
-              marginBottom: 16,
-            }}
-          >
-            Ketuk untuk memulai presensi hari ini
-          </Text>
-
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              backgroundColor: "rgba(16, 185, 129, 0.1)",
-              borderColor: "rgba(45, 212, 191, 0.35)",
-              borderWidth: 1,
-              borderRadius: 14,
-              paddingHorizontal: 12,
-              paddingVertical: 10,
-              marginBottom: 16,
-              gap: 8,
-            }}
-          >
-            <Feather name="map-pin" size={16} color="#2dd4bf" />
-            <Text style={{ color: "#2dd4bf", fontSize: 13, fontWeight: "600" }}>
-              Dalam radius · Gd. Dekanat FATEK · 12 m
-            </Text>
-          </View>
-
-          <Pressable
-            style={{
-              backgroundColor: "#2563eb",
-              borderRadius: 16,
-              paddingVertical: 14,
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 8,
-            }}
-            className="active:opacity-80"
-            onPress={() => router.push("/absen")}
-          >
-            <Feather name="maximize" size={18} color="#ffffff" />
-            <Text style={{ color: "#ffffff", fontSize: 16, fontWeight: "700" }}>
-              Absen Masuk
-            </Text>
-          </Pressable>
-        </LinearGradient>
+        <PresenceCard
+          dateLabel="Rabu, 12 Agustus 2026"
+          workModeLabel="WFO - Reguler"
+          radiusLabel="Dalam Radius · Gd. Dekanat FATEK · 12 m"
+          presensi={
+            presensi ?? {
+              sudahAbsenMasuk: false,
+              jamMasuk: null,
+              sudahAbsenPulang: false,
+              jamPulang: null,
+            }
+          }
+          onAbsenMasuk={() => router.push("/absen")}
+          onAbsenPulang={() => router.push("/absen")}
+        />
 
         {/* Card Ringkasan */}
         <View className="flex-row gap-2 mt-4 mb-4">
